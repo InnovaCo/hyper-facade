@@ -19,8 +19,8 @@ import scala.util.Success
 class EventPublishingServiceTest extends FreeSpec with ScalaFutures with Matchers with BeforeAndAfter with BeforeAndAfterAll {
   val transportConfiguration = TransportConfigurationLoader.fromConfig(ConfigFactory.load())
   val transportManager = new TransportManager(transportConfiguration)
-  val publishingService = new EventPublishingService
-  var hyperBus = new HyperBus(transportManager, Some("group1"))
+  val hyperBus = new HyperBus(transportManager, Some("group1"))
+  val publishingService = new EventPublishingService(new HyperBus(transportManager, Some("group1")))
   
   after {
     publishingService.unsubscribe
@@ -81,8 +81,8 @@ class EventPublishingServiceTest extends FreeSpec with ScalaFutures with Matcher
         "requestMessage",
         "requestCorrelationId")
       val expectedEchoRequest = TestRequestForFacade(TestBodyForFacade("ha ha"),
-        "responseMessage",
-        "responseCorrelationId")
+        "responseMessage1",
+        "responseCorrelationId1")
       var echoRequest: TestRequestForFacade = null
       val onEchoReceived: Promise[Unit] = Promise()
       var subscriptionId: String = null
