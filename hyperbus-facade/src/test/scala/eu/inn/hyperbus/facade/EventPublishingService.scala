@@ -2,12 +2,16 @@ package eu.inn.hyperbus.facade
 
 import java.util.concurrent.atomic.AtomicInteger
 
+import akka.actor.ActorSystem
+import akka.cluster.Cluster
 import com.typesafe.config.ConfigFactory
+import eu.inn.binders.dynamic.Text
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.annotations.{body, request}
 import eu.inn.hyperbus.model.standard._
 import eu.inn.hyperbus.transport.api._
+import eu.inn.util.ConfigComponent
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -17,6 +21,23 @@ case class TestBodyForFacade(content: String) extends Body
 
 @request("/test-facade/{content}")
 case class TestRequestForFacade(body: TestBodyForFacade, messageId: String, correlationId: String) extends StaticGet(body)
+with DefinedResponse[Ok[DynamicBody]]
+
+object EventPublishingService extends App with ConfigComponent {
+  val transportConfiguration = TransportConfigurationLoader.fromConfig(ConfigFactory.load())
+  val transportManager = new TransportManager(transportConfiguration)
+  val hyperBus = new HyperBus(transportManager, Some("group1"))
+  val publishingService = new EventPublishingService(new HyperBus(transportManager, Some("group1")))
+  startSeedNode
+  publishingService.onCommand()
+
+  def startSeedNode: Unit = {
+    val serviceConfig = config.getConfig("seed-node-service")
+    val system = ActorSystem("eu-inn", serviceConfig)
+
+    Cluster(system)
+  }
+}
 
 /**
  * NOT THREAD SAFE
@@ -36,6 +57,14 @@ class EventPublishingService(hyperBus: HyperBus) {
   def publish (request: TestRequestForFacade): Future[PublishResult] = {
     unsubscribe
     hyperBus <| request
+  }
+
+  def onCommand(): String = {
+    hyperBus.onCommand(Topic("/test-facade"), Method.GET, None) { request: DynamicRequest ⇒
+      Future {
+        Ok(DynamicBody(Text("another result")))
+      }
+    }
   }
 
   /**
