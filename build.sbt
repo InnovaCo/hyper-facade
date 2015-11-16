@@ -1,14 +1,10 @@
 organization := "eu.inn"
-
 name := "hyperbus-facade"
 
-version := "1.0"
-
 scalaVersion := "2.11.7"
+version := "0.1.SNAPSHOT"
 
 scalacOptions ++= Seq(
-  "-language:postfixOps",
-  "-language:implicitConversions",
   "-feature",
   "-deprecation",
   "-unchecked",
