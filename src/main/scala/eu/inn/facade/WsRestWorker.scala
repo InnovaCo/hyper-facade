@@ -24,6 +24,8 @@ class WsRestWorker(val serverConnection: ActorRef,
   // order is really important, closeLogic should be before httpRequests, otherwise there is a memory leak
   override def receive = handshaking orElse closeLogic orElse httpRequests
 
+  def runFilterChain: Unit = {}
+
   def businessLogic: Receive = {
     case message: Frame ⇒
       val dynamicRequest: Option[DynamicRequest] =

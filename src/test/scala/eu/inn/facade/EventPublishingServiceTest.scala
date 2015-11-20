@@ -1,4 +1,4 @@
-package eu.inn.hyperbus.facade
+package eu.inn.facade
 
 import com.typesafe.config.ConfigFactory
 import eu.inn.hyperbus.HyperBus

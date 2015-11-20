@@ -1,4 +1,4 @@
-package eu.inn.hyperbus.facade
+package eu.inn.facade
 
 import java.util.concurrent.atomic.AtomicInteger
 
