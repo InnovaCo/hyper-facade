@@ -10,8 +10,14 @@ object MainApp extends App with ComponentRegistry {
   new WebsocketsRestServiceApp("localhost", 8080) {
     start {
       path("test-facade") {
-        statusMonitorRoutes.routes
+        respondWithFilter {
+          requestWithFilter {
+            statusMonitorRoutes.routes
+          }
+        }
       }
     }
   }
+  val hb = hyperBus // reference lazy val to start up
+  log.info("hyperbus is starting...: {}", hb)
 }

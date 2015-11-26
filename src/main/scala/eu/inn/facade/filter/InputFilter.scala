@@ -1,9 +1,11 @@
 package eu.inn.facade.filter
 
+import eu.inn.facade.filter.model.Headers
 import eu.inn.hyperbus.model.DynamicBody
-import eu.inn.hyperbus.serialization.{RequestHeader, ResponseHeader}
+
+import scala.concurrent.Future
 
 trait InputFilter {
 
-  def apply(requestHeaders: Seq[RequestHeader], body: DynamicBody): (Either[Seq[RequestHeader], Seq[ResponseHeader]], DynamicBody)
+  def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)]
 }
