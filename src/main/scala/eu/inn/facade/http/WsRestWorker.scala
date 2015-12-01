@@ -6,7 +6,6 @@ import akka.actor._
 import akka.util.ByteString
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{SubscriptionActor, SubscriptionsManager}
-import eu.inn.facade.filter.RequestFilterComponent
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard._

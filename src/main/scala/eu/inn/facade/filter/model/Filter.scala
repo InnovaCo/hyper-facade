@@ -1,11 +1,10 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.model
 
-import eu.inn.facade.filter.model.Headers
 import eu.inn.hyperbus.model.DynamicBody
 
 import scala.concurrent.Future
 
-trait InputFilter {
+trait Filter {
 
   def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)]
 }

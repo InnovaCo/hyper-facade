@@ -18,5 +18,3 @@ trait ComponentRegistry
     with StatusMonitorFacade
     with ConsoleIOComponent
     with FilterChainComponent
-    with RequestFilterComponent
-    with FilteringDirective

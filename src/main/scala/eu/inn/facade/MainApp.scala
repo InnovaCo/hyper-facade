@@ -1,7 +1,6 @@
 package eu.inn.facade
 
 import akka.actor.ActorSystem
-import akka.cluster.Cluster
 
 object MainApp extends App with ComponentRegistry {
 
@@ -10,11 +9,7 @@ object MainApp extends App with ComponentRegistry {
   new WebsocketsRestServiceApp("localhost", 8080) {
     start {
       path("test-facade") {
-        respondWithFilter {
-          requestWithFilter {
-            statusMonitorRoutes.routes
-          }
-        }
+        statusMonitorRoutes.routes
       }
     }
   }
