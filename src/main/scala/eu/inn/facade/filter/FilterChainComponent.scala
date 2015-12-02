@@ -30,18 +30,12 @@ trait FilterChainComponent {
         (headers, body)
       }
       val promisedResult = Promise[Try[(Headers, DynamicBody)]]()
-      try {
-        val filteredResult = filters.foldLeft(accumulator) { (previousResult, filter) ⇒
-          previousResult.flatMap { result ⇒
-            val (resultHeaders, resultBody) = result
-            filter.apply(resultHeaders, resultBody)
-          }
+      filters.foldLeft(accumulator) { (previousResult, filter) ⇒
+        previousResult.flatMap { result ⇒
+          val (resultHeaders, resultBody) = result
+          filter.apply(resultHeaders, resultBody)
         }
-        val wrappedFilteredResult = filteredResult.flatMap(result ⇒ Future(Success(result)))
-        promisedResult.completeWith(wrappedFilteredResult)
-      } catch {
-        case error: Throwable ⇒ promisedResult.completeWith(Future(Failure(error)))
-      }
+      } onComplete { filteredResult ⇒ promisedResult.completeWith(Future(filteredResult)) }
       promisedResult.future
     }
   }
