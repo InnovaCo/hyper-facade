@@ -1,17 +1,17 @@
 package eu.inn.facade.filter
 
 import eu.inn.binders.dynamic.Text
+import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.filter.model.{Filter, Headers}
 import eu.inn.hyperbus.model.DynamicBody
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
 
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
-import scala.concurrent.ExecutionContext.Implicits.global
-
-class FilterChainTest extends FreeSpec with Matchers with ScalaFutures with FilterChainComponent {
+class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   val filterChain: FilterChain = new FilterChain(Seq(new TestInputFilter), Seq(new TestOutputFilter))
 
   class TestInputFilter extends Filter {

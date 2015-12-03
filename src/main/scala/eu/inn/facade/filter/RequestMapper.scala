@@ -2,11 +2,11 @@ package eu.inn.facade.filter
 
 import eu.inn.binders.dynamic.Text
 import eu.inn.binders.json._
-import eu.inn.facade.filter.model.Headers
 import eu.inn.facade.filter.model.DynamicRequestHeaders._
+import eu.inn.facade.filter.model.Headers
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest}
 import eu.inn.hyperbus.serialization.RequestHeader
-import spray.http
+import spray.can.websocket.frame.TextFrame
 import spray.http.HttpCharsets._
 import spray.http.HttpHeaders.RawHeader
 import spray.http.MediaTypes._
@@ -15,7 +15,15 @@ import spray.http._
 object RequestMapper {
 
   def toDynamicRequest(headers: Headers, body: DynamicBody): DynamicRequest = {
-    DynamicRequest(extractDynamicRequestHeader(headers), body)
+    DynamicRequest(extractDynamicHeader(headers), body)
+  }
+
+  def toDynamicRequest(textFrame: TextFrame): DynamicRequest = {
+    DynamicRequest(textFrame.payload.iterator.asInputStream)
+  }
+
+  def toDynamicRequest(httpRequest: HttpRequest): DynamicRequest = {
+    DynamicRequest(httpRequest.entity.data.toByteString.iterator.asInputStream)
   }
 
   def toHttpResponse(headers: Headers, body: DynamicBody): HttpResponse = {
@@ -32,8 +40,35 @@ object RequestMapper {
     HttpResponse(httpStatusCode, HttpEntity(httpContentType, jsonBody), List())
   }
 
-  def toDynamicRequest(httpRequest: HttpRequest): DynamicRequest = {
-    DynamicRequest(httpRequest.entity.data.toByteString.iterator.asInputStream)
+  def extractHeaders(dynamicRequest: DynamicRequest): Headers = {
+    var headers = Map[String, String]()
+    var dynamicHeader: RequestHeader = null
+    dynamicRequest match {
+      case DynamicRequest(header, _) ⇒ dynamicHeader = header
+    }
+    headers += ((URL, dynamicHeader.url))
+    headers += ((METHOD, dynamicHeader.method))
+    dynamicHeader.contentType match {
+      case Some(contentType) ⇒ headers += ((CONTENT_TYPE, contentType))
+      case None ⇒
+    }
+    headers += ((MESSAGE_ID, dynamicHeader.messageId))
+    dynamicHeader.correlationId match {
+      case Some(correlationId) ⇒ headers += ((CORRELATION_ID, correlationId))
+      case None ⇒
+    }
+    Headers(headers)
+  }
+
+  def extractDynamicHeader(headers: Headers): RequestHeader = {
+    var contentTypeOption: Option[String] = None
+    val contentType = headers → CONTENT_TYPE
+    if (contentType != null) contentTypeOption = Some(contentType)
+
+    var correlationIdOption: Option[String] = None
+    val correlationId = headers → CORRELATION_ID
+    if (correlationId != null) correlationIdOption = Some(correlationId)
+    RequestHeader(headers → URL, headers → METHOD, contentTypeOption, headers → MESSAGE_ID, correlationIdOption)
   }
 
   private def contentType(contentType: Option[String]): ContentType = {
@@ -41,7 +76,7 @@ object RequestMapper {
       case None ⇒ `application/json`
       case Some(dynamicContentType) ⇒
         val mediaType = MediaTypes.register(MediaType.custom(dynamicContentType, null, true, false, Seq("json")))
-        http.ContentType(mediaType, Some(`UTF-8`))
+        ContentType(mediaType, Some(`UTF-8`))
     }
   }
 
@@ -52,16 +87,5 @@ object RequestMapper {
       if (!isDynamicHeader(name)) httpHeaders = httpHeaders :+ RawHeader(name, value)
     }
     httpHeaders
-  }
-
-  private def extractDynamicRequestHeader(headers: Headers): RequestHeader = {
-    var contentTypeOption: Option[String] = None
-    val contentType = headers → CONTENT_TYPE
-    if (contentType != null) contentTypeOption = Some(contentType)
-
-    var correlationIdOption: Option[String] = None
-    val correlationId = headers → CORRELATION_ID
-    if (correlationId != null) correlationIdOption = Some(correlationId)
-    RequestHeader(headers → URL, headers → METHOD, contentTypeOption, headers → MESSAGE_ID, correlationIdOption)
   }
 }

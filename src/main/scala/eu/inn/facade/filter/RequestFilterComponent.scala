@@ -1,6 +1,7 @@
 package eu.inn.facade.filter
 
 import eu.inn.facade.filter.RequestMapper._
+import eu.inn.facade.filter.chain.FilterChainComponent
 import eu.inn.hyperbus.model.{Response, DynamicBody, DynamicRequest}
 import eu.inn.hyperbus.serialization.RequestHeader
 import spray.http.{HttpResponse, HttpRequest}
