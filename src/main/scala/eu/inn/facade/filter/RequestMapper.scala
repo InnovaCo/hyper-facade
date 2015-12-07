@@ -11,6 +11,8 @@ import spray.http.HttpCharsets._
 import spray.http.HttpHeaders.RawHeader
 import spray.http.MediaTypes._
 import spray.http._
+import java.io.ByteArrayOutputStream
+import akka.util.ByteString
 
 object RequestMapper {
 
@@ -24,6 +26,19 @@ object RequestMapper {
 
   def toDynamicRequest(httpRequest: HttpRequest): DynamicRequest = {
     DynamicRequest(httpRequest.entity.data.toByteString.iterator.asInputStream)
+  }
+  
+  def toTextFrame(dynamicRequest: DynamicRequest): Option[TextFrame] = {
+    try {
+      val ba = new ByteArrayOutputStream()
+      dynamicRequest.serialize(ba)
+      Some(TextFrame(ByteString(ba.toByteArray)))
+    }
+    catch {
+      case t: Throwable ⇒
+        println(t, s"Can't serialize $dynamicRequest")
+        None
+    }
   }
 
   def toHttpResponse(headers: Headers, body: DynamicBody): HttpResponse = {

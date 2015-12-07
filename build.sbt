@@ -30,6 +30,7 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "eu.inn"              %% "hyperbus"         % "0.1.SNAPSHOT",
   "eu.inn"              %% "hyperbus-model"   % "0.1.SNAPSHOT",
+  "eu.inn"              %% "hyperbus-standard-model"   % "0.1.SNAPSHOT",
   "eu.inn"              %% "hyperbus-transport"   % "0.1.SNAPSHOT",
   "eu.inn"              %% "hyperbus-t-kafka" % "0.1.SNAPSHOT",
   "eu.inn"              %% "hyperbus-t-distributed-akka" % "0.1.SNAPSHOT",

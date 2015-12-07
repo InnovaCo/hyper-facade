@@ -12,7 +12,7 @@ import spray.routing.HttpServiceActor
 
 import scala.util.Success
 
-class WsTestServer(listener: ActorRef, onConnected: ()⇒ ()) extends Actor {
+class WsTestServer(listener: ActorRef) extends Actor {
 
   def receive = {
     case Http.Connected(remoteAddress, localAddress) =>
@@ -21,8 +21,13 @@ class WsTestServer(listener: ActorRef, onConnected: ()⇒ ()) extends Actor {
   }
 }
 
-abstract class WsTestWorker(val serverConnection: ActorRef, val filterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker with FilterChainComponent {
-  override def receive = handshaking orElse closeLogic
+abstract class WsTestWorker(val serverConnection: ActorRef, val filterChain: FilterChain, onConnected: () ⇒ _) extends HttpServiceActor with websocket.WebSocketServerWorker with FilterChainComponent {
+  import scala.concurrent.ExecutionContext.Implicits.global
+  
+  override def receive = {
+    onConnected()
+    handshaking orElse closeLogic
+  }
 
   def businessLogic: Receive = {
     case frame: TextFrame =>
@@ -35,14 +40,12 @@ abstract class WsTestWorker(val serverConnection: ActorRef, val filterChain: Fil
       filterChain.applyInputFilters(headers, dynamicBody) map {
         case Success((headers, body)) ⇒ exposeDynamicRequest(extractDynamicHeader(headers), body)
       }
+      
+    case request: DynamicRequest => toTextFrame(request) map { frame => send(frame) }
 
     case request: HttpRequest =>
       val dynamicRequest = toDynamicRequest(request)
       exposeHttpRequest(request)
-  }
-
-  def push(dynamicRequest: DynamicRequest): Unit = {
-
   }
 
   def exposeDynamicRequest(header: RequestHeader, dynamicBody: DynamicBody): Unit = ???

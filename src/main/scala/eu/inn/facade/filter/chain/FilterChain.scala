@@ -11,6 +11,10 @@ object FilterChain {
   def apply(inputFilters: Seq[Filter], outputFilters: Seq[Filter]) = {
     new FilterChain(inputFilters, outputFilters)
   }
+  
+  def apply() = {
+    new FilterChain(Seq(), Seq())
+  }
 }
 
 class FilterChain(val inputFilters: Seq[Filter], val outputFilters: Seq[Filter]) {
