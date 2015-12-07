@@ -5,7 +5,7 @@ import eu.inn.hyperbus.model.DynamicBody
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
-import scala.util.Try
+import scala.util.{Success, Try}
 
 object FilterChain {
   def apply(inputFilters: Seq[Filter], outputFilters: Seq[Filter]) = {
@@ -32,12 +32,16 @@ class FilterChain(val inputFilters: Seq[Filter], val outputFilters: Seq[Filter])
       (headers, body)
     }
     val promisedResult = Promise[Try[(Headers, DynamicBody)]]()
-    filters.foldLeft(accumulator) { (previousResult, filter) ⇒
-      previousResult.flatMap { result ⇒
-        val (resultHeaders, resultBody) = result
-        filter.apply(resultHeaders, resultBody)
-      }
-    } onComplete { filteredResult ⇒ promisedResult.completeWith(Future(filteredResult)) }
+    if (filters nonEmpty) {
+      filters.foldLeft(accumulator) { (previousResult, filter) ⇒
+        previousResult.flatMap { result ⇒
+          val (resultHeaders, resultBody) = result
+          filter.apply(resultHeaders, resultBody)
+        }
+      } onComplete { filteredResult ⇒ promisedResult.completeWith(Future(filteredResult)) }
+    } else {
+      promisedResult.completeWith(Future(Success((headers, body))))
+    }
     promisedResult.future
   }
 }

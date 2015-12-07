@@ -55,12 +55,8 @@ object RequestMapper {
     HttpResponse(httpStatusCode, HttpEntity(httpContentType, jsonBody), List())
   }
 
-  def extractHeaders(dynamicRequest: DynamicRequest): Headers = {
+  def extractHeaders(dynamicHeader: RequestHeader): Headers = {
     var headers = Map[String, String]()
-    var dynamicHeader: RequestHeader = null
-    dynamicRequest match {
-      case DynamicRequest(header, _) ⇒ dynamicHeader = header
-    }
     headers += ((URL, dynamicHeader.url))
     headers += ((METHOD, dynamicHeader.method))
     dynamicHeader.contentType match {
@@ -79,7 +75,6 @@ object RequestMapper {
     var contentTypeOption: Option[String] = None
     val contentType = headers → CONTENT_TYPE
     if (contentType != null) contentTypeOption = Some(contentType)
-
     var correlationIdOption: Option[String] = None
     val correlationId = headers → CORRELATION_ID
     if (correlationId != null) correlationIdOption = Some(correlationId)

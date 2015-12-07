@@ -1,4 +1,2 @@
 <configuration>
-  <property name="TAG" value="spray.api.4game.com" />
-  <include resource="default-inn-logback.xml"/>
 </configuration>

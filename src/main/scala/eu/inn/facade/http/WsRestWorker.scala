@@ -42,19 +42,19 @@ class WsRestWorker(val serverConnection: ActorRef,
   override def receive = watchConnection orElse handshaking orElse httpRequests
 
   def watchConnection: Receive = {
-    case handshakeRequest @ websocket.HandshakeRequest(state) => {
+    case handshakeRequest @ websocket.HandshakeRequest(state) ⇒ {
       state match {
-        case wsContext: websocket.HandshakeContext =>
+        case wsContext: websocket.HandshakeContext ⇒
           request = Some(wsContext.request)
 
           // todo: this is dangerous, network infrastructure should guarantee that http_x_forwarded_for is always overridden at server-side
           remoteAddress = wsContext.request.headers.find(_.is("http_x_forwarded_for")).map(_.value).getOrElse(clientAddress)
-        case _ =>
+        case _ ⇒
       }
       handshaking(handshakeRequest)
     }
 
-    case ev: Http.ConnectionClosed =>
+    case ev: Http.ConnectionClosed ⇒
       if (log.isDebugEnabled) {
         log.debug(s"Connection with $serverConnection/$remoteAddress is closing")
       }

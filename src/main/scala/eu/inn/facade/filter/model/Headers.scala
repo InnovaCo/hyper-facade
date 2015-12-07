@@ -9,7 +9,7 @@ class Headers(val headers: Map[String, String], val statusCode: Option[Int]) {
   }
 
   def → (name: String): String = {
-    headers(name)
+    headers.getOrElse(name, null)
   }
 
   def withResponseCode(newResponseCode: Option[Int]) = {
