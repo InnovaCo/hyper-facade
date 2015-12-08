@@ -12,7 +12,9 @@ import spray.routing.HttpServiceActor
 import scala.util.{Failure, Success}
 
 abstract class WsTestWorker(val filterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker with FilterChainComponent {
+
   import scala.concurrent.ExecutionContext.Implicits.global
+
   private var _serverConnection: ActorRef = _
 
   def serverConnection = _serverConnection
@@ -26,21 +28,31 @@ abstract class WsTestWorker(val filterChain: FilterChain) extends HttpServiceAct
 
   def businessLogic: Receive = {
     case frame: TextFrame =>
-      val dynamicRequest @ DynamicRequest(requestHeader, dynamicBody) = toDynamicRequest(frame)
-      val headers = extractHeaders(requestHeader)
-      filterChain.applyInputFilters(headers, dynamicBody) map {
-        case Success((headers, body)) ⇒ exposeDynamicRequest(toDynamicRequest(headers, body))
-        case Failure(ex) ⇒ println(ex)
+      toDynamicRequest(frame) match {
+        case DynamicRequest(requestHeader, dynamicBody) ⇒
+          val headers = extractHeaders(requestHeader)
+          filterChain.applyInputFilters(headers, dynamicBody) map {
+            case Success((headers, body)) ⇒ exposeDynamicRequest(toDynamicRequest(headers, body))
+          }
       }
 
     case request: DynamicRequest =>
-      toTextFrame(request) map { frame => send(frame) }
+      request match {
+        case DynamicRequest(requestHeader, dynamicBody) ⇒
+          val headers = extractHeaders(requestHeader)
+          filterChain.applyOutputFilters(headers, dynamicBody) map {
+            case Success((headers, body)) ⇒
+              toTextFrame(toDynamicRequest(headers, body)) map {
+                frame =>
+                  send(frame)
+              }
+          }
+      }
 
     case request: HttpRequest =>
-      val dynamicRequest = toDynamicRequest(request)
-      exposeHttpRequest(request)
   }
 
   def exposeDynamicRequest(dynamicRequest: DynamicRequest): Unit = ???
+
   def exposeHttpRequest(request: HttpRequest): Unit = ???
 }

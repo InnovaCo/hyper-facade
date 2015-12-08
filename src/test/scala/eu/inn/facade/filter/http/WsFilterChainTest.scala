@@ -7,7 +7,9 @@ import akka.io.IO
 import akka.pattern.ask
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.filter.FilterNotPassedException
+import eu.inn.facade.filter.RequestMapper._
 import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.filter.model.DynamicRequestHeaders._
 import eu.inn.facade.filter.model.{Filter, Headers}
 import eu.inn.hyperbus.model.standard.Method
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest}
@@ -30,26 +32,30 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
   class TestInputFilter extends Filter {
     override def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
-      if (requestHeaders.headers.nonEmpty) Future(requestHeaders, body)
+      if (requestHeaders.headers.nonEmpty) {
+        val filteredHeaders = requestHeaders.filterNot {
+          _._1 == CORRELATION_ID
+        }
+        Future(filteredHeaders, body)
+      }
       else Future(requestHeaders withResponseCode Some(403), DynamicBody(Text("Forbidden")))
-    }
-  }
-
-  class TestFailedFilter extends Filter {
-    override def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
-      throw new FilterNotPassedException(403, "Forbidden")
     }
   }
 
   class TestOutputFilter extends Filter {
     override def apply(responseHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
-      if (responseHeaders.headers.nonEmpty) Future(responseHeaders, body)
+      if (responseHeaders.headers.nonEmpty) {
+        val filteredHeaders = responseHeaders.filterNot {
+          _._1 == CORRELATION_ID
+        }
+        Future(filteredHeaders, body)
+      }
       else Future(Headers(Map("x-http-header" → "Accept-Language"), Some(200)), null)
     }
   }
 
   "WsFilterChain " - {
-    "applyInputFilters empty headers" in {
+    "applyInputFilters empty filterChain, non-empty headers" in {
       implicit val system = ActorSystem()
 
       val host = "localhost"
@@ -62,6 +68,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
       val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
         override def onMessage(frame: TextFrame): Unit = ()
+
         override def onUpgrade: Unit = {
           onClientUpgradePromise.complete(Success(true))
         }
@@ -72,13 +79,64 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         filteredDynamicRequestPromise.complete(Success(filteredDynamicRequest))
       }
       val server = system.actorOf(Props(wsWorker(FilterChain(), exposeDynamicRequest)), "websocket-worker")
+      try {
+        val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
+          case b: Http.Bound ⇒
+            Future.successful(b)
+        }
+        whenReady(binding, Timeout(Span(10, Seconds))) { b ⇒
+          client ! Connect()
+
+          whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
+            client ! DynamicRequest(RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId")), DynamicBody(Text("haha")))
+
+            whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
+              case DynamicRequest(header, body) ⇒
+                header shouldBe RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId"))
+                body shouldBe DynamicBody(Text("haha"))
+            }
+          }
+        }
+      } catch {
+        case ex: Throwable ⇒
+          fail(ex)
+      } finally {
+        system.shutdown()
+        system.awaitTermination()
+      }
+    }
+
+    "applyInputFilters non-empty filterChain, non-empty headers" in {
+      implicit val system = ActorSystem()
+
+      val host = "localhost"
+      val port = 54321
+      val url = "/testFilterChain"
+
+      val connect = Http.Connect(host, port)
+      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
+      val onClientUpgradePromise = Promise[Boolean]()
+
+      val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
+        override def onMessage(frame: TextFrame): Unit = ()
+
+        override def onUpgrade: Unit = {
+          onClientUpgradePromise.complete(Success(true))
+        }
+      }), "websocket-client")
+
+      val filteredDynamicRequestPromise = Promise[DynamicRequest]()
+      def exposeDynamicRequest: (DynamicRequest ⇒ Unit) = { filteredDynamicRequest ⇒
+        filteredDynamicRequestPromise.complete(Success(filteredDynamicRequest))
+      }
+      val server = system.actorOf(Props(wsWorker(FilterChain(Seq(new TestInputFilter), Seq()), exposeDynamicRequest)), "websocket-worker")
 
       val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
         case b: Http.Bound ⇒
           Future.successful(b)
       }
       whenReady(binding, Timeout(Span(10, Seconds))) { b ⇒
-        client! Connect()
+        client ! Connect()
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
           client ! DynamicRequest(RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId")), DynamicBody(Text("haha")))
@@ -86,14 +144,114 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
           try {
             whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
               case DynamicRequest(header, body) ⇒
+                header shouldBe RequestHeader("/test", Method.GET, None, "messageId", None)
+                body shouldBe DynamicBody(Text("haha"))
+            }
+          } catch {
+            case ex: Throwable ⇒ fail(ex)
+          } finally {
+            system.shutdown()
+            system.awaitTermination()
+          }
+        }
+      }
+    }
+
+    "applyOutputFilters empty filterChain, non-empty headers" in {
+      implicit val system = ActorSystem()
+
+      val host = "localhost"
+      val port = 54321
+      val url = "/testFilterChain"
+
+      val connect = Http.Connect(host, port)
+      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
+      val onClientUpgradePromise = Promise[Boolean]()
+      val onClientReceivedPromise = Promise[DynamicRequest]()
+
+      val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
+        override def onMessage(frame: TextFrame): Unit = {
+          onClientReceivedPromise.complete(Success(toDynamicRequest(frame)))
+        }
+
+        override def onUpgrade: Unit = {
+          onClientUpgradePromise.complete(Success(true))
+        }
+      }), "websocket-client")
+
+      val server = system.actorOf(Props(wsWorker(FilterChain())), "websocket-worker")
+
+      val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
+        case b: Http.Bound ⇒
+          Future.successful(b)
+      }
+      whenReady(binding, Timeout(Span(10, Seconds))) { b ⇒
+        client ! Connect()
+
+        whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
+          server ! DynamicRequest(RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId")), DynamicBody(Text("haha")))
+
+          try {
+            whenReady(onClientReceivedPromise.future, Timeout(Span(5, Seconds))) {
+              case DynamicRequest(header, body) ⇒
                 header shouldBe RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId"))
                 body shouldBe DynamicBody(Text("haha"))
             }
           } catch {
-            case ex: Throwable ⇒
-              IO(UHttp) ! Http.Unbind
-              system.shutdown()
-              fail(ex)
+            case ex: Throwable ⇒ fail(ex)
+          } finally {
+            system.shutdown()
+            system.awaitTermination()
+          }
+        }
+      }
+    }
+
+    "applyOutputFilters non-empty filterChain, non-empty headers" in {
+      implicit val system = ActorSystem()
+
+      val host = "localhost"
+      val port = 54321
+      val url = "/testFilterChain"
+
+      val connect = Http.Connect(host, port)
+      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
+      val onClientUpgradePromise = Promise[Boolean]()
+      val onClientReceivedPromise = Promise[DynamicRequest]()
+
+      val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
+        override def onMessage(frame: TextFrame): Unit = {
+          onClientReceivedPromise.complete(Success(toDynamicRequest(frame)))
+        }
+
+        override def onUpgrade: Unit = {
+          onClientUpgradePromise.complete(Success(true))
+        }
+      }), "websocket-client")
+
+      val server = system.actorOf(Props(wsWorker(FilterChain(Seq(), Seq(new TestOutputFilter)))), "websocket-worker")
+
+      val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
+        case b: Http.Bound ⇒
+          Future.successful(b)
+      }
+      whenReady(binding, Timeout(Span(10, Seconds))) { b ⇒
+        client ! Connect()
+
+        whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
+          server ! DynamicRequest(RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId")), DynamicBody(Text("haha")))
+
+          try {
+            whenReady(onClientReceivedPromise.future, Timeout(Span(5, Seconds))) {
+              case DynamicRequest(header, body) ⇒
+                header shouldBe RequestHeader("/test", Method.GET, None, "messageId", None)
+                body shouldBe DynamicBody(Text("haha"))
+            }
+          } catch {
+            case ex: Throwable ⇒ fail(ex)
+          } finally {
+            system.shutdown()
+            system.awaitTermination()
           }
         }
       }

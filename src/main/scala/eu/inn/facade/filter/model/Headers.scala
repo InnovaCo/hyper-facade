@@ -4,6 +4,10 @@ import scala.collection.immutable.HashMap
 
 class Headers(val headers: Map[String, String], val statusCode: Option[Int]) {
 
+  def filterNot(p: (((String, String)) ⇒ Boolean)): Headers = {
+    Headers(headers.filterNot(p))
+  }
+
   def +(name: String, value: String) = {
     Headers(headers + ((name, value)), statusCode)
   }

@@ -42,7 +42,7 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"   %% "akka-actor"       % "2.3.11",
   "com.typesafe.akka"   %% "akka-cluster"     % "2.3.11",
   "com.typesafe.akka"   %% "akka-testkit"     % "2.3.11"         % "test",
-  "eu.inn"              %% "util-http"        % "[0.1.+]",
+  "eu.inn"              %% "util-http"        % "[0.1.172]",
   "org.scalatest"       %% "scalatest"        % "2.2.1"          % "test"
 )
 
