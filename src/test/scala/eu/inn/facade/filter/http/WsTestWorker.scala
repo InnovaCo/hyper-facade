@@ -29,7 +29,7 @@ abstract class WsTestWorker(val filterChain: FilterChain) extends HttpServiceAct
   def businessLogic: Receive = {
     case frame: TextFrame =>
       toDynamicRequest(frame) match {
-        case DynamicRequest(requestHeader, dynamicBody) ⇒
+        case Some(DynamicRequest(requestHeader, dynamicBody)) ⇒
           val headers = extractHeaders(requestHeader)
           filterChain.applyInputFilters(headers, dynamicBody) map {
             case Success((headers, body)) ⇒ exposeDynamicRequest(toDynamicRequest(headers, body))

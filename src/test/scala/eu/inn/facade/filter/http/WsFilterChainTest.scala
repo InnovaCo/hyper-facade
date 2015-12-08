@@ -6,7 +6,6 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
 import eu.inn.binders.dynamic.Text
-import eu.inn.facade.filter.FilterNotPassedException
 import eu.inn.facade.filter.RequestMapper._
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.filter.model.DynamicRequestHeaders._
@@ -171,7 +170,10 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
       val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
         override def onMessage(frame: TextFrame): Unit = {
-          onClientReceivedPromise.complete(Success(toDynamicRequest(frame)))
+          toDynamicRequest(frame) match {
+            case Some(dynamicRequest) ⇒ onClientReceivedPromise.complete(Success(dynamicRequest))
+            case None ⇒ onClientReceivedPromise.failure(new RuntimeException("TextFrame cannot be deserialized to DynamicRequest "))
+          }
         }
 
         override def onUpgrade: Unit = {
@@ -221,7 +223,10 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
       val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
         override def onMessage(frame: TextFrame): Unit = {
-          onClientReceivedPromise.complete(Success(toDynamicRequest(frame)))
+          toDynamicRequest(frame) match {
+            case Some(dynamicRequest) ⇒ onClientReceivedPromise.complete(Success(dynamicRequest))
+            case None ⇒ onClientReceivedPromise.failure(new RuntimeException("TextFrame cannot be deserialized to DynamicRequest "))
+          }
         }
 
         override def onUpgrade: Unit = {

@@ -20,8 +20,14 @@ object RequestMapper {
     DynamicRequest(extractDynamicHeader(headers), body)
   }
 
-  def toDynamicRequest(textFrame: TextFrame): DynamicRequest = {
-    DynamicRequest(textFrame.payload.iterator.asInputStream)
+  def toDynamicRequest(textFrame: TextFrame): Option[DynamicRequest] = {
+    try {
+      Some(DynamicRequest(textFrame.payload.iterator.asInputStream))
+    } catch {
+      case t: Throwable ⇒
+        println(t, s"Can't deserialize $textFrame to DynamicRequest")
+        None
+    }
   }
 
   def toDynamicRequest(httpRequest: HttpRequest): DynamicRequest = {
@@ -36,7 +42,7 @@ object RequestMapper {
     }
     catch {
       case t: Throwable ⇒
-        println(t, s"Can't serialize $dynamicRequest")
+        println(t, s"Can't serialize $dynamicRequest to TextFrame")
         None
     }
   }
