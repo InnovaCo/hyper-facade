@@ -28,10 +28,7 @@ abstract class WsTestClient(connect: Http.Connect, val upgradeRequest: HttpReque
       onMessage(frame)
 
     case dynamicRequest: DynamicRequest ⇒
-      toTextFrame(dynamicRequest) match {
-        case Some(frame) ⇒ connection ! frame
-        case None ⇒ throw new RuntimeException(s"$dynamicRequest cannot be serialized to TextFrame")
-      }
+      connection ! toFrame(dynamicRequest)
 
     case _: Http.ConnectionClosed ⇒
       context.stop(self)

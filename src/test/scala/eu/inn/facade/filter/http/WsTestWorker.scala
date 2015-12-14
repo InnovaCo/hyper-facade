@@ -9,7 +9,7 @@ import spray.can.{Http, websocket}
 import spray.http.HttpRequest
 import spray.routing.HttpServiceActor
 
-import scala.util.{Failure, Success}
+import scala.util.Success
 
 abstract class WsTestWorker(val filterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker with FilterChainComponent {
 
@@ -29,7 +29,7 @@ abstract class WsTestWorker(val filterChain: FilterChain) extends HttpServiceAct
   def businessLogic: Receive = {
     case frame: TextFrame =>
       toDynamicRequest(frame) match {
-        case Some(DynamicRequest(requestHeader, dynamicBody)) ⇒
+        case DynamicRequest(requestHeader, dynamicBody) ⇒
           val headers = extractHeaders(requestHeader)
           filterChain.applyInputFilters(headers, dynamicBody) map {
             case Success((headers, body)) ⇒ exposeDynamicRequest(toDynamicRequest(headers, body))
@@ -42,10 +42,7 @@ abstract class WsTestWorker(val filterChain: FilterChain) extends HttpServiceAct
           val headers = extractHeaders(requestHeader)
           filterChain.applyOutputFilters(headers, dynamicBody) map {
             case Success((headers, body)) ⇒
-              toTextFrame(toDynamicRequest(headers, body)) map {
-                frame =>
-                  send(frame)
-              }
+              send(toFrame(toDynamicRequest(headers, body)))
           }
       }
 

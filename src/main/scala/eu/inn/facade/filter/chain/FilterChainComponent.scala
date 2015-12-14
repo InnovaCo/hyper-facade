@@ -4,5 +4,5 @@ import scala.language.postfixOps
 
 trait FilterChainComponent {
 
-  def filterChain(url: String): FilterChain
+  def filterChain(uri: String): FilterChain
 }

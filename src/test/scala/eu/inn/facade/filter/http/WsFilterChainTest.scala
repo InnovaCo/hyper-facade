@@ -170,10 +170,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
       val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
         override def onMessage(frame: TextFrame): Unit = {
-          toDynamicRequest(frame) match {
-            case Some(dynamicRequest) ⇒ onClientReceivedPromise.complete(Success(dynamicRequest))
-            case None ⇒ onClientReceivedPromise.failure(new RuntimeException("TextFrame cannot be deserialized to DynamicRequest "))
-          }
+          onClientReceivedPromise.complete(Success(toDynamicRequest(frame)))
         }
 
         override def onUpgrade: Unit = {
@@ -223,10 +220,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
       val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
         override def onMessage(frame: TextFrame): Unit = {
-          toDynamicRequest(frame) match {
-            case Some(dynamicRequest) ⇒ onClientReceivedPromise.complete(Success(dynamicRequest))
-            case None ⇒ onClientReceivedPromise.failure(new RuntimeException("TextFrame cannot be deserialized to DynamicRequest "))
-          }
+            onClientReceivedPromise.complete(Success(toDynamicRequest(frame)))
         }
 
         override def onUpgrade: Unit = {

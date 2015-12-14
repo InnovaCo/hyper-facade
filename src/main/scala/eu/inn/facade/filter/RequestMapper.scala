@@ -4,9 +4,9 @@ import eu.inn.binders.dynamic.Text
 import eu.inn.binders.json._
 import eu.inn.facade.filter.model.DynamicRequestHeaders._
 import eu.inn.facade.filter.model.Headers
-import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest}
+import eu.inn.hyperbus.model.{Body, Message, DynamicBody, DynamicRequest}
 import eu.inn.hyperbus.serialization.RequestHeader
-import spray.can.websocket.frame.TextFrame
+import spray.can.websocket.frame.{TextFrame, Frame}
 import spray.http.HttpCharsets._
 import spray.http.HttpHeaders.RawHeader
 import spray.http.MediaTypes._
@@ -20,31 +20,24 @@ object RequestMapper {
     DynamicRequest(extractDynamicHeader(headers), body)
   }
 
-  def toDynamicRequest(textFrame: TextFrame): Option[DynamicRequest] = {
-    try {
-      Some(DynamicRequest(textFrame.payload.iterator.asInputStream))
-    } catch {
-      case t: Throwable ⇒
-        println(t, s"Can't deserialize $textFrame to DynamicRequest")
-        None
-    }
+  def toDynamicRequest(frame: Frame): DynamicRequest = {
+    DynamicRequest(frame.payload.iterator.asInputStream)
   }
 
   def toDynamicRequest(httpRequest: HttpRequest): DynamicRequest = {
     DynamicRequest(httpRequest.entity.data.toByteString.iterator.asInputStream)
   }
+
+  def unfold(dynamicRequest: DynamicRequest): (Headers, DynamicBody) = {
+    dynamicRequest match {
+      case DynamicRequest(requestHeader, dynamicBody) ⇒ (extractHeaders(requestHeader), dynamicBody)
+    }
+  }
   
-  def toTextFrame(dynamicRequest: DynamicRequest): Option[TextFrame] = {
-    try {
-      val ba = new ByteArrayOutputStream()
-      dynamicRequest.serialize(ba)
-      Some(TextFrame(ByteString(ba.toByteArray)))
-    }
-    catch {
-      case t: Throwable ⇒
-        println(t, s"Can't serialize $dynamicRequest to TextFrame")
-        None
-    }
+  def toFrame(message: Message[Body]): Frame = {
+    val ba = new ByteArrayOutputStream()
+    message.serialize(ba)
+    TextFrame(ByteString(ba.toByteArray))
   }
 
   def toHttpResponse(headers: Headers, body: DynamicBody): HttpResponse = {

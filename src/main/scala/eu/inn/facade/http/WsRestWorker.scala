@@ -6,6 +6,9 @@ import akka.actor._
 import akka.util.ByteString
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{SubscriptionActor, SubscriptionsManager}
+import eu.inn.facade.filter.RequestMapper
+import eu.inn.facade.filter.chain.FilterChainRamlComponent
+import eu.inn.facade.raml.RamlConfigComponent
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard._
@@ -16,6 +19,10 @@ import spray.can.{Http, websocket}
 import spray.http.HttpRequest
 import spray.routing.{HttpServiceActor, Route}
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
+import scala.util.Success
+
 class WsRestWorker(val serverConnection: ActorRef,
                    workerRoutes: WsRestRoutes,
                    hyperBus: HyperBus,
@@ -23,7 +30,9 @@ class WsRestWorker(val serverConnection: ActorRef,
                    clientAddress: String) extends
   HttpServiceActor
   with websocket.WebSocketServerWorker
-  with ActorLogging {
+  with ActorLogging
+  with FilterChainRamlComponent
+  with RamlConfigComponent {
 
   var isConnectionTerminated = false
   var remoteAddress = clientAddress
@@ -71,25 +80,37 @@ class WsRestWorker(val serverConnection: ActorRef,
 
   def businessLogic: Receive = {
     case message: Frame ⇒
-      val dynamicRequest: Option[DynamicRequest] =
-        try {
-          Some(DynamicRequest(message.payload.iterator.asInputStream))
+      try {
+        val dynamicRequest = RequestMapper.toDynamicRequest(message)
+        val url = dynamicRequest.url
+        if (ramlConfig.isPingRequest(url)) pong(dynamicRequest)
+        else {
+          val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
+          filterChain(url).applyInputFilters(headers, dynamicBody) map {
+            case Success((filteredHeaders, filteredBody)) ⇒
+              val filteredDynamicRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
+              processRequest(filteredDynamicRequest)
+          }
         }
-        catch {
-          case t: Throwable ⇒
-            val msg = message.payload.utf8String
-            val msgShort = msg.substring(0, Math.min(msg.length, 240))
-            log.warning(s"Can't deserialize websocket message '$msg' from ${sender()}/$remoteAddress. $t")
-            None
-        }
-
-      dynamicRequest.foreach(processRequest)
+      }
+      catch {
+        case t: Throwable ⇒
+          val msg = message.payload.utf8String
+          val msgShort = msg.substring(0, Math.min(msg.length, 240))
+          log.warning(s"Can't deserialize websocket message '$msg' from ${sender()}/$remoteAddress. $t")
+          None
+      }
 
     case x: FrameCommandFailed =>
       log.error(s"Frame command $x failed from ${sender()}/$remoteAddress")
 
-    case message: Message[Body] ⇒
-      send(message)
+    case dynamicRequest: DynamicRequest ⇒
+        val url = dynamicRequest.url
+        val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
+        filterChain(url).applyOutputFilters(headers, dynamicBody) map {
+          case Success((filteredHeaders, filteredBody)) ⇒
+            send(RequestMapper.toDynamicRequest(filteredHeaders, filteredBody))
+        }
   }
 
   def httpRequests: Receive = {
@@ -100,12 +121,6 @@ class WsRestWorker(val serverConnection: ActorRef,
   }
 
   def processRequest(request: DynamicRequest) = request match {
-    case request @ DynamicRequest(RequestHeader("/meta/ping", "ping", _, messageId, correlationId), _) ⇒ {
-      val finalCorrelationId = correlationId.getOrElse(messageId)
-      implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
-      send(Ok(DynamicBody(Text("pong"))))
-    }
-
     case request @ DynamicRequest(RequestHeader(_,_,_,messageId,correlationId), _) ⇒
       val key = correlationId.getOrElse(messageId)
       val actorName = "Subscr-" + key
@@ -115,30 +130,26 @@ class WsRestWorker(val serverConnection: ActorRef,
       }
   }
 
-  def send(message: Message[Body]): Boolean = {
+  def pong(dynamicRequest: DynamicRequest) = request match {
+    case request @ DynamicRequest(RequestHeader(_, _, _, messageId, correlationId), _) ⇒ {
+      val finalCorrelationId = correlationId.getOrElse(messageId)
+      implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
+      send(Ok(DynamicBody(Text("pong"))))
+    }
+  }
+
+  def send(message: Message[Body]): Unit = {
     if (isConnectionTerminated) {
       log.warning(s"Can't send message $message to $serverConnection/$remoteAddress: connection was terminated")
-      false
     }
     else {
-      val frame: Option[Frame] =
         try {
-          val ba = new ByteArrayOutputStream()
-          message.serialize(ba)
-          Some(TextFrame(ByteString(ba.toByteArray)))
+          send(RequestMapper.toFrame(message))
         }
         catch {
           case t: Throwable ⇒
             log.error(t, s"Can't serialize $message to $serverConnection/$remoteAddress")
-            None
         }
-
-      frame.map { f ⇒
-        send(f)
-        true
-      } getOrElse {
-        false
-      }
     }
   }
 }
