@@ -4,12 +4,14 @@ import akka.actor._
 import akka.io.{IO, Inet, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
+import com.typesafe.config.Config
 import eu.inn.facade.HyperBusComponent
 import eu.inn.facade.events.SubscriptionsManager
 import eu.inn.util.ConfigComponent
 import eu.inn.util.akka.ActorSystemComponent
 import eu.inn.util.http.RestServiceComponent
 import eu.inn.util.metrics.StatsComponent
+import scaldi.{Injectable, Injector}
 import spray.can.Http
 import spray.can.server.{ServerSettings, UHttp}
 import spray.io.ServerSSLEngineProvider
@@ -25,12 +27,14 @@ trait WsRestServiceComponent extends RestServiceComponent {
     with HyperBusComponent
     with ConfigComponent ⇒
 
-  class WebsocketsRestServiceApp(interface: String, port: Int)
-    extends RestServiceApp(interface, port) {
+  class WebsocketsRestServiceApp(interface: String, port: Int)(implicit inj: Injector)
+    extends RestServiceApp(interface, port)
+    with Injectable {
 
     private val stats = createStats("http")
     private val connectionCountStat = stats.counter("connection-count")
     private val rejectedConnectionsMetter = stats.meter("rejected-connects")
+    val config = inject[Config]
 
     @volatile private[this] var _refFactory: Option[ActorRefFactory] = None
 

@@ -1,18 +1,19 @@
-package eu.inn.facade.filter
+package eu.inn.facade.http
 
+import java.io.ByteArrayOutputStream
+
+import akka.util.ByteString
 import eu.inn.binders.dynamic.Text
 import eu.inn.binders.json._
 import eu.inn.facade.filter.model.DynamicRequestHeaders._
 import eu.inn.facade.filter.model.Headers
-import eu.inn.hyperbus.model.{Body, Message, DynamicBody, DynamicRequest}
+import eu.inn.hyperbus.model.{Body, DynamicBody, DynamicRequest, Message}
 import eu.inn.hyperbus.serialization.RequestHeader
-import spray.can.websocket.frame.{TextFrame, Frame}
+import spray.can.websocket.frame.{Frame, TextFrame}
 import spray.http.HttpCharsets._
 import spray.http.HttpHeaders.RawHeader
 import spray.http.MediaTypes._
 import spray.http._
-import java.io.ByteArrayOutputStream
-import akka.util.ByteString
 
 object RequestMapper {
 

@@ -1,0 +1,21 @@
+#%RAML 1.0
+title: Facade API
+version: v1
+traits:
+  in.secured:
+  in.paged:
+  in.rateLimited:
+  in.private:
+  out.paged:
+/users:
+  is: [ in.secured ]
+  get:
+    is: [ in.paged, in.rateLimited, out.paged ]
+/status:
+  get:
+    is: [ in.rateLimited ]
+  /test-service
+    get:
+      is: [ in.paged ]
+/private:
+  is: [ in.private ]

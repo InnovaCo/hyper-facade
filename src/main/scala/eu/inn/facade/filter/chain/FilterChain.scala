@@ -7,6 +7,8 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
 import scala.util.{Success, Try}
 
+import scala.language.postfixOps
+
 object FilterChain {
   def apply(inputFilters: Seq[Filter], outputFilters: Seq[Filter]) = {
     new FilterChain(inputFilters, outputFilters)

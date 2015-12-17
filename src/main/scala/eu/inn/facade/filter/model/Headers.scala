@@ -36,4 +36,8 @@ object Headers {
   def apply(headers: Map[String, String]) = {
     new Headers(headers, None)
   }
+
+  def apply(statusCode: Option[Int]) = {
+    new Headers(Map(), statusCode)
+  }
 }

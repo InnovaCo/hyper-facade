@@ -1,42 +1,41 @@
 package eu.inn.facade.http
 
-import java.io.ByteArrayOutputStream
-
 import akka.actor._
-import akka.util.ByteString
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{SubscriptionActor, SubscriptionsManager}
-import eu.inn.facade.filter.RequestMapper
-import eu.inn.facade.filter.chain.FilterChainRamlComponent
-import eu.inn.facade.raml.RamlConfigComponent
+import eu.inn.facade.filter.chain.FilterChainComponent
+import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard._
 import eu.inn.hyperbus.serialization.RequestHeader
+import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
-import spray.can.websocket.frame.{Frame, TextFrame}
+import spray.can.websocket.frame.Frame
 import spray.can.{Http, websocket}
 import spray.http.HttpRequest
 import spray.routing.{HttpServiceActor, Route}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 class WsRestWorker(val serverConnection: ActorRef,
                    workerRoutes: WsRestRoutes,
                    hyperBus: HyperBus,
                    subscriptionManager: SubscriptionsManager,
-                   clientAddress: String) extends
+                   clientAddress: String)
+                  (implicit inj: Injector) extends
   HttpServiceActor
   with websocket.WebSocketServerWorker
   with ActorLogging
-  with FilterChainRamlComponent
-  with RamlConfigComponent {
+  with Injectable {
 
   var isConnectionTerminated = false
   var remoteAddress = clientAddress
   var request: Option[HttpRequest] = None
+
+  val filterChainComposer = inject[FilterChainComponent]
+  val ramlConfig = inject[RamlConfig]
 
   override def preStart(): Unit = {
     super.preStart()
@@ -86,10 +85,14 @@ class WsRestWorker(val serverConnection: ActorRef,
         if (ramlConfig.isPingRequest(url)) pong(dynamicRequest)
         else {
           val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-          filterChain(url).applyInputFilters(headers, dynamicBody) map {
+          filterChainComposer.filterChain(url).applyInputFilters(headers, dynamicBody) map {
             case Success((filteredHeaders, filteredBody)) ⇒
               val filteredDynamicRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
               processRequest(filteredDynamicRequest)
+
+            case Failure(ex) ⇒
+              val msg = message.payload.utf8String
+              log.error(ex, s"Failed to apply input filter chain for request $msg")
           }
         }
       }
@@ -107,9 +110,13 @@ class WsRestWorker(val serverConnection: ActorRef,
     case dynamicRequest: DynamicRequest ⇒
         val url = dynamicRequest.url
         val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-        filterChain(url).applyOutputFilters(headers, dynamicBody) map {
+      filterChainComposer.filterChain(url).applyOutputFilters(headers, dynamicBody) map {
           case Success((filteredHeaders, filteredBody)) ⇒
             send(RequestMapper.toDynamicRequest(filteredHeaders, filteredBody))
+
+          case Failure(ex) ⇒
+            val msg = dynamicRequest.toString
+            log.error(ex, s"Failed to apply output filter chain for response $msg")
         }
   }
 

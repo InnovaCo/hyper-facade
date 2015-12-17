@@ -2,7 +2,8 @@ package eu.inn.facade.filter.http
 
 import akka.actor.ActorSystem
 import akka.io.IO
-import eu.inn.facade.filter.RequestMapper._
+import eu.inn.facade.http.RequestMapper
+import RequestMapper._
 import eu.inn.hyperbus.model.DynamicRequest
 import spray.can.server.UHttp
 import spray.can.{Http, websocket}

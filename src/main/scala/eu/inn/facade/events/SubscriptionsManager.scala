@@ -4,6 +4,7 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 
 import akka.actor.ActorRef
+import com.typesafe.config.ConfigFactory
 import eu.inn.facade.HyperBusComponent
 import eu.inn.hyperbus.model.DynamicRequest
 import eu.inn.hyperbus.model.standard.Method
@@ -16,8 +17,7 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.Future
 
 trait SubscriptionsManager {
-  this: ConfigComponent
-    with ActorSystemComponent
+  this:  ActorSystemComponent
     with HyperBusComponent
     with Logging ⇒
 
@@ -27,7 +27,7 @@ trait SubscriptionsManager {
   private val subscriptionManager = new Manager
 
  class Manager {
-    val groupName = Some(config.getString("hyperbus.facade.group-name"))
+    val groupName = Some(ConfigFactory.load.getString("hyperbus.facade.group-name"))
     val idCounter = new AtomicLong(0)
     val groupSubscriptions = scala.collection.mutable.Map[Topic,GroupSubscription]()
     val groupSubscriptionById = TrieMap[String, Topic]()

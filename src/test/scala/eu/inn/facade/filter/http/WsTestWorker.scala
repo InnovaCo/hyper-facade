@@ -1,7 +1,8 @@
 package eu.inn.facade.filter.http
 
 import akka.actor.ActorRef
-import eu.inn.facade.filter.RequestMapper._
+import eu.inn.facade.http.RequestMapper
+import RequestMapper._
 import eu.inn.facade.filter.chain.{FilterChain, FilterChainComponent}
 import eu.inn.hyperbus.model.DynamicRequest
 import spray.can.websocket.frame.TextFrame

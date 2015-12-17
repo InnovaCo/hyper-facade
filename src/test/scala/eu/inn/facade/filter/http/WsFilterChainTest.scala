@@ -6,7 +6,8 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
 import eu.inn.binders.dynamic.Text
-import eu.inn.facade.filter.RequestMapper._
+import eu.inn.facade.http.RequestMapper
+import RequestMapper._
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.filter.model.DynamicRequestHeaders._
 import eu.inn.facade.filter.model.{Filter, Headers}

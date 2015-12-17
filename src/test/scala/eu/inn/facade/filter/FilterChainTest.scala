@@ -37,7 +37,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   "FilterChain " - {
     "applyInputFilters empty headers" in {
       val body = DynamicBody(Text("test body"))
-      val requestHeaders = Headers(Map())
+      val requestHeaders = Headers(Map[String, String]())
 
       val filteringResult = filterChain.applyInputFilters(requestHeaders, body)
       whenReady(filteringResult) {
@@ -67,7 +67,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
     "applyInputFilters with error" in {
       val body = DynamicBody(Text("test body"))
-      val requestHeaders = Headers(Map())
+      val requestHeaders = Headers(Map[String, String]())
 
       val failedFilterChain = new FilterChain(Seq(new TestFailedFilter, new TestInputFilter), Seq())
       val filteringResult = failedFilterChain.applyInputFilters(requestHeaders, body)
@@ -83,7 +83,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
     "applyOutputFilters empty headers" in {
       val body = DynamicBody(Text("test body"))
-      val responseHeaders = Headers(Map())
+      val responseHeaders = Headers(Map[String, String]())
 
       val filteringResult = filterChain.applyOutputFilters(responseHeaders, body)
       whenReady(filteringResult) {
@@ -114,7 +114,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
     "applyOutputFilters with error" in {
       val body = DynamicBody(Text("test body"))
-      val requestHeaders = Headers(Map())
+      val requestHeaders = Headers(Map[String, String]())
 
       val failedFilterChain = new FilterChain(Seq(), Seq(new TestFailedFilter, new TestInputFilter))
       val filteringResult = failedFilterChain.applyOutputFilters(requestHeaders, body)
