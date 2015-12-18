@@ -1,14 +1,28 @@
 package eu.inn.facade.filter.chain
 
-import eu.inn.util.ConfigComponent
+import eu.inn.facade.filter.model.Filter
+import eu.inn.facade.raml.RamlConfig
+import scaldi.{Injectable, Injector}
 
-class FilterChainRamlComponent extends FilterChainComponent with ConfigComponent {
+class FilterChainRamlComponent(implicit inj: Injector) extends FilterChainComponent with Injectable {
 
-   override def filterChain(uri: String): FilterChain = {
-      val filterTraits = extractTraitsFromRaml(uri)
-      constructFilterChain(filterTraits)
-   }
+  val ramlConfig = inject[RamlConfig]
 
-   def extractTraitsFromRaml(uri: String): Seq[String] = ???
-   def constructFilterChain(filterTraits: Seq[String]): FilterChain = ???
+  override def inputFilterChain(uri: String, method: String): FilterChain = {
+    constructFilterChain(uri, method, filter ⇒ filter.isInputFilter)
+  }
+
+  override def outputFilterChain(uri: String, method: String): FilterChain = {
+    constructFilterChain(uri, method, filter ⇒ filter.isOutputFilter)
+  }
+
+  private def constructFilterChain(uri: String, method: String, predicate: Filter ⇒ Boolean): FilterChain = {
+    val filterNames = ramlConfig.traits(uri, method)
+    var filters = Seq[Filter]()
+    filterNames.foreach { filterName ⇒
+      val filter = inject[Filter](filterName)
+      if (predicate(filter)) filters = filters :+ filter
+    }
+    FilterChain(filters)
+  }
 }

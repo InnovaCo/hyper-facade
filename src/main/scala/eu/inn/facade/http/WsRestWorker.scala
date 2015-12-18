@@ -82,10 +82,11 @@ class WsRestWorker(val serverConnection: ActorRef,
       try {
         val dynamicRequest = RequestMapper.toDynamicRequest(message)
         val url = dynamicRequest.url
+        val method = dynamicRequest.method
         if (ramlConfig.isPingRequest(url)) pong(dynamicRequest)
         else {
           val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-          filterChainComposer.filterChain(url).applyInputFilters(headers, dynamicBody) map {
+          filterChainComposer.inputFilterChain(url, method).applyFilters(headers, dynamicBody) map {
             case Success((filteredHeaders, filteredBody)) ⇒
               val filteredDynamicRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
               processRequest(filteredDynamicRequest)
@@ -109,8 +110,9 @@ class WsRestWorker(val serverConnection: ActorRef,
 
     case dynamicRequest: DynamicRequest ⇒
         val url = dynamicRequest.url
+        val method = dynamicRequest.method
         val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-      filterChainComposer.filterChain(url).applyOutputFilters(headers, dynamicBody) map {
+      filterChainComposer.outputFilterChain(url, method).applyFilters(headers, dynamicBody) map {
           case Success((filteredHeaders, filteredBody)) ⇒
             send(RequestMapper.toDynamicRequest(filteredHeaders, filteredBody))
 

@@ -7,8 +7,8 @@ import scaldi.Module
 
 class FiltersModule extends Module {
 
-  bind [FilterChainComponent] identifiedBy "ramlFilterChain"        to new FilterChainRamlComponent
+  bind [Filter]               identifiedBy "noop"              to new NoOpFilter
+  bind [Filter]               identifiedBy "private"           to new PrivateResourceFilter
 
-  bind [Filter]               identifiedBy "noop"                   to new NoOpFilter
-  bind [Filter]               identifiedBy "private"                to new PrivateResourceFilter
+  bind [FilterChainComponent] identifiedBy "ramlFilterChain"   to new FilterChainRamlComponent
 }

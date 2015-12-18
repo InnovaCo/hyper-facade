@@ -9,27 +9,9 @@ import scala.util.{Success, Try}
 
 import scala.language.postfixOps
 
-object FilterChain {
-  def apply(inputFilters: Seq[Filter], outputFilters: Seq[Filter]) = {
-    new FilterChain(inputFilters, outputFilters)
-  }
-  
-  def apply() = {
-    new FilterChain(Seq(), Seq())
-  }
-}
+class FilterChain(val filters: Seq[Filter]) {
 
-class FilterChain(val inputFilters: Seq[Filter], val outputFilters: Seq[Filter]) {
-
-  def applyInputFilters(headers: Headers, body: DynamicBody): Future[Try[(Headers, DynamicBody)]] = {
-    applyFilters(inputFilters, headers, body)
-  }
-
-  def applyOutputFilters(headers: Headers, body: DynamicBody): Future[Try[(Headers, DynamicBody)]] = {
-    applyFilters(outputFilters, headers, body)
-  }
-
-  private def applyFilters(filters: Seq[Filter], headers: Headers, body: DynamicBody): Future[Try[(Headers, DynamicBody)]] = {
+  def applyFilters(headers: Headers, body: DynamicBody): Future[Try[(Headers, DynamicBody)]] = {
     val accumulator: Future[(Headers, DynamicBody)] = Future {
       (headers, body)
     }
@@ -45,5 +27,15 @@ class FilterChain(val inputFilters: Seq[Filter], val outputFilters: Seq[Filter])
       promisedResult.completeWith(Future(Success((headers, body))))
     }
     promisedResult.future
+  }
+}
+
+object FilterChain {
+  def apply(filters: Seq[Filter]) = {
+    new FilterChain(filters)
+  }
+
+  def apply() = {
+    new FilterChain(Seq())
   }
 }

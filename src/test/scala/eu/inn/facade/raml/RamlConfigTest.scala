@@ -13,7 +13,7 @@ class RamlConfigTest extends FreeSpec with Matchers {
       val config = ConfigFactory.load()
       val factory = new JavaNodeFactory
       val ramlConfig = RamlConfig(factory.createApi(config.getString("inn.facade.raml.file")))
-      ramlConfig.inputTraits("/status", "get") shouldBe Seq("rateLimited")
+      ramlConfig.traits("/status", "get") shouldBe Seq("rateLimited")
     }
   }
 }
@@ -25,9 +25,9 @@ object RamlConfigTest extends App {
   val fileUri = Thread.currentThread().getContextClassLoader.getResource(fileRelativePath).toURI
   val file = Paths.get(fileUri).toFile
   val ramlConfig = RamlConfig(factory.createApi(file.getCanonicalPath))
-  println(ramlConfig.inputTraits("/status", "get") == Seq("rateLimited"))
-  println(ramlConfig.inputTraits("/users", "get"))
-  println(ramlConfig.outputTraits("/users", "get"))
-  println(ramlConfig.inputTraits("/users", "post"))
-  println(ramlConfig.inputTraits("/status/test-service", "get"))
+  println(ramlConfig.traits("/status", "get") == Seq("rateLimited"))
+  println(ramlConfig.traits("/users", "get"))
+  println(ramlConfig.traits("/users", "get"))
+  println(ramlConfig.traits("/users", "post"))
+  println(ramlConfig.traits("/status/test-service", "get"))
 }

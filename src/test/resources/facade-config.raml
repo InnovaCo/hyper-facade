@@ -2,20 +2,20 @@
 title: Facade API
 version: v1
 traits:
-  in.secured:
-  in.paged:
-  in.rateLimited:
-  in.private:
-  out.paged:
+  secured:
+  paged:
+  rateLimited:
+  private:
+  paged:
 /users:
-  is: [ in.secured ]
+  is: [ secured ]
   get:
-    is: [ in.paged, in.rateLimited, out.paged ]
+    is: [ paged, rateLimited, paged ]
 /status:
   get:
-    is: [ in.rateLimited ]
+    is: [ rateLimited ]
   /test-service
     get:
-      is: [ in.paged ]
+      is: [ paged ]
 /private:
-  is: [ in.private ]
+  is: [ private ]

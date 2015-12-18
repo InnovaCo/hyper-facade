@@ -11,35 +11,23 @@ import scala.collection.JavaConversions._
 
 class RamlConfig(val api: Api) {
 
-  def inputTraits(url: String, method: String): Seq[String] = {
-    traits(url, method, traitNames ⇒ filterTraits(traitNames, "in."))
-  }
-
-  def outputTraits(url: String, method: String): Seq[String] = {
-    traits(url, method, traitNames ⇒ filterTraits(traitNames, "out."))
-  }
-
   def isPingRequest(url: String): Boolean = {
     false
   }
 
-  private def traits(url: String, method: String, filter: Seq[String] ⇒ Seq[String]): Seq[String] = {
+  def traits(url: String, method: String): Seq[String] = {
     findResource(url) match {
       case Some(targetResource) ⇒
         targetResource.methods().find { ramlMethod ⇒
           ramlMethod.method() == method
         } match {
           case Some(ramlMethod) ⇒
-            filter(extractTraitNames(ramlMethod.is()))
+            extractTraitNames(ramlMethod.is())
 
-          case None ⇒ filter(extractTraitNames(targetResource.is()))
+          case None ⇒ extractTraitNames(targetResource.is())
         }
       case None ⇒ Seq()
     }
-  }
-
-  private def filterTraits(traitNames: Seq[String], prefix: String): Seq[String] = {
-    traitNames.filter( traitName ⇒ traitName.startsWith(prefix) ) map ( traitName ⇒ traitName.substring(prefix.length) )
   }
 
   private def extractTraitNames(traits: java.util.List[TraitRef]): Seq[String] = {
@@ -76,7 +64,7 @@ class RamlConfig(val api: Api) {
     else None   // Node of url is not matched with current resource of resource tree of RAML configuration
   }
 
-  def normalizeResourceUri(resource: Resource): String = {
+  private def normalizeResourceUri(resource: Resource): String = {
     resource.relativeUri().value().replace("/", "")
   }
 

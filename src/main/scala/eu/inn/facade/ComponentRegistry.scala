@@ -17,4 +17,3 @@ trait ComponentRegistry
     with ConfigComponent
     with StatusMonitorFacade
     with ConsoleIOComponent
-    with FilterChainStubComponent

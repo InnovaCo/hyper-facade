@@ -1,9 +1,9 @@
 package eu.inn.facade.filter.http
 
 import akka.actor.ActorRef
+import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.http.RequestMapper
-import RequestMapper._
-import eu.inn.facade.filter.chain.{FilterChain, FilterChainComponent}
+import eu.inn.facade.http.RequestMapper._
 import eu.inn.hyperbus.model.DynamicRequest
 import spray.can.websocket.frame.TextFrame
 import spray.can.{Http, websocket}
@@ -12,7 +12,7 @@ import spray.routing.HttpServiceActor
 
 import scala.util.Success
 
-abstract class WsTestWorker(val filterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker with FilterChainComponent {
+abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -32,7 +32,7 @@ abstract class WsTestWorker(val filterChain: FilterChain) extends HttpServiceAct
       toDynamicRequest(frame) match {
         case DynamicRequest(requestHeader, dynamicBody) ⇒
           val headers = extractHeaders(requestHeader)
-          filterChain.applyInputFilters(headers, dynamicBody) map {
+          inputFilterChain.applyFilters(headers, dynamicBody) map {
             case Success((headers, body)) ⇒ exposeDynamicRequest(toDynamicRequest(headers, body))
           }
       }
@@ -41,7 +41,7 @@ abstract class WsTestWorker(val filterChain: FilterChain) extends HttpServiceAct
       request match {
         case DynamicRequest(requestHeader, dynamicBody) ⇒
           val headers = extractHeaders(requestHeader)
-          filterChain.applyOutputFilters(headers, dynamicBody) map {
+          outputFilterChain.applyFilters(headers, dynamicBody) map {
             case Success((headers, body)) ⇒
               send(toFrame(toDynamicRequest(headers, body)))
           }
