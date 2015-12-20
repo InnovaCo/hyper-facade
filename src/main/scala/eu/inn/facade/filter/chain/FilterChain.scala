@@ -11,6 +11,7 @@ import scala.language.postfixOps
 
 class FilterChain(val filters: Seq[Filter]) {
 
+  // review: почему возвращается Future[Try[..]] а не просто Future[..]? (где конвертация исключений?)
   def applyFilters(headers: Headers, body: DynamicBody): Future[Try[(Headers, DynamicBody)]] = {
     val accumulator: Future[(Headers, DynamicBody)] = Future {
       (headers, body)

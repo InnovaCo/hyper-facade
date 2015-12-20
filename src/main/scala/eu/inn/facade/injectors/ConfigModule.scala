@@ -1,4 +1,4 @@
-package eu.inn.facade.injectors
+package eu.inn.facade.injectors // review: наверно package должен называться modules, а не injectors?
 
 import com.typesafe.config.Config
 import eu.inn.facade.ConfigComponent
