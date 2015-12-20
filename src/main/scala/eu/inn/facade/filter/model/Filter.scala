@@ -4,6 +4,8 @@ import eu.inn.hyperbus.model.DynamicBody
 
 import scala.concurrent.Future
 
+
+// review: у OutputFilter должен быть responseHeaders, а не request
 trait Filter {
 
   def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)]

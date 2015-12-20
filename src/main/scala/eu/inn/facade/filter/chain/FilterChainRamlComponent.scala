@@ -4,6 +4,7 @@ import eu.inn.facade.filter.model.Filter
 import eu.inn.facade.raml.RamlConfig
 import scaldi.{Injectable, Injector}
 
+// review: именование Component из CakePattern остается?
 class FilterChainRamlComponent(implicit inj: Injector) extends FilterChainComponent with Injectable {
 
   val ramlConfig = inject[RamlConfig]

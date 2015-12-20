@@ -9,6 +9,8 @@ import com.typesafe.config.Config
 
 import scala.collection.JavaConversions._
 
+// review: надо разделить на 2 стадии, подготовка (кеширование результатов RAML -> internal state)
+// и вторая стадия - возврат результатов из internal state, чтобы возврат был с предсказуемым временем (алгоритмической сложностью)
 class RamlConfig(val api: Api) {
 
   def isPingRequest(url: String): Boolean = {

@@ -9,6 +9,6 @@ import scala.concurrent.Future
 
 class PrivateResourceFilter extends InputFilter {
   override def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
-    Future(Headers(Some(403)), DynamicBody(Text("Forbidden")))
+    Future(Headers(Some(403)), DynamicBody(Text("Forbidden"))) // reivew: возвращать ErrorBody в JSON формате и возможно 404 вместо 403?
   }
 }
