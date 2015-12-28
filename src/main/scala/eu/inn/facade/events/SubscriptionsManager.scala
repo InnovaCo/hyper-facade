@@ -3,23 +3,25 @@ package eu.inn.facade.events
 import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 
-import akka.actor.ActorRef
+import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.ConfigFactory
-import eu.inn.facade.HyperBusComponent
+import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model.DynamicRequest
 import eu.inn.hyperbus.model.standard.Method
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api.Topic
-import eu.inn.util.akka.ActorSystemComponent
-import eu.inn.util.{ConfigComponent, Logging}
+import org.slf4j.LoggerFactory
+import scaldi.{Injectable, Injector}
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-trait SubscriptionsManager {
-  this:  ActorSystemComponent
-    with HyperBusComponent
-    with Logging ⇒
+class SubscriptionsManager(implicit inj: Injector) extends Injectable {
+
+  val hyperBus = inject[HyperBus]
+  val log = LoggerFactory.getLogger(SubscriptionsManager.this.getClass.getName)
+  implicit val actorSystem = inject[ActorSystem]
+  implicit val executionContext = inject[ExecutionContext]
 
   def subscribe(topicFilter: Topic, clientActor: ActorRef, correlationId: String): String =
     subscriptionManager.subscribe(topicFilter, clientActor, correlationId)

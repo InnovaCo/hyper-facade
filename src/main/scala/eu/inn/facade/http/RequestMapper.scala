@@ -68,17 +68,12 @@ object RequestMapper {
       case Some(correlationId) ⇒ headers += ((CORRELATION_ID, correlationId))
       case None ⇒
     }
-    Headers(headers)
+    Headers(headers, None)
   }
 
   def extractDynamicHeader(headers: Headers): RequestHeader = {
-    var contentTypeOption: Option[String] = None
-    val contentType = headers → CONTENT_TYPE
-    if (contentType != null) contentTypeOption = Some(contentType)
-    var correlationIdOption: Option[String] = None
-    val correlationId = headers → CORRELATION_ID
-    if (correlationId != null) correlationIdOption = Some(correlationId)
-    RequestHeader(headers → URL, headers → METHOD, contentTypeOption, headers → MESSAGE_ID, correlationIdOption)
+    val headersMap = headers.headers
+    RequestHeader(headersMap(URL), headersMap(METHOD), headersMap.get(CONTENT_TYPE), headersMap(MESSAGE_ID), headersMap.get(CORRELATION_ID))
   }
 
   private def contentType(contentType: Option[String]): ContentType = {
@@ -92,9 +87,9 @@ object RequestMapper {
 
   private def extractHttpHeaders(headers: Headers): List[HttpHeader]= {
     var httpHeaders = List[HttpHeader]()
-    headers.headers.foreach { header ⇒
-      val (name, value) = header
-      if (!isDynamicHeader(name)) httpHeaders = httpHeaders :+ RawHeader(name, value)
+    headers.headers.foreach {
+      case (name, value) ⇒
+        if (!isDynamicHeader(name)) httpHeaders = httpHeaders :+ RawHeader(name, value)
     }
     httpHeaders
   }

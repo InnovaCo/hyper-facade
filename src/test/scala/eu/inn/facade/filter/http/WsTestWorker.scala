@@ -2,7 +2,6 @@ package eu.inn.facade.filter.http
 
 import akka.actor.ActorRef
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.http.RequestMapper
 import eu.inn.facade.http.RequestMapper._
 import eu.inn.hyperbus.model.DynamicRequest
 import spray.can.websocket.frame.TextFrame
@@ -32,7 +31,7 @@ abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterC
       toDynamicRequest(frame) match {
         case DynamicRequest(requestHeader, dynamicBody) ⇒
           val headers = extractHeaders(requestHeader)
-          inputFilterChain.applyFilters(headers, dynamicBody) map {
+          inputFilterChain.applyFilters(headers, dynamicBody) onComplete {
             case Success((headers, body)) ⇒ exposeDynamicRequest(toDynamicRequest(headers, body))
           }
       }
@@ -41,7 +40,7 @@ abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterC
       request match {
         case DynamicRequest(requestHeader, dynamicBody) ⇒
           val headers = extractHeaders(requestHeader)
-          outputFilterChain.applyFilters(headers, dynamicBody) map {
+          outputFilterChain.applyFilters(headers, dynamicBody) onComplete {
             case Success((headers, body)) ⇒
               send(toFrame(toDynamicRequest(headers, body)))
           }

@@ -6,7 +6,7 @@ import scala.concurrent.Future
 
 trait Filter {
 
-  def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)]
-  def isInputFilter: Boolean
-  def isOutputFilter: Boolean
+  def apply(headers: Headers, body: DynamicBody): Future[(Headers, DynamicBody)]
+  def isInputFilter: Boolean = false
+  def isOutputFilter: Boolean = false
 }

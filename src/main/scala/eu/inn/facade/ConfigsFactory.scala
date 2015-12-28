@@ -10,7 +10,7 @@ import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
 
-object ConfigComponent {
+class ConfigsFactory {
 
   /**
    * Parse and merge local configs specified in system property -Dconfig.localfile

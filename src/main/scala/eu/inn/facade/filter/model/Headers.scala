@@ -1,20 +1,6 @@
 package eu.inn.facade.filter.model
 
-import scala.collection.immutable.HashMap
-
-class Headers(val headers: Map[String, String], val statusCode: Option[Int]) {
-
-  def filterNot(p: (((String, String)) ⇒ Boolean)): Headers = {
-    Headers(headers.filterNot(p))
-  }
-
-  def +(name: String, value: String) = {
-    Headers(headers + ((name, value)), statusCode)
-  }
-
-  def → (name: String): String = {
-    headers.getOrElse(name, null)
-  }
+case class Headers(headers: Map[String, String], statusCode: Option[Int]) {
 
   def withResponseCode(newResponseCode: Option[Int]) = {
     Headers(headers, newResponseCode)
@@ -25,19 +11,5 @@ class Headers(val headers: Map[String, String], val statusCode: Option[Int]) {
       case Some(_) ⇒ true
       case None ⇒ false
     }
-  }
-}
-
-object Headers {
-  def apply(headers: Map[String, String], statusCode: Option[Int]) = {
-    new Headers(headers, statusCode)
-  }
-
-  def apply(headers: Map[String, String]) = {
-    new Headers(headers, None)
-  }
-
-  def apply(statusCode: Option[Int]) = {
-    new Headers(Map(), statusCode)
   }
 }

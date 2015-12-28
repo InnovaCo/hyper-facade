@@ -11,7 +11,6 @@ import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.annotations.{body, request}
 import eu.inn.hyperbus.model.standard._
 import eu.inn.hyperbus.transport.api._
-import eu.inn.util.ConfigComponent
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -19,15 +18,16 @@ import scala.concurrent.Future
 @body("application/vnd+test-1.json")
 case class TestBodyForFacade(content: String) extends Body
 
-@request("/test-facade/{content}")
+@request("/test-service/{content}/events")
 case class TestRequestForFacade(body: TestBodyForFacade, messageId: String, correlationId: String) extends StaticGet(body)
 with DefinedResponse[Ok[DynamicBody]]
 
-object EventPublishingService extends App with ConfigComponent {
+object EventPublishingService extends App {
   val transportConfiguration = TransportConfigurationLoader.fromConfig(ConfigFactory.load())
   val transportManager = new TransportManager(transportConfiguration)
   val hyperBus = new HyperBus(transportManager, Some("group1"))
   val publishingService = new EventPublishingService(new HyperBus(transportManager, Some("group1")))
+  val config = ConfigFactory.load()
   startSeedNode
   publishingService.onCommand()
 
@@ -60,7 +60,7 @@ class EventPublishingService(hyperBus: HyperBus) {
   }
 
   def onCommand(): String = {
-    hyperBus.onCommand(Topic("/test-facade"), Method.GET, None) { request: DynamicRequest ⇒
+    hyperBus.onCommand(Topic("/test-service"), Method.GET, None) { request: DynamicRequest ⇒
       Future {
         Ok(DynamicBody(Text("another result")))
       }

@@ -9,7 +9,6 @@ import eu.inn.binders.dynamic.Text
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.filter.model.DynamicRequestHeaders._
 import eu.inn.facade.filter.model.{Headers, InputFilter, OutputFilter}
-import eu.inn.facade.http.RequestMapper
 import eu.inn.facade.http.RequestMapper._
 import eu.inn.hyperbus.model.standard.Method
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest}
@@ -33,10 +32,8 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   class TestInputFilter extends InputFilter {
     override def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
       if (requestHeaders.headers.nonEmpty) {
-        val filteredHeaders = requestHeaders.filterNot {
-          _._1 == CORRELATION_ID
-        }
-        Future(filteredHeaders, body)
+        val filteredHeaders = requestHeaders.headers.filterNot{ _._1 == CORRELATION_ID }
+        Future(Headers(filteredHeaders, None), body)
       }
       else Future(requestHeaders withResponseCode Some(403), DynamicBody(Text("Forbidden")))
     }
@@ -45,10 +42,8 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   class TestOutputFilter extends OutputFilter {
     override def apply(responseHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
       if (responseHeaders.headers.nonEmpty) {
-        val filteredHeaders = responseHeaders.filterNot {
-          _._1 == CORRELATION_ID
-        }
-        Future(filteredHeaders, body)
+        val filteredHeaders = responseHeaders.headers.filterNot { _._1 == CORRELATION_ID }
+        Future(Headers(filteredHeaders, None), body)
       }
       else Future(Headers(Map("x-http-header" → "Accept-Language"), Some(200)), null)
     }

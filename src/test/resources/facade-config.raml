@@ -6,15 +6,14 @@ traits:
   paged:
   rateLimited:
   private:
-  paged:
 /users:
   is: [ secured ]
   get:
-    is: [ paged, rateLimited, paged ]
+    is: [ paged, rateLimited ]
 /status:
   get:
     is: [ rateLimited ]
-  /test-service
+  /test-service:
     get:
       is: [ paged ]
 /private:

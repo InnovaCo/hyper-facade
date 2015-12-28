@@ -2,7 +2,7 @@ package eu.inn.facade.filter.chain
 
 import scala.language.postfixOps
 
-trait FilterChainComponent {
+trait FilterChainFactory {
 
   def inputFilterChain(uri: String, method: String): FilterChain
   def outputFilterChain(uri: String, method: String): FilterChain

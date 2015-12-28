@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.chain
 
-class FilterChainStubComponent extends FilterChainComponent {
+class FilterChainStubFactory extends FilterChainFactory {
   override def inputFilterChain(uri: String, method: String): FilterChain = {
     FilterChain(Seq())
   }

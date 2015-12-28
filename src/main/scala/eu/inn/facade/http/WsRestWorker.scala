@@ -3,7 +3,7 @@ package eu.inn.facade.http
 import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{SubscriptionActor, SubscriptionsManager}
-import eu.inn.facade.filter.chain.FilterChainComponent
+import eu.inn.facade.filter.chain.FilterChainFactory
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
@@ -34,7 +34,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   var remoteAddress = clientAddress
   var request: Option[HttpRequest] = None
 
-  val filterChainComposer = inject[FilterChainComponent]
+  val filterChainComposer = inject[FilterChainFactory]
   val ramlConfig = inject[RamlConfig]
 
   override def preStart(): Unit = {
@@ -83,10 +83,10 @@ class WsRestWorker(val serverConnection: ActorRef,
         val dynamicRequest = RequestMapper.toDynamicRequest(message)
         val url = dynamicRequest.url
         val method = dynamicRequest.method
-        if (ramlConfig.isPingRequest(url)) pong(dynamicRequest)
+        if (isPingRequest(url, method)) pong(dynamicRequest)
         else {
           val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-          filterChainComposer.inputFilterChain(url, method).applyFilters(headers, dynamicBody) map {
+          filterChainComposer.inputFilterChain(url, method).applyFilters(headers, dynamicBody) onComplete {
             case Success((filteredHeaders, filteredBody)) ⇒
               val filteredDynamicRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
               processRequest(filteredDynamicRequest)
@@ -112,7 +112,7 @@ class WsRestWorker(val serverConnection: ActorRef,
         val url = dynamicRequest.url
         val method = dynamicRequest.method
         val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-      filterChainComposer.outputFilterChain(url, method).applyFilters(headers, dynamicBody) map {
+      filterChainComposer.outputFilterChain(url, method).applyFilters(headers, dynamicBody) onComplete {
           case Success((filteredHeaders, filteredBody)) ⇒
             send(RequestMapper.toDynamicRequest(filteredHeaders, filteredBody))
 
@@ -137,6 +137,10 @@ class WsRestWorker(val serverConnection: ActorRef,
         case Some(actor) ⇒ actor.forward(request)
         case None ⇒ context.actorOf(Props(classOf[SubscriptionActor], self, hyperBus, subscriptionManager), actorName) ! request
       }
+  }
+
+  def isPingRequest(url: String, method: String): Boolean = {
+    url == "/meta/ping" && method == "ping"
   }
 
   def pong(dynamicRequest: DynamicRequest) = request match {

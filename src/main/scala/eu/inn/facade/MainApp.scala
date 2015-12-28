@@ -1,20 +1,31 @@
 package eu.inn.facade
 
-import akka.actor.ActorSystem
-import eu.inn.facade.injectors.{FiltersModule, ConfigModule}
+import eu.inn.facade.http.{StatusMonitorFacade, WsRestServiceApp}
+import eu.inn.facade.modules.{ConfigModule, FiltersModule, ServiceModule}
+import eu.inn.hyperbus.HyperBus
+import org.slf4j.LoggerFactory
+import scaldi.{Injector, Injectable}
 
-object MainApp extends App with ComponentRegistry {
+object MainApp extends App with Injectable {
 
-  implicit override lazy val actorSystem = ActorSystem("eu-inn", config)
-  implicit val injector = new ConfigModule :: new FiltersModule
+  implicit val injector = getInjector
+  val statusMonitorFacade = inject[StatusMonitorFacade]
+  val log = LoggerFactory.getLogger(MainApp.getClass.getName)
 
-  new WebsocketsRestServiceApp("localhost", 8080) {
+  new WsRestServiceApp("localhost", 8080) {
     start {
-      path("test-facade") {
-        statusMonitorRoutes.routes
+      path("/test-service") {
+        statusMonitorFacade.statusMonitorRoutes.routes
       }
     }
   }
-  val hb = hyperBus // reference lazy val to start up
-  log.info("hyperbus is starting...: {}", hb)
+  val hyperBus = inject[HyperBus]  // it's time to initialize hyperbus
+  log.info("hyperbus is starting...: {}", hyperBus)
+
+  def getInjector: Injector = {
+    val filtersModule = new FiltersModule
+    val injector = new ConfigModule :: filtersModule :: new ServiceModule
+    filtersModule.initOuterBindings
+    injector
+  }
 }
