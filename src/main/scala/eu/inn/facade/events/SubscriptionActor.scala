@@ -21,7 +21,7 @@ class SubscriptionActor(websocketWorker: ActorRef,
       implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
 
       if (SubscriptionActor.urlStatusMonitorRegex.findFirstIn(url).isDefined) {
-        subscriptionId = Some(subscriptionManager.subscribe(Topic("/test-facade"), websocketWorker, finalCorrelationId)) // todo: Topic logic/raml
+        subscriptionId = Some(subscriptionManager.subscribe(Topic(url), websocketWorker, finalCorrelationId)) // todo: Topic logic/raml
         //context.become(subscribed(request))
         fetchAndReplyWithResource(request)
       }
@@ -47,7 +47,7 @@ class SubscriptionActor(websocketWorker: ActorRef,
     import context._
 
     // todo: update front correlationId <> back correlationId!
-    hyperBus <~ DynamicGet("/test-facade", DynamicBody(EmptyBody.contentType, Null)) recover {
+    hyperBus <~ DynamicGet(request.url, DynamicBody(EmptyBody.contentType, Null)) recover {
       case e: Response[Body] ⇒ e
       case t: Throwable ⇒ exceptionToResponse(t)
     } pipeTo websocketWorker

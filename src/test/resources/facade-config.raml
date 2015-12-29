@@ -1,6 +1,20 @@
 #%RAML 1.0
 title: Facade API
 version: v1
+types:
+  Status:
+    type: object
+    properties:
+      statusCode: number
+      processedBy:
+        (private):
+        type: string
+  StatusRequest:
+    type: object
+    properties:
+      serviceType: string
+annotationTypes:
+  private:
 traits:
   secured:
   paged:
@@ -10,6 +24,16 @@ traits:
   is: [ secured ]
   get:
     is: [ paged, rateLimited ]
+    body:
+      type: StatusRequest
+    headers:
+      authToken:
+    responses:
+      200:
+        body:
+          type: Status
+        headers:
+          errorType:
 /status:
   get:
     is: [ rateLimited ]
