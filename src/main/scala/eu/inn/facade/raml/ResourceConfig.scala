@@ -19,8 +19,8 @@ case class Method(name: String)
 
 case class DataStructure(headers: Seq[Header], body: Body)
 object DataStructure {
-  def apply(): DataStructure = {
-    DataStructure(Seq(), Body(Seq()))
+  def apply(headers: Seq[Header]): DataStructure = {
+    DataStructure(headers, Body(Seq()))
   }
 }
 

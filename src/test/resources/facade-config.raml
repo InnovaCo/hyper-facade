@@ -9,10 +9,17 @@ types:
       processedBy:
         (private):
         type: string
+
   StatusRequest:
     type: object
     properties:
       serviceType: string
+
+  TestRequest:
+    type: object
+    properties:
+      mode: string
+      resultType: string
 annotationTypes:
   private:
 traits:
@@ -33,12 +40,26 @@ traits:
         body:
           type: Status
         headers:
-          errorType:
+          content-type:
 /status:
   get:
     is: [ rateLimited ]
   /test-service:
     get:
       is: [ paged ]
+      body:
+        type: TestRequest
+      headers:
+        x_http_forwarded_for:
+        authToken:
+      responses:
+        200:
+          body:
+            type: Status
+          headers:
+            content-type:
+        404:
+          body:
+            type: string
 /private:
   is: [ private ]

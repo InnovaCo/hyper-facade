@@ -82,19 +82,20 @@ class RamlConfig(val api: Api) {
     }
     val typeName = getTypeName(ramlReqRspWrapper)
     typeName match {
-      case Some(name) ⇒
-        val typeDefinition = getTypeDeclaration(name)
-        val fields = typeDefinition.asInstanceOf[ObjectFieldImpl].properties().foldLeft(Seq[Field] ()) {
-          (fieldList, ramlField) ⇒
-            val field = Field(ramlField.name(), isPrivate(ramlField))
-            fieldList :+ field
-        }
-        val body = Body(fields)
-        val dataType = DataStructure(headers, body)
-        println(dataType)
-        dataType
+      case Some(name) ⇒ getTypeDefinition(name) match {
+        case Some(typeDefinition) ⇒
+          val fields = typeDefinition.asInstanceOf[ObjectFieldImpl].properties().foldLeft(Seq[Field] ()) {
+            (fieldList, ramlField) ⇒
+              val field = Field(ramlField.name(), isPrivate(ramlField))
+              fieldList :+ field
+          }
+          val body = Body(fields)
+          val dataType = DataStructure(headers, body)
+          dataType
+        case None ⇒ DataStructure(headers)
+      }
 
-      case None ⇒ DataStructure()
+      case None ⇒ DataStructure(headers)
     }
   }
 
@@ -105,7 +106,7 @@ class RamlConfig(val api: Api) {
     else Some(ramlReqRspWrapper.body.get(0).`type`.get(0))
   }
 
-  private def getTypeDeclaration(typeName: String): DataElement = {
+  private def getTypeDefinition(typeName: String): Option[DataElement] = {
     api.types.foldLeft[Option[DataElement]](None) { (matchedType, typeDef) ⇒
       matchedType match {
         case Some(foundType) ⇒ Some(foundType)
@@ -114,9 +115,6 @@ class RamlConfig(val api: Api) {
           else None
         }
       }
-    } match {
-      case Some(typeDef) ⇒ typeDef
-      case None ⇒ throw new RamlConfigException(s"Declaration of type '$typeName' wasn't found")
     }
   }
 

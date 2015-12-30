@@ -23,6 +23,7 @@ abstract class EnrichmentFilter(val ramlConfig: RamlConfig) extends Filter {
     }
   }
 
+  // TODO: sort out if headers should be enriched
   def enrichHeaders(headers: Headers): Headers = {
     headers
   }
