@@ -27,6 +27,14 @@ class RamlConfig(val api: Api) {
       .map(foundTrait ⇒ foundTrait.name)
   }
 
+  def requestDataStructure(url: String, method: String): DataStructure = {
+    resourcesConfig(url).requests.dataStructures(Method(method))
+  }
+
+  def responseDataStructure(url: String, method: String, statusCode: Int): DataStructure = {
+    resourcesConfig(url).responses.dataStructures((Method(method), statusCode))
+  }
+
   private def parseConfig(): Map[String, ResourceConfig] = {
     api.resources()
       .foldLeft(Map[String, ResourceConfig]()) { (accumulator, resource) ⇒
@@ -48,27 +56,27 @@ class RamlConfig(val api: Api) {
   }
 
   private def extractResourceRequests(resource: Resource): Requests = {
-    val requestsByMethod = resource.methods.foldLeft(Map[Method, DataType]()) { (requestMap, ramlMethod) ⇒
-      val dataType: DataType = extractTypeDefinition(RamlRequestResponseWrapper(ramlMethod))
+    val requestsByMethod = resource.methods.foldLeft(Map[Method, DataStructure]()) { (requestMap, ramlMethod) ⇒
+      val dataType: DataStructure = extractTypeDefinition(RamlRequestResponseWrapper(ramlMethod))
       requestMap + ((Method(ramlMethod.method()), dataType))
     }
     Requests(requestsByMethod)
   }
 
   private def extractResourceResponses(resource: Resource): Responses = {
-    var responses = Map[(Method, Int), DataType]()
+    var responses = Map[(Method, Int), DataStructure]()
     resource.methods.foreach { ramlMethod ⇒
       val method = Method(ramlMethod.method())
       val responsesByCodes = ramlMethod.responses.foreach { ramlResponse ⇒
-        val code: Int = Integer.parseInt(ramlResponse.code.value).toInt
+        val statusCode: Int = Integer.parseInt(ramlResponse.code.value).toInt
         val dataType = extractTypeDefinition(RamlRequestResponseWrapper(ramlResponse))
-        responses += (((method, code), dataType))
+        responses += (((method, statusCode), dataType))
       }
     }
     Responses(responses)
   }
 
-  private def extractTypeDefinition(ramlReqRspWrapper: RamlRequestResponseWrapper): DataType = {
+  private def extractTypeDefinition(ramlReqRspWrapper: RamlRequestResponseWrapper): DataStructure = {
     val headers = ramlReqRspWrapper.headers.foldLeft(Seq[Header]()) { (headerList, ramlHeader) ⇒
       headerList :+ Header(ramlHeader.name())
     }
@@ -82,11 +90,11 @@ class RamlConfig(val api: Api) {
             fieldList :+ field
         }
         val body = Body(fields)
-        val dataType = DataType(headers, body)
+        val dataType = DataStructure(headers, body)
         println(dataType)
         dataType
 
-      case None ⇒ DataType()
+      case None ⇒ DataStructure()
     }
   }
 

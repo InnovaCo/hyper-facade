@@ -4,6 +4,7 @@ import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{SubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChainFactory
+import eu.inn.facade.filter.model.Headers
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
@@ -85,7 +86,7 @@ class WsRestWorker(val serverConnection: ActorRef,
         val method = dynamicRequest.method
         if (isPingRequest(url, method)) pong(dynamicRequest)
         else {
-          val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
+          val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest, Map("http_x_forwarded_for" → remoteAddress))
           filterChainComposer.inputFilterChain(url, method).applyFilters(headers, dynamicBody) onComplete {
             case Success((filteredHeaders, filteredBody)) ⇒
               val filteredDynamicRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)

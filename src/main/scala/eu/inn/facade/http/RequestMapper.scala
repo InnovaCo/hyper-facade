@@ -29,9 +29,12 @@ object RequestMapper {
     DynamicRequest(httpRequest.entity.data.toByteString.iterator.asInputStream)
   }
 
-  def unfold(dynamicRequest: DynamicRequest): (Headers, DynamicBody) = {
+  def unfold(dynamicRequest: DynamicRequest, additionalHeaders: Map[String, String] = Map()): (Headers, DynamicBody) = {
     dynamicRequest match {
-      case DynamicRequest(requestHeader, dynamicBody) ⇒ (extractHeaders(requestHeader), dynamicBody)
+      case DynamicRequest(requestHeader, dynamicBody) ⇒
+        var originalHeaders = extractHeaders(requestHeader)
+        val headersWithAdditional = Headers(originalHeaders.headers ++ additionalHeaders, originalHeaders.statusCode)
+        (headersWithAdditional, dynamicBody)
     }
   }
   

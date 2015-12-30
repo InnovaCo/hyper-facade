@@ -9,18 +9,18 @@ object ResourceConfig {
 
 case class Traits(commonTraits: Set[Trait], methodSpecificTraits: Map[Method, Set[Trait]])
 
-case class Requests(dataTypes: Map[Method, DataType])
+case class Requests(dataStructures: Map[Method, DataStructure])
 
-case class Responses(dataTypes: Map[(Method, Int), DataType])
+case class Responses(dataStructures: Map[(Method, Int), DataStructure])
 
 case class Trait(name: String)
 
 case class Method(name: String)
 
-case class DataType(headers: Seq[Header], body: Body)
-object DataType {
-  def apply(): DataType = {
-    DataType(Seq(), Body(Seq()))
+case class DataStructure(headers: Seq[Header], body: Body)
+object DataStructure {
+  def apply(): DataStructure = {
+    DataStructure(Seq(), Body(Seq()))
   }
 }
 
@@ -28,4 +28,4 @@ case class Header(name: String)
 
 case class Body(fields: Seq[Field])
 
-case class Field(name: String, isPrivate: Boolean)
+case class Field(name: String, isPrivate: Boolean = false)
