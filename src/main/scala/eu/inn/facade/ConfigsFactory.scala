@@ -5,7 +5,7 @@ import java.nio.file.Paths
 import ch.qos.logback.classic.{Level, Logger}
 import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.inn.facade.raml.RamlConfig
+import eu.inn.facade.raml.{RamlConfig, RamlConfigParser, RamlConfigParser$}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._
@@ -53,7 +53,7 @@ class ConfigsFactory {
   def ramlConfig(appConfig: Config): RamlConfig = {
     val factory = new JavaNodeFactory
     val ramlConfigPath = ramlFilePath(appConfig)
-    new RamlConfig(factory.createApi(ramlConfigPath))
+    RamlConfigParser(factory.createApi(ramlConfigPath)).parseRaml
   }
 
   private def ramlFilePath(config: Config): String = {

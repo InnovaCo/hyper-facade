@@ -15,7 +15,7 @@ import spray.io.ServerSSLEngineProvider
 import spray.routing._
 
 import scala.collection.immutable
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 class WsRestServiceApp(interface: String, port: Int)(implicit inj: Injector)
   extends RestServiceApp(interface, port)
@@ -66,7 +66,7 @@ class WsRestServiceApp(interface: String, port: Int)(implicit inj: Injector)
                 connectionId += 1
                 connectionCount += 1
                 val worker = context.actorOf(
-                  Props(classOf[WsRestWorker], serverConnection, new WsRestRoutes(route), hyperBus, subscriptionsManager, remoteAddress.toString),
+                  WsRestWorker.props(serverConnection, new WsRestRoutes(route), hyperBus, subscriptionsManager, remoteAddress.toString),
                   "wrkr-" + connectionId.toHexString
                 )
                 context.watch(worker)

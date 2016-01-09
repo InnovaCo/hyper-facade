@@ -1,6 +1,6 @@
 package eu.inn.facade.filter
 
-import eu.inn.facade.filter.model.{DynamicRequestHeaders, InputFilter, Headers}
+import eu.inn.facade.filter.model.{DynamicRequestHeaders, Headers, InputFilter}
 import eu.inn.facade.raml.{DataStructure, RamlConfig}
 
 class InputEnrichmentFilter(ramlConfig: RamlConfig) extends EnrichmentFilter(ramlConfig) with InputFilter {

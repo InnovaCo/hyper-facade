@@ -1,8 +1,8 @@
 package eu.inn.facade.filter
 
-import eu.inn.binders.dynamic.{Text, Obj}
+import eu.inn.binders.dynamic.{Obj, Text}
 import eu.inn.facade.filter.model._
-import eu.inn.facade.raml.{Field, DataStructure, RamlConfig}
+import eu.inn.facade.raml.{DataStructure, Field, RamlConfig}
 import eu.inn.hyperbus.model.DynamicBody
 
 import scala.concurrent.ExecutionContext.Implicits.global

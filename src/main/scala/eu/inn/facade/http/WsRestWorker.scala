@@ -4,8 +4,6 @@ import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{SubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.filter.model.Headers
-import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard._
@@ -15,7 +13,7 @@ import spray.can.websocket.FrameCommandFailed
 import spray.can.websocket.frame.Frame
 import spray.can.{Http, websocket}
 import spray.http.HttpRequest
-import spray.routing.{HttpServiceActor, Route}
+import spray.routing.HttpServiceActor
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.util.{Failure, Success}
@@ -36,7 +34,6 @@ class WsRestWorker(val serverConnection: ActorRef,
   var request: Option[HttpRequest] = None
 
   val filterChainComposer = inject[FilterChainFactory]
-  val ramlConfig = inject[RamlConfig]
 
   override def preStart(): Unit = {
     super.preStart()
@@ -168,6 +165,16 @@ class WsRestWorker(val serverConnection: ActorRef,
   }
 }
 
-class WsRestRoutes(aroute: ⇒ Route) {
-  def route: Route = aroute
+object WsRestWorker {
+  def props(serverConnection: ActorRef,
+    workerRoutes: WsRestRoutes,
+    hyperBus: HyperBus,
+    subscriptionManager: SubscriptionsManager,
+    clientAddress: String)
+    (implicit inj: Injector) = Props(new WsRestWorker(
+                                      serverConnection,
+                                      workerRoutes,
+                                      hyperBus,
+                                      subscriptionManager,
+                                      clientAddress))
 }

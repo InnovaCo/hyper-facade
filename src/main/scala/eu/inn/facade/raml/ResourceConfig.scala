@@ -1,5 +1,23 @@
 package eu.inn.facade.raml
 
+class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
+
+  def traits(url: String, method: String): Set[String] = {
+    val traits = resourcesByUrl(url).traits
+    traits.methodSpecificTraits
+      .getOrElse(Method(method), traits.commonTraits)
+      .map(foundTrait ⇒ foundTrait.name)
+  }
+
+  def requestDataStructure(url: String, method: String): DataStructure = {
+    resourcesByUrl(url).requests.dataStructures(Method(method))
+  }
+
+  def responseDataStructure(url: String, method: String, statusCode: Int): DataStructure = {
+    resourcesByUrl(url).responses.dataStructures((Method(method), statusCode))
+  }
+}
+
 case class ResourceConfig(traits: Traits, requests: Requests, responses: Responses)
 object ResourceConfig {
   def apply(traits: Traits): ResourceConfig = {

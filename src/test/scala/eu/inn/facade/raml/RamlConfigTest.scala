@@ -16,7 +16,7 @@ class RamlConfigTest extends FreeSpec with Matchers {
     val fileUri = Thread.currentThread().getContextClassLoader.getResource(fileRelativePath).toURI
     val file = Paths.get(fileUri).toFile
     val api = factory.createApi(file.getCanonicalPath)
-    RamlConfig(api)
+    RamlConfigParser(api).parseRaml
   }
 
   "RamlConfig" - {

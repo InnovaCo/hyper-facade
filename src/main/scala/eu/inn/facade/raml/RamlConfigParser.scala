@@ -13,34 +13,15 @@ import com.typesafe.config.Config
 
 import scala.collection.JavaConversions._
 
-class RamlConfig(val api: Api) {
+class RamlConfigParser(val api: Api) {
 
-  /**
-   * Contains mapping from uri to resource configuration
-   */
-  val resourcesConfig: Map[String, ResourceConfig] = parseConfig()
-
-  def traits(url: String, method: String): Set[String] = {
-    val traits = resourcesConfig(url).traits
-    traits.methodSpecificTraits
-      .getOrElse(Method(method), traits.commonTraits)
-      .map(foundTrait ⇒ foundTrait.name)
-  }
-
-  def requestDataStructure(url: String, method: String): DataStructure = {
-    resourcesConfig(url).requests.dataStructures(Method(method))
-  }
-
-  def responseDataStructure(url: String, method: String, statusCode: Int): DataStructure = {
-    resourcesConfig(url).responses.dataStructures((Method(method), statusCode))
-  }
-
-  private def parseConfig(): Map[String, ResourceConfig] = {
-    api.resources()
+  def parseRaml: RamlConfig = {
+    val resourcesByUrl = api.resources()
       .foldLeft(Map[String, ResourceConfig]()) { (accumulator, resource) ⇒
         val currentRelativeUri = resource.relativeUri().value()
         accumulator ++ parseResource(currentRelativeUri, resource)
       }
+    new RamlConfig(resourcesByUrl)
   }
 
   private def parseResource(currentUri: String, resource: Resource): Map[String, ResourceConfig] = {
@@ -144,15 +125,15 @@ class RamlConfig(val api: Api) {
   }
 }
 
-object RamlConfig {
+object RamlConfigParser {
   def apply(api: Api) = {
-    new RamlConfig(api)
+    new RamlConfigParser(api)
   }
 
   def apply(config: Config) = {
     val factory = new JavaNodeFactory
     val ramlConfigPath = ramlFilePath(config)
-    new RamlConfig(factory.createApi(ramlConfigPath))
+    new RamlConfigParser(factory.createApi(ramlConfigPath))
   }
 
   private def ramlFilePath(config: Config): String = {
