@@ -21,10 +21,10 @@ class RamlConfigTest extends FreeSpec with Matchers {
 
   "RamlConfig" - {
     "traits" in {
-      ramlConfig.traits("/status", "get") shouldBe Set("rateLimited")
-      ramlConfig.traits("/users", "get") shouldBe Set("paged", "rateLimited", "secured")
-      ramlConfig.traits("/users", "post") shouldBe Set("secured")
-      ramlConfig.traits("/status/test-service", "get") shouldBe Set("paged")
+      ramlConfig.traits("/status", "get") shouldBe Seq("rateLimited")
+      ramlConfig.traits("/users", "get") shouldBe Seq("paged", "rateLimited", "secured")
+      ramlConfig.traits("/users", "post") shouldBe Seq("secured")
+      ramlConfig.traits("/status/test-service", "get") shouldBe Seq("paged")
     }
 
     "request data structure" in {
@@ -32,8 +32,8 @@ class RamlConfigTest extends FreeSpec with Matchers {
       val usersBody = Body(Seq(Field("serviceType", false)))
       ramlConfig.requestDataStructure("/users", "get") shouldBe DataStructure(usersHeaders, usersBody)
 
-      val testServiceHeaders = Seq(Header("x_http_forwarded_for"), Header("authToken"))
-      val testServiceBody = Body(Seq(Field("mode", false), Field("resultType", false)))
+      val testServiceHeaders = Seq(Header("authToken"))
+      val testServiceBody = Body(Seq(Field("mode", false), Field("resultType", false), Field("clientIP", false), Field("clientLanguage", false)))
       ramlConfig.requestDataStructure("/status/test-service", "get") shouldBe DataStructure(testServiceHeaders, testServiceBody)
     }
 

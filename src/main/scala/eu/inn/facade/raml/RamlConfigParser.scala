@@ -109,7 +109,7 @@ class RamlConfigParser(val api: Api) {
 
   private def extractResourceTraits(resource: Resource): Traits = {
     val commonResourceTraits = extractTraits(resource.is())
-    val methodSpecificTraits = resource.methods().foldLeft(Map[Method, Set[Trait]]()) { (specificTraits, ramlMethod) ⇒
+    val methodSpecificTraits = resource.methods().foldLeft(Map[Method, Seq[Trait]]()) { (specificTraits, ramlMethod) ⇒
       val method = Method(ramlMethod.method())
       val methodTraits = extractTraits(ramlMethod.is())
       specificTraits + ((method, (methodTraits ++ commonResourceTraits)))
@@ -117,10 +117,10 @@ class RamlConfigParser(val api: Api) {
     Traits(commonResourceTraits, methodSpecificTraits)
   }
 
-  private def extractTraits(traits: java.util.List[TraitRef]): Set[Trait] = {
-    traits.foldLeft(Set[Trait]()) {
+  private def extractTraits(traits: java.util.List[TraitRef]): Seq[Trait] = {
+    traits.foldLeft(Seq[Trait]()) {
       (accumulator, traitRef) ⇒
-        accumulator + Trait(traitRef.value.getRAMLValueName)
+        accumulator :+ Trait(traitRef.value.getRAMLValueName)
     }
   }
 }

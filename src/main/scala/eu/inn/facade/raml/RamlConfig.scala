@@ -2,7 +2,7 @@ package eu.inn.facade.raml
 
 class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
 
-  def traits(url: String, method: String): Set[String] = {
+  def traits(url: String, method: String): Seq[String] = {
     val traits = resourcesByUrl(url).traits
     traits.methodSpecificTraits
       .getOrElse(Method(method), traits.commonTraits)
@@ -25,7 +25,7 @@ object ResourceConfig {
   }
 }
 
-case class Traits(commonTraits: Set[Trait], methodSpecificTraits: Map[Method, Set[Trait]])
+case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
 
 case class Requests(dataStructures: Map[Method, DataStructure])
 

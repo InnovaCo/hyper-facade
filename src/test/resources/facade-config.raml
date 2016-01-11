@@ -20,7 +20,18 @@ types:
     properties:
       mode: string
       resultType: string
+      clientIP:
+        type: string
+        (x-content):
+      clientLanguage:
+        type: string
+        (x-http-header):
+          headerName: Accept-Language
 annotationTypes:
+  x-content:
+  x-http-header:
+    properties:
+      headerName: string
   private:
 traits:
   secured:
@@ -50,7 +61,6 @@ traits:
       body:
         type: TestRequest
       headers:
-        x_http_forwarded_for:
         authToken:
       responses:
         200:
