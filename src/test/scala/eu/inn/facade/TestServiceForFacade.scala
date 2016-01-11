@@ -22,14 +22,14 @@ case class TestBodyForFacade(content: String) extends Body
 case class TestRequestForFacade(body: TestBodyForFacade, messageId: String, correlationId: String) extends StaticGet(body)
 with DefinedResponse[Ok[DynamicBody]]
 
-object EventPublishingService extends App {
+object TestServiceForFacade extends App {
   val transportConfiguration = TransportConfigurationLoader.fromConfig(ConfigFactory.load())
   val transportManager = new TransportManager(transportConfiguration)
   val hyperBus = new HyperBus(transportManager, Some("group1"))
-  val publishingService = new EventPublishingService(new HyperBus(transportManager, Some("group1")))
+  val publishingService = new TestServiceForFacade(new HyperBus(transportManager, Some("group1")))
   val config = ConfigFactory.load()
   startSeedNode
-  publishingService.onCommand()
+  publishingService.onCommand(Ok(DynamicBody(Text("another result"))))
 
   def startSeedNode: Unit = {
     val serviceConfig = config.getConfig("seed-node-service")
@@ -43,7 +43,7 @@ object EventPublishingService extends App {
  * NOT THREAD SAFE
  * This class is just a test stuff for publishing events to HyperBus. It operates just with requests of type `TestRequestForFacade`
  */
-class EventPublishingService(hyperBus: HyperBus) {
+class TestServiceForFacade(hyperBus: HyperBus) {
   val requestCounter = new AtomicInteger
   val defaultCallback = {() => println("default")}
 
@@ -59,10 +59,10 @@ class EventPublishingService(hyperBus: HyperBus) {
     hyperBus <| request
   }
 
-  def onCommand(): String = {
+  def onCommand(response: Response[Body]): String = {
     hyperBus.onCommand(Topic("/test-service"), Method.GET, None) { request: DynamicRequest ⇒
       Future {
-        Ok(DynamicBody(Text("another result")))
+        response
       }
     }
   }

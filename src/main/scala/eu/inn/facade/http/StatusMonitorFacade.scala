@@ -23,9 +23,9 @@ class StatusMonitorFacade(implicit inj: Injector) extends Injectable {
   implicit val actorSystem = inject[ActorSystem]
   implicit val executionContext = inject[ExecutionContext]
 
-  lazy val statusMonitorRoutes = new RestRoutes {
+  val statusMonitorRoutes = new RestRoutes {
 
-    lazy val routes: Route =
+    val routes: Route =
       get {
         complete {
           hyperBus <~ DynamicGet("/test-service", DynamicBody(EmptyBody.contentType, Null)) map { result ⇒

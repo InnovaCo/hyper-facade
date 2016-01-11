@@ -14,7 +14,7 @@ object MainApp extends App with Injectable {
 
   new WsRestServiceApp("localhost", 8080) {
     start {
-      path("/test-service") {
+      pathPrefix("test-service") {
         statusMonitorFacade.statusMonitorRoutes.routes
       }
     }
@@ -26,6 +26,6 @@ object MainApp extends App with Injectable {
     val filtersModule = new FiltersModule
     val injector = new ConfigModule :: filtersModule :: new ServiceModule
     filtersModule.initOuterBindings
-    injector
+    injector.initNonLazy
   }
 }

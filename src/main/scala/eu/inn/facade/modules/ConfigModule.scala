@@ -7,6 +7,6 @@ import scaldi.Module
 
 class ConfigModule extends Module {
 
-  bind [Config]     identifiedBy 'config to new ConfigsFactory().config
-  bind [RamlConfig] identifiedBy 'raml   to new ConfigsFactory().ramlConfig(inject [Config] )
+  bind [Config]     identifiedBy 'config toNonLazy new ConfigsFactory().config
+  bind [RamlConfig] identifiedBy 'raml   toNonLazy new ConfigsFactory().ramlConfig(inject [Config] )
 }

@@ -16,11 +16,11 @@ import scala.util.Success
 /**
  * This tests requires Kafka up and running
  */
-class EventPublishingServiceTest extends FreeSpec with ScalaFutures with Matchers with BeforeAndAfter with BeforeAndAfterAll {
+class TestServiceForFacadeTest extends FreeSpec with ScalaFutures with Matchers with BeforeAndAfter with BeforeAndAfterAll {
   val transportConfiguration = TransportConfigurationLoader.fromConfig(ConfigFactory.load())
   val transportManager = new TransportManager(transportConfiguration)
   val hyperBus = new HyperBus(transportManager, Some("group1"))
-  val publishingService = new EventPublishingService(new HyperBus(transportManager, Some("group1")))
+  val publishingService = new TestServiceForFacade(new HyperBus(transportManager, Some("group1")))
   
   after {
     publishingService.unsubscribe
@@ -35,7 +35,7 @@ class EventPublishingServiceTest extends FreeSpec with ScalaFutures with Matcher
     }
   }
   
-  "EventPublishingService " - {
+  "TestServiceForFacade " - {
     "publish" in {
       val request = TestRequestForFacade(TestBodyForFacade("ha ha"),
         "123",
