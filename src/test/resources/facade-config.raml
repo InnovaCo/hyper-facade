@@ -7,7 +7,7 @@ types:
     properties:
       statusCode: number
       processedBy:
-        (private):
+        (privateField):
         type: string
 
   StatusRequest:
@@ -21,23 +21,20 @@ types:
       mode: string
       resultType: string
       clientIP:
+        (x-client-ip):
         type: string
-        (x-content):
       clientLanguage:
+        (x-client-language):
         type: string
-        (x-http-header):
-          headerName: Accept-Language
 annotationTypes:
-  x-content:
-  x-http-header:
-    properties:
-      headerName: string
-  private:
+  x-client-ip:
+  x-client-language:
+  privateField:
 traits:
   secured:
   paged:
   rateLimited:
-  private:
+  privateResource:
 /users:
   is: [ secured ]
   get:
@@ -72,4 +69,4 @@ traits:
           body:
             type: string
 /private:
-  is: [ private ]
+  is: [ privateResource ]

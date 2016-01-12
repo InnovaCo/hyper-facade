@@ -2,19 +2,29 @@ package eu.inn.facade.raml
 
 class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
 
-  def traits(url: String, method: String): Seq[String] = {
+  def traitNames(url: String, method: String): Seq[String] = {
     val traits = resourcesByUrl(url).traits
     traits.methodSpecificTraits
       .getOrElse(Method(method), traits.commonTraits)
       .map(foundTrait ⇒ foundTrait.name)
   }
 
-  def requestDataStructure(url: String, method: String): DataStructure = {
-    resourcesByUrl(url).requests.dataStructures(Method(method))
+  def requestDataStructure(url: String, method: String): Option[DataStructure] = {
+    resourcesByUrl(url).requests.dataStructures.get(Method(method))
   }
 
-  def responseDataStructure(url: String, method: String, statusCode: Int): DataStructure = {
-    resourcesByUrl(url).responses.dataStructures((Method(method), statusCode))
+  def responseDataStructure(url: String, method: String, statusCode: Int): Option[DataStructure] = {
+    resourcesByUrl(url).responses.dataStructures.get((Method(method), statusCode))
+  }
+
+  def responseDataStructures(url: String, method: String): Seq[DataStructure] = {
+    val allStructures = resourcesByUrl(url).responses.dataStructures
+    allStructures.foldLeft(Seq[DataStructure]()) { (structuresByMethod, kv) ⇒
+      val (httpMethod, _) = kv._1
+      val structure = kv._2
+      if (httpMethod == Method(method)) structuresByMethod :+ structure
+      else structuresByMethod
+    }
   }
 }
 
@@ -46,4 +56,13 @@ case class Header(name: String)
 
 case class Body(fields: Seq[Field])
 
-case class Field(name: String, isPrivate: Boolean = false)
+case class Field(name: String, annotations: Seq[Annotation]) {
+  def isPrivate: Boolean = annotations.contains(Annotation(Annotation.PRIVATE))
+}
+
+case class Annotation(name: String)
+object Annotation {
+  val PRIVATE = "privateField"
+  val CLIENT_LANGUAGE = "x-client-language"
+  val CLIENT_IP = "x-client-ip"
+}

@@ -2,67 +2,54 @@ package eu.inn.facade.filter
 
 import eu.inn.binders.dynamic.{Obj, Text}
 import eu.inn.facade.filter.model._
-import eu.inn.facade.raml.{DataStructure, Field, RamlConfig}
+import eu.inn.facade.raml.Annotation._
+import eu.inn.facade.raml.{Annotation, RamlConfig}
 import eu.inn.hyperbus.model.DynamicBody
 
 import scala.concurrent.ExecutionContext.Implicits.global
+
 import scala.concurrent.Future
 
-abstract class EnrichmentFilter(val ramlConfig: RamlConfig) extends Filter {
-  val LANGUAGE_FIELD = "language"
-  val CLIENT_IP_FIELD = "clientIp"
-
-  def getDataStructure(headers: Headers): DataStructure
+class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
 
   override def apply(headers: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
     Future {
-      val enrichedHeaders = enrichHeaders(headers)
-      val filteredBody = filterBody(body, getDataStructure(headers))
-      val enrichedBody = enrichBody(enrichedHeaders, filteredBody)
-      (enrichedHeaders, enrichedBody)
+      val enrichedBody = enrichBody(headers, body)
+      (headers, enrichedBody)
     }
-  }
-
-  // TODO: sort out if headers should be enriched
-  def enrichHeaders(headers: Headers): Headers = {
-    headers
   }
 
   def enrichBody(headers: Headers, body: DynamicBody): DynamicBody = {
     var enrichedBody = body
-    val fields = getDataStructure(headers).body.fields
-    if (fields.contains(Field(LANGUAGE_FIELD))) {
-      val clientLanguage = headers.headers.get("Accept-Language")
-      enrichedBody = clientLanguage match {
-        case Some(language) ⇒ {
-          val bodyFields = body.content.asMap + ((LANGUAGE_FIELD, Text(language)))
-          DynamicBody(Obj(bodyFields))
-        }
-        case None ⇒ body
-      }
+    val dataStructure = getDataStructure(headers)
+    dataStructure match {
+      case Some(structure) ⇒
+        val fields = structure.body.fields
+        fields.filter(_.annotations.contains(Annotation(CLIENT_LANGUAGE)))
+          .foreach { field ⇒
+            val clientLanguage = headers.headers.get("Accept-Language")
+            enrichedBody = clientLanguage match {
+              case Some(language) ⇒ {
+                val bodyFields = body.content.asMap + ((field.name, Text(language)))
+                DynamicBody(Obj(bodyFields))
+              }
+              case None ⇒ body
+            }
+          }
+        fields.filter(_.annotations.contains(Annotation(CLIENT_IP)))
+          .foreach { field ⇒
+            val clientIp = headers.headers.get("http_x_forwarded_for")
+            enrichedBody = clientIp match {
+              case Some(ip) ⇒ {
+                val bodyFields = body.content.asMap + ((field.name, Text(ip)))
+                DynamicBody(Obj(bodyFields))
+              }
+              case None ⇒ body
+            }
+          }
+      case None ⇒
     }
-    if (fields.contains(Field(CLIENT_IP_FIELD))) {
-      val clientIp = headers.headers.get("http_x_forwarded_for")
-      enrichedBody = clientIp match {
-        case Some(ip) ⇒ {
-          val bodyFields = body.content.asMap + ((CLIENT_IP_FIELD, Text(ip)))
-          DynamicBody(Obj(bodyFields))
-        }
-        case None ⇒ body
-      }
-    }
-    enrichedBody
-  }
 
-  def filterBody(body: DynamicBody, dataStructure: DataStructure): DynamicBody = {
-    val privateFieldNames = dataStructure.body.fields.foldLeft(Seq[String]()) { (privateFields, field) ⇒
-      if (field.isPrivate) privateFields :+ field.name
-      else privateFields
-    }
-    var bodyFields = body.content.asMap
-    privateFieldNames.foreach { fieldName ⇒
-      bodyFields -= fieldName
-    }
-    DynamicBody(Obj(bodyFields))
+    enrichedBody
   }
 }

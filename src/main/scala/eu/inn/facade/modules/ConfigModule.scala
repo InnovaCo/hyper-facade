@@ -2,7 +2,7 @@ package eu.inn.facade.modules
 
 import com.typesafe.config.Config
 import eu.inn.facade.ConfigsFactory
-import eu.inn.facade.raml.{RamlConfig, RamlConfigParser$}
+import eu.inn.facade.raml.RamlConfig
 import scaldi.Module
 
 class ConfigModule extends Module {

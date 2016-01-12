@@ -21,11 +21,11 @@ class RestServiceApp(interface: String, port: Int)(implicit inj: Injector) exten
   with Injectable {
 
   implicit val timeout = Timeout(10 seconds)
-  implicit val actorSystem = inject[ActorSystem]
-  implicit val executionContext = inject[ExecutionContext]
+  implicit val actorSystem = inject [ActorSystem]
+  implicit val executionContext = inject [ExecutionContext]
 
-  private val conf = inject[Config].getConfig("inn.util.http.rest-service")
-  private val handleErrorsDirectives = inject[HandleErrorsDirectives]
+  private val conf = inject [Config].getConfig("inn.util.http.rest-service")
+  private val handleErrorsDirectives = inject [HandleErrorsDirectives]
   private val ErrorHandlerHeader = "X-Errors-Handled"
   val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
 

@@ -67,7 +67,7 @@ class RamlConfigParser(val api: Api) {
         case Some(typeDefinition) ⇒
           val fields = typeDefinition.asInstanceOf[ObjectFieldImpl].properties().foldLeft(Seq[Field] ()) {
             (fieldList, ramlField) ⇒
-              val field = Field(ramlField.name(), isPrivate(ramlField))
+              val field = Field(ramlField.name(), extractAnnotations(ramlField))
               fieldList :+ field
           }
           val body = Body(fields)
@@ -99,12 +99,10 @@ class RamlConfigParser(val api: Api) {
     }
   }
 
-  private def isPrivate(ramlField: DataElement): Boolean = {
-    var result = false
-    ramlField.annotations.foreach { annotation ⇒
-      result |= annotation.value.getRAMLValueName == "private"
+  private def extractAnnotations(ramlField: DataElement): Seq[Annotation] = {
+    ramlField.annotations.foldLeft(Seq[Annotation]()) { (annotations, annotation) ⇒
+      annotations :+ Annotation(annotation.value.getRAMLValueName)
     }
-    result
   }
 
   private def extractResourceTraits(resource: Resource): Traits = {

@@ -11,6 +11,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class PrivateResourceFilter extends InputFilter {
+
   override def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
     val error = new ByteArrayOutputStream()
     ErrorBody("Not Found").serialize(error)

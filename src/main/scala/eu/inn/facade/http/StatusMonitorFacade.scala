@@ -18,10 +18,10 @@ import scala.concurrent.ExecutionContext
 
 class StatusMonitorFacade(implicit inj: Injector) extends Injectable {
 
-  val hyperBus = inject[HyperBus]
+  val hyperBus = inject [HyperBus]
   val log = LoggerFactory.getLogger(StatusMonitorFacade.this.getClass.getName)
-  implicit val actorSystem = inject[ActorSystem]
-  implicit val executionContext = inject[ExecutionContext]
+  implicit val actorSystem = inject [ActorSystem]
+  implicit val executionContext = inject [ExecutionContext]
 
   val statusMonitorRoutes = new RestRoutes {
 

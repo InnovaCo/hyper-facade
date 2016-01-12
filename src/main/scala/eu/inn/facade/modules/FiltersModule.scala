@@ -2,8 +2,8 @@ package eu.inn.facade.modules
 
 import com.typesafe.config.Config
 import eu.inn.facade.filter.chain.{FilterChainFactory, FilterChainRamlFactory}
-import eu.inn.facade.filter.model.Filter
-import eu.inn.facade.filter.{InputEnrichmentFilter, OutputEnrichmentFilter, PrivateResourceFilter}
+import eu.inn.facade.filter.model.{OutputFilter, InputFilter, Filter}
+import eu.inn.facade.filter._
 import eu.inn.facade.raml.RamlConfig
 import scaldi.Module
 
@@ -11,10 +11,12 @@ import scala.collection.JavaConversions._
 
 class FiltersModule extends Module {
 
-  bind [Filter]             identifiedBy 'private           to new PrivateResourceFilter
-  bind [Filter]             identifiedBy 'inputEnrichment   to new InputEnrichmentFilter(inject [RamlConfig] )
-  bind [Filter]             identifiedBy 'outputEnrichment  to new OutputEnrichmentFilter(inject [RamlConfig] )
-  bind [FilterChainFactory] identifiedBy 'ramlFilterChain   to new FilterChainRamlFactory
+  bind [Seq[Filter]]        identifiedBy "privateResource"                      to Seq(new PrivateResourceFilter)
+  bind [Seq[Filter]]        identifiedBy "privateField"                         to Seq(new PrivateFieldsFilter(inject [RamlConfig] ) with InputFilter,
+                                                                                       new PrivateFieldsFilter(inject [RamlConfig] ) with OutputFilter)
+  bind [Seq[Filter]]        identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilter(inject [RamlConfig] ) with InputFilter,
+                                                                                       new EnrichmentFilter(inject [RamlConfig] ) with OutputFilter)
+  bind [FilterChainFactory] identifiedBy 'ramlFilterChain                       to new FilterChainRamlFactory
 
   def initOuterBindings: Unit = {
     val config = inject[Config]

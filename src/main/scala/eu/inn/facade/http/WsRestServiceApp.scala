@@ -21,12 +21,12 @@ class WsRestServiceApp(interface: String, port: Int)(implicit inj: Injector)
   extends RestServiceApp(interface, port)
   with Injectable {
 
-  private val stats = inject[StatsReporterFactory].createStats("http")
+  private val stats = inject [StatsReporterFactory].createStats("http")
   private val connectionCountStat = stats.counter("connection-count")
   private val rejectedConnectionsMetter = stats.meter("rejected-connects")
-  val config = inject[Config]
-  val hyperBus = inject[HyperBus]
-  val subscriptionsManager = inject[SubscriptionsManager]
+  val config = inject [Config]
+  val hyperBus = inject [HyperBus]
+  val subscriptionsManager = inject [SubscriptionsManager]
 
   @volatile private[this] var _refFactory: Option[ActorRefFactory] = None
 

@@ -9,7 +9,7 @@ import scaldi.{Injector, Injectable}
 object MainApp extends App with Injectable {
 
   implicit val injector = getInjector
-  val statusMonitorFacade = inject[StatusMonitorFacade]
+  val statusMonitorFacade = inject [StatusMonitorFacade]
   val log = LoggerFactory.getLogger(MainApp.getClass.getName)
 
   new WsRestServiceApp("localhost", 8080) {
@@ -19,7 +19,7 @@ object MainApp extends App with Injectable {
       }
     }
   }
-  val hyperBus = inject[HyperBus]  // it's time to initialize hyperbus
+  val hyperBus = inject [HyperBus]  // it's time to initialize hyperbus
   log.info("hyperbus is starting...: {}", hyperBus)
 
   def getInjector: Injector = {

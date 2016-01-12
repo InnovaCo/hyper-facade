@@ -33,7 +33,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   var remoteAddress = clientAddress
   var request: Option[HttpRequest] = None
 
-  val filterChainComposer = inject[FilterChainFactory]
+  val filterChainComposer = inject [FilterChainFactory]
 
   override def preStart(): Unit = {
     super.preStart()
