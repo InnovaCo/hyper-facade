@@ -103,25 +103,17 @@ traits:
   is: [ privateResource ]
 /unreliable-feed:
   is: [ streamed-unreliable ]
-  get:
+  put:
     body:
-      type: ResourceRequest
-    responses:
-      300:
-        body:
-          application/vnd+app-server-status.json:
-            type: ResourceState
-          application/vnd+app-server-status-update.json:
-            type: ResourceUpdate
+      application/vnd+app-server-status.json:
+        type: ResourceState
+      application/vnd+app-server-status-update.json:
+        type: ResourceUpdate
 /reliable-feed:
   is: [ streamed-reliable ]
-  get:
+  put:
     body:
-      type: ResourceRequest
-    responses:
-      200:
-        body:
-          application/vnd+app-server-status.json:
-            type: ReliableResourceState
-          application/vnd+app-server-status-update.json:
-            type: ReliableResourceUpdate
+      application/vnd+app-server-status.json:
+        type: ReliableResourceState
+      application/vnd+app-server-status-update.json:
+        type: ReliableResourceUpdate

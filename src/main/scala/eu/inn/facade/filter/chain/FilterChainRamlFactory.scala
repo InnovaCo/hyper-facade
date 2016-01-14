@@ -10,8 +10,8 @@ class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory 
 
   val ramlConfig = inject[RamlConfig]
 
-  override def inputFilterChain(url: String, method: String): FilterChain = {
-    val dataStructure = ramlConfig.requestDataStructure(url, method)
+  override def inputFilterChain(url: String, method: String, contentType: Option[String]): FilterChain = {
+    val dataStructure = ramlConfig.requestDataStructure(url, method, contentType)
     val dataStructures: Seq[DataStructure] = dataStructure match {
       case Some(structure) ⇒ Seq(structure)
       case None ⇒ Seq()
@@ -20,8 +20,8 @@ class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory 
     FilterChain(inputFilters)
   }
 
-  override def outputFilterChain(url: String, method: String, contentType: Option[String]): FilterChain = {
-    val dataStructures: Seq[DataStructure] = ramlConfig.responseDataStructures(url, method, contentType)
+  override def outputFilterChain(url: String, method: String): FilterChain = {
+    val dataStructures: Seq[DataStructure] = ramlConfig.responseDataStructures(url, method)
     val outputFilters = filters(url, method, dataStructures).filter(_.isOutputFilter)
     FilterChain(outputFilters)
   }

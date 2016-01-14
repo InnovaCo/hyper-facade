@@ -9,20 +9,20 @@ class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
       .map(foundTrait ⇒ foundTrait.name)
   }
 
-  def requestDataStructure(url: String, method: String): Option[DataStructure] = {
-    resourcesByUrl(url).requests.dataStructures.get(Method(method))
+  def requestDataStructure(url: String, method: String, contentType: Option[String]): Option[DataStructure] = {
+    resourcesByUrl(url).requests.dataStructures.get(Method(method), getContentType(contentType))
   }
 
-  def responseDataStructure(url: String, method: String, statusCode: Int, contentType: Option[String]): Option[DataStructure] = {
-    resourcesByUrl(url).responses.dataStructures.get((Method(method), statusCode, getContentType(contentType)))
+  def responseDataStructure(url: String, method: String, statusCode: Int): Option[DataStructure] = {
+    resourcesByUrl(url).responses.dataStructures.get((Method(method), statusCode))
   }
 
-  def responseDataStructures(url: String, method: String, contentType: Option[String]): Seq[DataStructure] = {
+  def responseDataStructures(url: String, method: String): Seq[DataStructure] = {
     val allStructures = resourcesByUrl(url).responses.dataStructures
     allStructures.foldLeft(Seq[DataStructure]()) { (structuresByMethod, kv) ⇒
-      val (httpMethod, _, ramlMediaType) = kv._1
+      val (httpMethod, _) = kv._1
       val structure = kv._2
-      if ((httpMethod == Method(method)) && (ramlMediaType == contentType)) structuresByMethod :+ structure
+      if (httpMethod == Method(method)) structuresByMethod :+ structure
       else structuresByMethod
     }
   }
@@ -44,9 +44,9 @@ object ResourceConfig {
 
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
 
-case class Requests(dataStructures: Map[Method, DataStructure])
+case class Requests(dataStructures: Map[(Method, Option[ContentType]), DataStructure])
 
-case class Responses(dataStructures: Map[(Method, Int, Option[ContentType]), DataStructure])
+case class Responses(dataStructures: Map[(Method, Int), DataStructure])
 
 case class Trait(name: String)
 

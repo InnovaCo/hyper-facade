@@ -39,30 +39,32 @@ class RamlConfigParser(val api: Api) {
   }
 
   private def extractResourceRequests(resource: Resource): Requests = {
-    val requestsByMethod = resource.methods.foldLeft(Map[(Method), DataStructure]()) { (requests, ramlMethod) ⇒
-      val dataTypes: Map[Option[ContentType], DataStructure] = extractTypeDefinitions(RamlRequestResponseWrapper(ramlMethod))
+    val acc = Map[(Method, Option[ContentType]), DataStructure]()
+    val requestsByMethodAndType = resource.methods.foldLeft(acc) { (requestMap, ramlMethod) ⇒
       val method = Method(ramlMethod.method())
-      dataTypes.foldLeft(requests) { (requestMap, mapEntry) ⇒
-        requestMap + ((method, mapEntry._2))
+      val dataTypes: Map[Option[ContentType], DataStructure] = extractTypeDefinitions(RamlRequestResponseWrapper(ramlMethod))
+      dataTypes.foldLeft(requestMap) { (requestMap, mapEntry) ⇒
+        val (contentType, dataStructure) = mapEntry
+        requestMap + (((method, contentType), dataStructure))
       }
     }
-    Requests(requestsByMethod)
+    Requests(requestsByMethodAndType)
   }
 
   private def extractResourceResponses(resource: Resource): Responses = {
-    val acc = Map[(Method, Int, Option[ContentType]), DataStructure]()
-    val responsesByMethodAndType = resource.methods.foldLeft(acc) { (responseMap, ramlMethod) ⇒
+    val acc = Map[(Method, Int), DataStructure]()
+    val responsesByMethod = resource.methods.foldLeft(acc) { (responseMap, ramlMethod) ⇒
       val method = Method(ramlMethod.method())
       ramlMethod.responses.foldLeft(responseMap) { (responseMap, ramlResponse) ⇒
         val statusCode: Int = Integer.parseInt(ramlResponse.code.value)
         val dataTypesMap: Map[Option[ContentType], DataStructure] = extractTypeDefinitions(RamlRequestResponseWrapper(ramlResponse))
         dataTypesMap.foldLeft(responseMap) { (responseMap, mapEntry) ⇒
-          val (contentType, dataStructure) = mapEntry
-          responseMap + (((method, statusCode, contentType), dataStructure))
+          val dataStructure = mapEntry._2
+          responseMap + (((method, statusCode), dataStructure))
         }
       }
     }
-    Responses(responsesByMethodAndType)
+    Responses(responsesByMethod)
   }
 
   private def extractTypeDefinitions(ramlReqRspWrapper: RamlRequestResponseWrapper): Map[Option[ContentType], DataStructure] = {

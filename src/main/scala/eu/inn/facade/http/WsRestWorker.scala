@@ -85,7 +85,8 @@ with Injectable {
         if (isPingRequest(url, method)) pong(dynamicRequest)
         else {
           val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest, Map("http_x_forwarded_for" → remoteAddress))
-          filterChainComposer.inputFilterChain(url, method).applyFilters(headers, dynamicBody) onComplete {
+          val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
+          filterChainComposer.inputFilterChain(url, method, contentType).applyFilters(headers, dynamicBody) onComplete {
             case Success((filteredHeaders, filteredBody)) ⇒
               val filteredDynamicRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
               processRequest(filteredDynamicRequest)
@@ -111,8 +112,7 @@ with Injectable {
       val url = dynamicRequest.url
       val method = dynamicRequest.method
       val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-      val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
-      filterChainComposer.outputFilterChain(url, method, contentType).applyFilters(headers, dynamicBody) onComplete {
+      filterChainComposer.outputFilterChain(url, method).applyFilters(headers, dynamicBody) onComplete {
         case Success((filteredHeaders, filteredBody)) ⇒
           send(RequestMapper.toDynamicRequest(filteredHeaders, filteredBody))
 

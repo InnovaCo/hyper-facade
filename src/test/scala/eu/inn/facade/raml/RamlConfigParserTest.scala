@@ -33,7 +33,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers {
     "request data structure" in {
       val usersHeaders = Seq(Header("authToken"))
       val usersBody = Body(DataType("StatusRequest", Seq(Field("serviceType", DataType())), Seq()))
-      ramlConfig.requestDataStructure("/users", "get") shouldBe Some(DataStructure(usersHeaders, Some(usersBody)))
+      ramlConfig.requestDataStructure("/users", "get", None) shouldBe Some(DataStructure(usersHeaders, Some(usersBody)))
 
       val testServiceHeaders = Seq(Header("authToken"))
       val testServiceBody = Body(
@@ -43,7 +43,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers {
               Field("clientIP", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(CLIENT_IP)))),
               Field("clientLanguage", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(CLIENT_LANGUAGE))))),
           Seq()))
-      ramlConfig.requestDataStructure("/status/test-service", "get") shouldBe Some(DataStructure(testServiceHeaders, Some(testServiceBody)))
+      ramlConfig.requestDataStructure("/status/test-service", "get", None) shouldBe Some(DataStructure(testServiceHeaders, Some(testServiceBody)))
     }
 
     "response data structure" in {
@@ -53,7 +53,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers {
           Seq(Field("statusCode", DataType("number", Seq(), Seq())),
               Field("processedBy", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(PRIVATE))))),
           Seq()))
-      ramlConfig.responseDataStructure("/users", "get", 200, None) shouldBe Some(DataStructure(usersHeaders, Some(usersBody)))
+      ramlConfig.responseDataStructure("/users", "get", 200) shouldBe Some(DataStructure(usersHeaders, Some(usersBody)))
 
       val testServiceHeaders = Seq(Header("content-type"))
       val testServiceBody = Body(
@@ -61,14 +61,14 @@ class RamlConfigParserTest extends FreeSpec with Matchers {
           Seq(Field("statusCode", DataType("number", Seq(), Seq())),
               Field("processedBy", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(PRIVATE))))),
           Seq()))
-      ramlConfig.responseDataStructure("/status/test-service", "get", 200, None) shouldBe Some(DataStructure(testServiceHeaders, Some(testServiceBody)))
+      ramlConfig.responseDataStructure("/status/test-service", "get", 200) shouldBe Some(DataStructure(testServiceHeaders, Some(testServiceBody)))
 
       val test404Headers = Seq[Header]()
       val test404Body = Body(DataType())
-      ramlConfig.responseDataStructure("/status/test-service", "get", 404, None) shouldBe Some(DataStructure(test404Headers, Some(test404Body)))
+      ramlConfig.responseDataStructure("/status/test-service", "get", 404) shouldBe Some(DataStructure(test404Headers, Some(test404Body)))
     }
 
-    "response data structures by contentType" in {
+    "request data structures by contentType" in {
       val feedHeaders = Seq()
       val reliableResourceStateBody = Body(
         DataType("ReliableResourceState",
@@ -83,8 +83,8 @@ class RamlConfigParserTest extends FreeSpec with Matchers {
       val resourceStateContentType = Some("application/vnd+app-server-status.json")
       val resourceUpdateContentType = Some("application/vnd+app-server-status-update.json")
 
-      ramlConfig.responseDataStructure("/reliable-feed", "get", 200, resourceStateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceStateBody)))
-      ramlConfig.responseDataStructure("/reliable-feed", "get", 200, resourceUpdateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceUpdateBody)))
+      ramlConfig.requestDataStructure("/reliable-feed", "put", resourceStateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceStateBody)))
+      ramlConfig.requestDataStructure("/reliable-feed", "put", resourceUpdateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceUpdateBody)))
     }
   }
 }
