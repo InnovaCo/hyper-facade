@@ -11,6 +11,8 @@ import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
 import com.typesafe.config.Config
 
+import eu.inn.facade.raml.DataType._
+
 import scala.collection.JavaConversions._
 
 class RamlConfigParser(val api: Api) {
@@ -37,54 +39,77 @@ class RamlConfigParser(val api: Api) {
   }
 
   private def extractResourceRequests(resource: Resource): Requests = {
-    val requestsByMethod = resource.methods.foldLeft(Map[Method, DataStructure]()) { (requestMap, ramlMethod) ⇒
-      val dataType: DataStructure = extractTypeDefinition(RamlRequestResponseWrapper(ramlMethod))
-      requestMap + ((Method(ramlMethod.method()), dataType))
+    val requestsByMethod = resource.methods.foldLeft(Map[(Method), DataStructure]()) { (requests, ramlMethod) ⇒
+      val dataTypes: Map[Option[ContentType], DataStructure] = extractTypeDefinitions(RamlRequestResponseWrapper(ramlMethod))
+      val method = Method(ramlMethod.method())
+      dataTypes.foldLeft(requests) { (requestMap, mapEntry) ⇒
+        requestMap + ((method, mapEntry._2))
+      }
     }
     Requests(requestsByMethod)
   }
 
   private def extractResourceResponses(resource: Resource): Responses = {
-    var responses = Map[(Method, Int), DataStructure]()
-    resource.methods.foreach { ramlMethod ⇒
+    val acc = Map[(Method, Int, Option[ContentType]), DataStructure]()
+    val responsesByMethodAndType = resource.methods.foldLeft(acc) { (responseMap, ramlMethod) ⇒
       val method = Method(ramlMethod.method())
-      val responsesByCodes = ramlMethod.responses.foreach { ramlResponse ⇒
-        val statusCode: Int = Integer.parseInt(ramlResponse.code.value).toInt
-        val dataType = extractTypeDefinition(RamlRequestResponseWrapper(ramlResponse))
-        responses += (((method, statusCode), dataType))
+      ramlMethod.responses.foldLeft(responseMap) { (responseMap, ramlResponse) ⇒
+        val statusCode: Int = Integer.parseInt(ramlResponse.code.value)
+        val dataTypesMap: Map[Option[ContentType], DataStructure] = extractTypeDefinitions(RamlRequestResponseWrapper(ramlResponse))
+        dataTypesMap.foldLeft(responseMap) { (responseMap, mapEntry) ⇒
+          val (contentType, dataStructure) = mapEntry
+          responseMap + (((method, statusCode, contentType), dataStructure))
+        }
       }
     }
-    Responses(responses)
+    Responses(responsesByMethodAndType)
   }
 
-  private def extractTypeDefinition(ramlReqRspWrapper: RamlRequestResponseWrapper): DataStructure = {
+  private def extractTypeDefinitions(ramlReqRspWrapper: RamlRequestResponseWrapper): Map[Option[ContentType], DataStructure] = {
     val headers = ramlReqRspWrapper.headers.foldLeft(Seq[Header]()) { (headerList, ramlHeader) ⇒
       headerList :+ Header(ramlHeader.name())
     }
-    val typeName = getTypeName(ramlReqRspWrapper)
-    typeName match {
-      case Some(name) ⇒ getTypeDefinition(name) match {
-        case Some(typeDefinition) ⇒
-          val fields = typeDefinition.asInstanceOf[ObjectFieldImpl].properties().foldLeft(Seq[Field] ()) {
-            (fieldList, ramlField) ⇒
-              val field = Field(ramlField.name(), extractAnnotations(ramlField))
-              fieldList :+ field
-          }
-          val body = Body(fields)
-          val dataType = DataStructure(headers, body)
-          dataType
-        case None ⇒ DataStructure(headers)
+    val typeNames: Map[Option[String], Option[String]] = getTypeNamesByContentType(ramlReqRspWrapper)
+    typeNames.foldLeft(Map[Option[ContentType], DataStructure]()) { (typeDefinitions, typeDefinition) ⇒
+      val (contentTypeName, typeName) = typeDefinition
+      val contentType: Option[ContentType] = contentTypeName match {
+        case Some(name) ⇒ Some(ContentType(name))
+        case None ⇒ None
       }
+      val dataStructure = typeName match {
+        case Some(name) ⇒ getTypeDefinition(name) match {
+          case Some(typeDefinition) ⇒
+            val fields = typeDefinition.asInstanceOf[ObjectFieldImpl].properties().foldLeft(Seq[Field] ()) {
+              (fieldList, ramlField) ⇒
+                val fieldName = ramlField.name
+                val fieldType = ramlField.`type`.get(0)
+                val field = Field(fieldName, DataType(fieldType, Seq(), extractAnnotations(ramlField)))
+                fieldList :+ field
+            }
+            val body = Body(DataType(name, fields, Seq()))
+            val dataType = DataStructure(headers, Some(body))
+            dataType
+          case None ⇒ DataStructure(headers, Some(Body(DataType(DEFAULT_TYPE_NAME, Seq(), Seq()))))
+        }
 
-      case None ⇒ DataStructure(headers)
+        case None ⇒ DataStructure(headers, Some(Body(DataType(DEFAULT_TYPE_NAME, Seq(), Seq()))))
+      }
+      typeDefinitions + ((contentType, dataStructure))
     }
   }
 
-  private def getTypeName(ramlReqRspWrapper: RamlRequestResponseWrapper): Option[String] = {
+  private def getTypeNamesByContentType(ramlReqRspWrapper: RamlRequestResponseWrapper): Map[Option[String], Option[String]] = {
     if (ramlReqRspWrapper.body.isEmpty
       || ramlReqRspWrapper.body.get(0).`type`.isEmpty)
-      None
-    else Some(ramlReqRspWrapper.body.get(0).`type`.get(0))
+      Map(None → None)
+    else {
+      ramlReqRspWrapper.body.foldLeft(Map[Option[String], Option[String]]()) { (typeNames, body) ⇒
+        val contentType = if (body.name == null || body.name == "body") None else Some(body.name)
+        val typeName = body.`type`.get(0)
+        val typeNameOption = if ( typeName == null) None else Some(typeName)
+        typeNames + ((contentType, typeNameOption))
+      }
+    }
   }
 
   private def getTypeDefinition(typeName: String): Option[DataElement] = {

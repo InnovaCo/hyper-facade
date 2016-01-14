@@ -22,15 +22,19 @@ class PrivateFieldsFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
     }
   }
 
-  def filterBody(body: DynamicBody, dataStructure: DataStructure): DynamicBody = {
-    val privateFieldNames = dataStructure.body.fields.foldLeft(Seq[String]()) { (privateFields, field) ⇒
-      if (field.isPrivate) privateFields :+ field.name
-      else privateFields
+  def filterBody(dynamicBody: DynamicBody, dataStructure: DataStructure): DynamicBody = {
+    dataStructure.body match {
+      case Some(body) ⇒
+        val privateFieldNames = body.dataType.fields.foldLeft(Seq[String]()) { (privateFields, field) ⇒
+          if (field.isPrivate) privateFields :+ field.name
+          else privateFields
+        }
+        var bodyFields = dynamicBody.content.asMap
+        privateFieldNames.foreach { fieldName ⇒
+          bodyFields -= fieldName
+        }
+        DynamicBody(Obj(bodyFields))
+      case None ⇒ dynamicBody
     }
-    var bodyFields = body.content.asMap
-    privateFieldNames.foreach { fieldName ⇒
-      bodyFields -= fieldName
-    }
-    DynamicBody(Obj(bodyFields))
   }
 }

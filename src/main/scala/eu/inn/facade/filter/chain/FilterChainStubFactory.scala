@@ -5,7 +5,7 @@ class FilterChainStubFactory extends FilterChainFactory {
     FilterChain(Seq())
   }
 
-  override def outputFilterChain(url: String, method: String): FilterChain = {
+  override def outputFilterChain(url: String, method: String, contentType: Option[String]): FilterChain = {
     FilterChain(Seq())
   }
 }

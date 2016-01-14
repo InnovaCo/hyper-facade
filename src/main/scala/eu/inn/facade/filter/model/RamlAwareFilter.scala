@@ -8,7 +8,8 @@ trait RamlAwareFilter extends Filter {
   def getDataStructure(headers: Headers): Option[DataStructure] = {
     val url = headers.headers(DynamicRequestHeaders.URL)
     val method = headers.headers(DynamicRequestHeaders.METHOD)
+    val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
     if (isInputFilter) ramlConfig.requestDataStructure(url, method)
-    else ramlConfig.responseDataStructure(url, method, headers.statusCode.getOrElse(200))
+    else ramlConfig.responseDataStructure(url, method, headers.statusCode.getOrElse(200), contentType)
   }
 }

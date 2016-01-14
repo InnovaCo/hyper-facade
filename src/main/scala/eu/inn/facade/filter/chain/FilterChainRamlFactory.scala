@@ -8,7 +8,7 @@ import scala.util.{Failure, Success, Try}
 
 class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory with Injectable {
 
-  val ramlConfig = inject [RamlConfig]
+  val ramlConfig = inject[RamlConfig]
 
   override def inputFilterChain(url: String, method: String): FilterChain = {
     val dataStructure = ramlConfig.requestDataStructure(url, method)
@@ -20,8 +20,8 @@ class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory 
     FilterChain(inputFilters)
   }
 
-  override def outputFilterChain(url: String, method: String): FilterChain = {
-    val dataStructures: Seq[DataStructure] = ramlConfig.responseDataStructures(url, method)
+  override def outputFilterChain(url: String, method: String, contentType: Option[String]): FilterChain = {
+    val dataStructures: Seq[DataStructure] = ramlConfig.responseDataStructures(url, method, contentType)
     val outputFilters = filters(url, method, dataStructures).filter(_.isOutputFilter)
     FilterChain(outputFilters)
   }
@@ -38,16 +38,20 @@ class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory 
       }
     }
     dataStructures.foldLeft(filters) { (filters, dataStructure) ⇒
-      dataStructure.body.fields.foldLeft(filters) { (filters, field) ⇒
-        field.annotations.foldLeft(filters) { (filters, annotation) ⇒
-          Try(inject[Seq[Filter]](annotation.name)) match {
-            case Success(annotationBasedFilters) ⇒
-              // we can map single filter on different annotations, so the same filter should not be added twice
-              val notAddedYetFilters = annotationBasedFilters.filter(!filters.contains(_))
-              filters ++ notAddedYetFilters
-            case Failure(_) ⇒ filters
+      dataStructure.body match {
+        case Some(body) ⇒
+          body.dataType.fields.foldLeft(filters) { (filters, field) ⇒
+            field.dataType.annotations.foldLeft(filters) { (filters, annotation) ⇒
+              Try(inject[Seq[Filter]](annotation.name)) match {
+                case Success(annotationBasedFilters) ⇒
+                  // we can map single filter on different annotations, so the same filter should not be added twice
+                  val notAddedYetFilters = annotationBasedFilters.filter(!filters.contains(_))
+                  filters ++ notAddedYetFilters
+                case Failure(_) ⇒ filters
+              }
+            }
           }
-        }
+        case None ⇒ filters
       }
     }
   }

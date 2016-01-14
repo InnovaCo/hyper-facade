@@ -4,6 +4,7 @@ import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{SubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChainFactory
+import eu.inn.facade.filter.model.DynamicRequestHeaders
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard._
@@ -24,16 +25,16 @@ class WsRestWorker(val serverConnection: ActorRef,
                    subscriptionManager: SubscriptionsManager,
                    clientAddress: String)
                   (implicit inj: Injector) extends
-  HttpServiceActor
-  with websocket.WebSocketServerWorker
-  with ActorLogging
-  with Injectable {
+HttpServiceActor
+with websocket.WebSocketServerWorker
+with ActorLogging
+with Injectable {
 
   var isConnectionTerminated = false
   var remoteAddress = clientAddress
   var request: Option[HttpRequest] = None
 
-  val filterChainComposer = inject [FilterChainFactory]
+  val filterChainComposer = inject[FilterChainFactory]
 
   override def preStart(): Unit = {
     super.preStart()
@@ -48,7 +49,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   override def receive = watchConnection orElse handshaking orElse httpRequests
 
   def watchConnection: Receive = {
-    case handshakeRequest @ websocket.HandshakeRequest(state) ⇒ {
+    case handshakeRequest@websocket.HandshakeRequest(state) ⇒ {
       state match {
         case wsContext: websocket.HandshakeContext ⇒
           request = Some(wsContext.request)
@@ -107,17 +108,18 @@ class WsRestWorker(val serverConnection: ActorRef,
       log.error(s"Frame command $x failed from ${sender()}/$remoteAddress")
 
     case dynamicRequest: DynamicRequest ⇒
-        val url = dynamicRequest.url
-        val method = dynamicRequest.method
-        val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-      filterChainComposer.outputFilterChain(url, method).applyFilters(headers, dynamicBody) onComplete {
-          case Success((filteredHeaders, filteredBody)) ⇒
-            send(RequestMapper.toDynamicRequest(filteredHeaders, filteredBody))
+      val url = dynamicRequest.url
+      val method = dynamicRequest.method
+      val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
+      val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
+      filterChainComposer.outputFilterChain(url, method, contentType).applyFilters(headers, dynamicBody) onComplete {
+        case Success((filteredHeaders, filteredBody)) ⇒
+          send(RequestMapper.toDynamicRequest(filteredHeaders, filteredBody))
 
-          case Failure(ex) ⇒
-            val msg = dynamicRequest.toString
-            log.error(ex, s"Failed to apply output filter chain for response $msg")
-        }
+        case Failure(ex) ⇒
+          val msg = dynamicRequest.toString
+          log.error(ex, s"Failed to apply output filter chain for response $msg")
+      }
   }
 
   def httpRequests: Receive = {
@@ -128,7 +130,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   }
 
   def processRequest(request: DynamicRequest) = request match {
-    case request @ DynamicRequest(RequestHeader(_,_,_,messageId,correlationId), _) ⇒
+    case request@DynamicRequest(RequestHeader(_, _, _, messageId, correlationId), _) ⇒
       val key = correlationId.getOrElse(messageId)
       val actorName = "Subscr-" + key
       context.child(actorName) match {
@@ -142,7 +144,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   }
 
   def pong(dynamicRequest: DynamicRequest) = request match {
-    case request @ DynamicRequest(RequestHeader(_, _, _, messageId, correlationId), _) ⇒ {
+    case request@DynamicRequest(RequestHeader(_, _, _, messageId, correlationId), _) ⇒ {
       val finalCorrelationId = correlationId.getOrElse(messageId)
       implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
       send(Ok(DynamicBody(Text("pong"))))
@@ -154,27 +156,27 @@ class WsRestWorker(val serverConnection: ActorRef,
       log.warning(s"Can't send message $message to $serverConnection/$remoteAddress: connection was terminated")
     }
     else {
-        try {
-          send(RequestMapper.toFrame(message))
-        }
-        catch {
-          case t: Throwable ⇒
-            log.error(t, s"Can't serialize $message to $serverConnection/$remoteAddress")
-        }
+      try {
+        send(RequestMapper.toFrame(message))
+      }
+      catch {
+        case t: Throwable ⇒
+          log.error(t, s"Can't serialize $message to $serverConnection/$remoteAddress")
+      }
     }
   }
 }
 
 object WsRestWorker {
   def props(serverConnection: ActorRef,
-    workerRoutes: WsRestRoutes,
-    hyperBus: HyperBus,
-    subscriptionManager: SubscriptionsManager,
-    clientAddress: String)
-    (implicit inj: Injector) = Props(new WsRestWorker(
-                                      serverConnection,
-                                      workerRoutes,
-                                      hyperBus,
-                                      subscriptionManager,
-                                      clientAddress))
+            workerRoutes: WsRestRoutes,
+            hyperBus: HyperBus,
+            subscriptionManager: SubscriptionsManager,
+            clientAddress: String)
+           (implicit inj: Injector) = Props(new WsRestWorker(
+    serverConnection,
+    workerRoutes,
+    hyperBus,
+    subscriptionManager,
+    clientAddress))
 }

@@ -13,17 +13,24 @@ class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
     resourcesByUrl(url).requests.dataStructures.get(Method(method))
   }
 
-  def responseDataStructure(url: String, method: String, statusCode: Int): Option[DataStructure] = {
-    resourcesByUrl(url).responses.dataStructures.get((Method(method), statusCode))
+  def responseDataStructure(url: String, method: String, statusCode: Int, contentType: Option[String]): Option[DataStructure] = {
+    resourcesByUrl(url).responses.dataStructures.get((Method(method), statusCode, getContentType(contentType)))
   }
 
-  def responseDataStructures(url: String, method: String): Seq[DataStructure] = {
+  def responseDataStructures(url: String, method: String, contentType: Option[String]): Seq[DataStructure] = {
     val allStructures = resourcesByUrl(url).responses.dataStructures
     allStructures.foldLeft(Seq[DataStructure]()) { (structuresByMethod, kv) ⇒
-      val (httpMethod, _) = kv._1
+      val (httpMethod, _, ramlMediaType) = kv._1
       val structure = kv._2
-      if (httpMethod == Method(method)) structuresByMethod :+ structure
+      if ((httpMethod == Method(method)) && (ramlMediaType == contentType)) structuresByMethod :+ structure
       else structuresByMethod
+    }
+  }
+
+  def getContentType(contentTypeName: Option[String]): Option[ContentType] = {
+    contentTypeName match {
+      case Some(contentType) ⇒ Some(ContentType(contentType))
+      case None ⇒ None
     }
   }
 }
@@ -39,25 +46,30 @@ case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Se
 
 case class Requests(dataStructures: Map[Method, DataStructure])
 
-case class Responses(dataStructures: Map[(Method, Int), DataStructure])
+case class Responses(dataStructures: Map[(Method, Int, Option[ContentType]), DataStructure])
 
 case class Trait(name: String)
 
 case class Method(name: String)
 
-case class DataStructure(headers: Seq[Header], body: Body)
-object DataStructure {
-  def apply(headers: Seq[Header]): DataStructure = {
-    DataStructure(headers, Body(Seq()))
-  }
-}
+case class ContentType(mediaType: String)
+
+case class DataStructure(headers: Seq[Header], body: Option[Body])
 
 case class Header(name: String)
 
-case class Body(fields: Seq[Field])
+case class DataType(typeName: String, fields: Seq[Field], annotations: Seq[Annotation])
+object DataType {
+  def apply(): DataType = {
+    DataType(DEFAULT_TYPE_NAME, Seq(), Seq())
+  }
+  val DEFAULT_TYPE_NAME = "string"
+}
 
-case class Field(name: String, annotations: Seq[Annotation]) {
-  def isPrivate: Boolean = annotations.contains(Annotation(Annotation.PRIVATE))
+case class Body(dataType: DataType)
+
+case class Field(name: String, dataType: DataType) {
+  def isPrivate: Boolean = dataType.annotations.contains(Annotation(Annotation.PRIVATE))
 }
 
 case class Annotation(name: String)
