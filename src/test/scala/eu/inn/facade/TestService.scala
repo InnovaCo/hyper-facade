@@ -16,22 +16,22 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @body("application/vnd+test-1.json")
-case class TestBodyForFacade(content: String) extends Body
+case class FeedTestBody(content: String, revisionId: Long = 0) extends Body
 
 @request("/test-service/{content}/events")
-case class TestRequestForFacade(body: TestBodyForFacade, messageId: String, correlationId: String) extends StaticGet(body)
+case class FeedTestRequest(body: FeedTestBody, messageId: String, correlationId: String) extends StaticPost(body)
 with DefinedResponse[Ok[DynamicBody]]
 
-object TestServiceForFacade extends App {
+object TestService extends App {
   val transportConfiguration = TransportConfigurationLoader.fromConfig(ConfigFactory.load())
   val transportManager = new TransportManager(transportConfiguration)
   val hyperBus = new HyperBus(transportManager, Some("group1"))
-  val publishingService = new TestServiceForFacade(new HyperBus(transportManager, Some("group1")))
+  val publishingService = new TestService(new HyperBus(transportManager, Some("group1")))
   val config = ConfigFactory.load()
-  startSeedNode
-  publishingService.onCommand(Ok(DynamicBody(Text("another result"))))
+  startSeedNode()
+  publishingService.onCommand(Topic("/test-service"), Ok(DynamicBody(Text("another result"))))
 
-  def startSeedNode: Unit = {
+  def startSeedNode(): Unit = {
     val serviceConfig = config.getConfig("seed-node-service")
     val system = ActorSystem("eu-inn", serviceConfig)
 
@@ -41,11 +41,11 @@ object TestServiceForFacade extends App {
 
 /**
  * NOT THREAD SAFE
- * This class is just a test stuff for publishing events to HyperBus. It operates just with requests of type `TestRequestForFacade`
+ * This class is just a test stuff for publishing events to HyperBus.
  */
-class TestServiceForFacade(hyperBus: HyperBus) {
+class TestService(hyperBus: HyperBus) {
   val requestCounter = new AtomicInteger
-  val defaultCallback = {() => println("default")}
+  val defaultCallback = { request: FeedTestRequest => ()}
 
   var subscriptionId: String = null
 
@@ -54,13 +54,13 @@ class TestServiceForFacade(hyperBus: HyperBus) {
    * @param request request to be published
    * @return future with result of publishing
    */
-  def publish (request: TestRequestForFacade): Future[PublishResult] = {
-    unsubscribe
+  def publish (request: FeedTestRequest): Future[PublishResult] = {
+    unsubscribe()
     hyperBus <| request
   }
 
-  def onCommand(response: Response[Body]): String = {
-    hyperBus.onCommand(Topic("/test-service"), Method.GET, None) { request: DynamicRequest ⇒
+  def onCommand(topic: Topic, response: Response[Body]): String = {
+    hyperBus.onCommand(topic, Method.GET, None) { request: DynamicRequest ⇒
       Future {
         response
       }
@@ -80,15 +80,16 @@ class TestServiceForFacade(hyperBus: HyperBus) {
    * @param optionalTestCallback callback function which will be called when `EventPublishingService` got new event from `HyperBus`. If not passed then
    *                             default one will be used (default callback does nothing)
    */
-  def subscribeAndPublishDefaultResponseOnReceived(messageId: String = "123", correlationId: String = "456", optionalTestCallback: (() => _) = defaultCallback)= {
-    unsubscribe
-    subscriptionId = hyperBus |> { request: TestRequestForFacade =>
-      unsubscribe
+  def subscribeAndPublishDefaultResponseOnReceived(messageId: String = "123", correlationId: String = "456",
+                                                   revisionId: Long = 0, optionalTestCallback: (FeedTestRequest => Any) = defaultCallback) = {
+    unsubscribe()
+    subscriptionId = hyperBus |> { request: FeedTestRequest =>
+      unsubscribe()
       Future {
-        optionalTestCallback()
+        optionalTestCallback(request)
         val requestNumber = requestCounter.incrementAndGet()
-        hyperBus <| TestRequestForFacade(
-          TestBodyForFacade("ha ha"),
+        hyperBus <| FeedTestRequest(
+          FeedTestBody("ha ha", revisionId),
           messageId + requestNumber,
           correlationId + requestNumber)
       }
@@ -106,12 +107,12 @@ class TestServiceForFacade(hyperBus: HyperBus) {
    * @param optionalTestCallback callback function which will be called when `EventPublishingService` got new event from `HyperBus`. If not passed then
    *                             default one will be used (default callback does nothing)
    */
-  def subscribeAndPublishOnReceived(requestToReplyWith: TestRequestForFacade, optionalTestCallback: (() => _) = defaultCallback): Unit = {
-    unsubscribe
-    subscriptionId = hyperBus |> { request: TestRequestForFacade =>
-      unsubscribe
+  def subscribeAndPublishOnReceived(requestToReplyWith: FeedTestRequest, optionalTestCallback: (FeedTestRequest => Any) = defaultCallback): Unit = {
+    unsubscribe()
+    subscriptionId = hyperBus |> { request: FeedTestRequest =>
+      unsubscribe()
       Future {
-        optionalTestCallback()
+        optionalTestCallback(request)
         hyperBus <| requestToReplyWith
       }
     }

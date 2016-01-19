@@ -28,7 +28,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
   def off(subscriptionId: String) = subscriptionManager.off(subscriptionId)
   private val subscriptionManager = new Manager
 
- class Manager {
+  class Manager {
     val groupName = Some(ConfigFactory.load.getString("hyperbus.facade.group-name"))
     val idCounter = new AtomicLong(0)
     val groupSubscriptions = scala.collection.mutable.Map[Topic,GroupSubscription]()
@@ -40,7 +40,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       val clientSubscriptions = new ConcurrentLinkedQueue[ClientSubscriptionData]()
       addClient(initialSubscription)
 
-      val hyperBusSubscriptionId = hyperBus.onEvent(groupTopic, Method.PUT, None, groupName) { eventRequest: DynamicRequest ⇒
+      val hyperBusSubscriptionId = hyperBus.onEvent(groupTopic, Method.POST, None, groupName) { eventRequest: DynamicRequest ⇒
         Future{
           log.debug(s"Event received ($groupName): $eventRequest")
           import scala.collection.JavaConversions._
@@ -54,7 +54,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
                     eventRequest.method,
                     eventRequest.body.contentType,
                     eventRequest.messageId,
-                    Some(consumer.correlationId)),
+                    Some(consumer.correlationId)), // todo: clarify!
                   eventRequest.body
                 )
                 consumer.clientActor ! request
@@ -86,7 +86,8 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
     def subscribe(topicFilter: Topic, clientActor: ActorRef, correlationId: String): String = {
       val subscriptionId = idCounter.incrementAndGet().toHexString
       val subscriptionData = ClientSubscriptionData(subscriptionId, topicFilter, clientActor, correlationId)
-      val groupTopic = normalize(topicFilter)
+//      val groupTopic = normalize(topicFilter)
+      val groupTopic = topicFilter
       groupSubscriptionById += subscriptionId → groupTopic
       groupSubscriptions.synchronized {
         groupSubscriptions.get(groupTopic).map { list ⇒

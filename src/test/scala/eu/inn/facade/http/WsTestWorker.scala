@@ -1,4 +1,4 @@
-package eu.inn.facade.filter.http
+package eu.inn.facade.http
 
 import akka.actor.ActorRef
 import eu.inn.facade.filter.chain.FilterChain

@@ -1,4 +1,4 @@
-package eu.inn.facade.filter.http
+package eu.inn.facade.filter
 
 import java.util.concurrent.TimeUnit
 
@@ -10,6 +10,7 @@ import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.filter.model.DynamicRequestHeaders._
 import eu.inn.facade.filter.model.{Headers, InputFilter, OutputFilter}
 import eu.inn.facade.http.RequestMapper._
+import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
 import eu.inn.hyperbus.model.standard.Method
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest}
 import eu.inn.hyperbus.serialization.RequestHeader
@@ -50,7 +51,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   }
 
   "WsFilterChain " - {
-    "applyInputFilters empty filterChain, non-empty headers" in {
+    "websocket: applyInputFilters empty filterChain, non-empty headers" in {
       implicit val system = ActorSystem()
 
       val host = "localhost"
@@ -101,7 +102,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       }
     }
 
-    "applyInputFilters non-empty filterChain, non-empty headers" in {
+    "websocket: applyInputFilters non-empty filterChain, non-empty headers" in {
       implicit val system = ActorSystem()
 
       val host = "localhost"
@@ -152,7 +153,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       }
     }
 
-    "applyOutputFilters empty filterChain, non-empty headers" in {
+    "websocket: applyOutputFilters empty filterChain, non-empty headers" in {
       implicit val system = ActorSystem()
 
       val host = "localhost"
@@ -202,7 +203,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       }
     }
 
-    "applyOutputFilters non-empty filterChain, non-empty headers" in {
+    "websocket: applyOutputFilters non-empty filterChain, non-empty headers" in {
       implicit val system = ActorSystem()
 
       val host = "localhost"

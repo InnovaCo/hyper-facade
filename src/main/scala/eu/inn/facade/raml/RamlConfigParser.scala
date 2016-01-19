@@ -91,10 +91,10 @@ class RamlConfigParser(val api: Api) {
             val body = Body(DataType(name, fields, Seq()))
             val dataType = DataStructure(headers, Some(body))
             dataType
-          case None ⇒ DataStructure(headers, Some(Body(DataType(DEFAULT_TYPE_NAME, Seq(), Seq()))))
+          case None ⇒ DataStructure(headers, Some(Body(DataType())))
         }
 
-        case None ⇒ DataStructure(headers, Some(Body(DataType(DEFAULT_TYPE_NAME, Seq(), Seq()))))
+        case None ⇒ DataStructure(headers, Some(Body(DataType())))
       }
       typeDefinitions + ((contentType, dataStructure))
     }

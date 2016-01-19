@@ -1,6 +1,6 @@
 package eu.inn.facade
 
-import java.util.concurrent.{SynchronousQueue, TimeUnit, ThreadPoolExecutor, Executor}
+import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, TimeUnit}
 
 import com.typesafe.config.Config
 import eu.inn.hyperbus.HyperBus
@@ -10,7 +10,9 @@ import scala.concurrent.ExecutionContext
 
 class HyperBusFactory(val config: Config) {
 
-  lazy val hyperBus = new HyperBus(newTransportManager())(ExecutionContext.fromExecutor(newPoolExecutor()))
+  val hypeBusGroupKey = "hyperbus.transports.kafka-server.defaultGroupName"
+  val defaultHyperBusGroup = if (config.hasPath(hypeBusGroupKey)) Some(config.getString(hypeBusGroupKey)) else None
+  lazy val hyperBus = new HyperBus(newTransportManager(), defaultHyperBusGroup)(ExecutionContext.fromExecutor(newPoolExecutor()))
 
   private def newPoolExecutor(): Executor = {
     val maximumPoolSize: Int = Runtime.getRuntime.availableProcessors() * 16

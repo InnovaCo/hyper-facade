@@ -10,20 +10,19 @@ import org.scalatest.{BeforeAndAfter, BeforeAndAfterAll, FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.DurationInt
-import scala.concurrent.{Promise, Await, Future}
-import scala.util.Success
+import scala.concurrent.{Await, Future, Promise}
 
 /**
- * This tests requires Kafka up and running
+ * These tests require Kafka up and running
  */
-class TestServiceForFacadeTest extends FreeSpec with ScalaFutures with Matchers with BeforeAndAfter with BeforeAndAfterAll {
+class TestServiceTest extends FreeSpec with ScalaFutures with Matchers with BeforeAndAfter with BeforeAndAfterAll {
   val transportConfiguration = TransportConfigurationLoader.fromConfig(ConfigFactory.load())
   val transportManager = new TransportManager(transportConfiguration)
   val hyperBus = new HyperBus(transportManager, Some("group1"))
-  val publishingService = new TestServiceForFacade(new HyperBus(transportManager, Some("group1")))
+  val publishingService = new TestService(new HyperBus(transportManager, Some("group1")))
   
   after {
-    publishingService.unsubscribe
+    publishingService.unsubscribe()
   }
 
   override def afterAll(): Unit = {
@@ -37,11 +36,11 @@ class TestServiceForFacadeTest extends FreeSpec with ScalaFutures with Matchers 
   
   "TestServiceForFacade " - {
     "publish" in {
-      val request = TestRequestForFacade(TestBodyForFacade("ha ha"),
+      val request = FeedTestRequest(FeedTestBody("ha ha"),
         "123",
         "456")
       val receiveFuture = Future {}
-      val subscriptionId = hyperBus |> { request: TestRequestForFacade =>
+      val subscriptionId = hyperBus |> { request: FeedTestRequest =>
         receiveFuture
       }
 
@@ -51,17 +50,17 @@ class TestServiceForFacadeTest extends FreeSpec with ScalaFutures with Matchers 
     }
 
     "subscribeAndPublishOnReceived" in {
-      val initialRequest = TestRequestForFacade(TestBodyForFacade("ha ha"),
+      val initialRequest = FeedTestRequest(FeedTestBody("ha ha"),
         "requestMessage",
         "requestCorrelationId")
-      val requestToReplyWith = TestRequestForFacade(TestBodyForFacade("ha ha"),
+      val requestToReplyWith = FeedTestRequest(FeedTestBody("ha ha"),
         "responseMessage",
         "responseCorrelationId")
-      var echoRequest: TestRequestForFacade = null
+      var echoRequest: FeedTestRequest = null
       val onEchoReceived: Promise[Unit] = Promise()
       var subscriptionId: String = null
-      val onReceive = { () =>
-        subscriptionId = hyperBus |> { request: TestRequestForFacade =>
+      val onReceive = { received: FeedTestRequest =>
+        subscriptionId = hyperBus |> { request: FeedTestRequest =>
           onEchoReceived.success({echoRequest = request})
           onEchoReceived.future
         }
@@ -77,23 +76,23 @@ class TestServiceForFacadeTest extends FreeSpec with ScalaFutures with Matchers 
     }
 
     "subscribeAndPublishDefaultResponseOnReceived" in {
-      val initialRequest = TestRequestForFacade(TestBodyForFacade("ha ha"),
+      val initialRequest = FeedTestRequest(FeedTestBody("ha ha"),
         "requestMessage",
         "requestCorrelationId")
-      val expectedEchoRequest = TestRequestForFacade(TestBodyForFacade("ha ha"),
+      val expectedEchoRequest = FeedTestRequest(FeedTestBody("ha ha"),
         "responseMessage1",
         "responseCorrelationId1")
-      var echoRequest: TestRequestForFacade = null
+      var echoRequest: FeedTestRequest = null
       val onEchoReceived: Promise[Unit] = Promise()
       var subscriptionId: String = null
-      val onReceive = { () =>
-        subscriptionId = hyperBus |> { request: TestRequestForFacade =>
+      val onReceive = {received: FeedTestRequest =>
+        subscriptionId = hyperBus |> { request: FeedTestRequest =>
           onEchoReceived.success({echoRequest = request})
           onEchoReceived.future
         }
       }
 
-      publishingService.subscribeAndPublishDefaultResponseOnReceived("responseMessage", "responseCorrelationId", onReceive)
+      publishingService.subscribeAndPublishDefaultResponseOnReceived("responseMessage", "responseCorrelationId", 0, onReceive)
       whenReady(hyperBus <| initialRequest, Timeout(Span(5, Seconds))) { _ =>
         whenReady(onEchoReceived.future, Timeout(Span(5, Seconds))) { _ =>
           echoRequest should equal(expectedEchoRequest)

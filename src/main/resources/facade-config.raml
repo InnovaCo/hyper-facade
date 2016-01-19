@@ -2,19 +2,8 @@
 title: Facade API
 version: v1
 traits:
-  secured:
-  paged:
-  rateLimited:
-  private:
-/users:
-  is: [ secured ]
-  get:
-    is: [ paged, rateLimited, paged ]
-/status:
-  get:
-    is: [ rateLimited ]
-  /test-service
+  streamed-reliable:
+  streamed-unreliable:
+/test-service/{content}/events:
     get:
-      is: [ paged ]
-/private:
-  is: [ private ]
+      is: [ streamed-reliable ]

@@ -49,8 +49,16 @@ case class Requests(dataStructures: Map[(Method, Option[ContentType]), DataStruc
 case class Responses(dataStructures: Map[(Method, Int), DataStructure])
 
 case class Trait(name: String)
+object Trait {
+  val STREAMED_RELIABLE = "streamed-reliable"
+  val STREAMED_UNRELIABLE = "streamed-unreliable"
+}
 
 case class Method(name: String)
+object Method {
+  val POST = "post"
+  val GET = "get"
+}
 
 case class ContentType(mediaType: String)
 

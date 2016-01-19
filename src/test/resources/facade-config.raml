@@ -55,10 +55,12 @@ types:
     properties:
       revisionId: number
       update: string
+
 annotationTypes:
   x-client-ip:
   x-client-language:
   privateField:
+
 traits:
   streamed-unreliable:
   streamed-reliable:
@@ -66,6 +68,7 @@ traits:
   paged:
   rateLimited:
   privateResource:
+
 /users:
   is: [ secured ]
   get:
@@ -80,6 +83,7 @@ traits:
           type: Status
         headers:
           content-type:
+
 /status:
   get:
     is: [ rateLimited ]
@@ -99,21 +103,28 @@ traits:
         404:
           body:
             type: string
+
 /private:
   is: [ privateResource ]
+
 /unreliable-feed:
   is: [ streamed-unreliable ]
-  put:
+  post:
     body:
       application/vnd+app-server-status.json:
         type: ResourceState
       application/vnd+app-server-status-update.json:
         type: ResourceUpdate
+
 /reliable-feed:
   is: [ streamed-reliable ]
-  put:
+  post:
     body:
       application/vnd+app-server-status.json:
         type: ReliableResourceState
       application/vnd+app-server-status-update.json:
         type: ReliableResourceUpdate
+
+/test-service/{content}/events:
+  post:
+    is: [ streamed-reliable ]

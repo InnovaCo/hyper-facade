@@ -26,8 +26,8 @@ class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory 
     FilterChain(outputFilters)
   }
 
-  private def filters(uri: String, method: String, dataStructures: Seq[DataStructure]): Seq[Filter] = {
-    val filterNames = ramlConfig.traitNames(uri, method)
+  private def filters(url: String, method: String, dataStructures: Seq[DataStructure]): Seq[Filter] = {
+    val filterNames = ramlConfig.traitNames(url, method)
     val filters = filterNames.foldLeft(Seq[Filter]()) { (filters, filterName) ⇒
       Try(inject[Seq[Filter]](filterName)) match {
         case Success(traitBasedFilters) ⇒
