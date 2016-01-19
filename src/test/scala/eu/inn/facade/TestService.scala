@@ -47,7 +47,7 @@ class TestService(hyperBus: HyperBus) {
   val requestCounter = new AtomicInteger
   val defaultCallback = { request: FeedTestRequest => ()}
 
-  var subscriptionId: String = null
+  var subscriptionId: Option[String] = None
 
   /**
    * Unsubscribes (if already subscribed to) from events and then publishes event passed as an argument
@@ -59,7 +59,7 @@ class TestService(hyperBus: HyperBus) {
     hyperBus <| request
   }
 
-  def onCommand(topic: Topic, response: Response[Body]): String = {
+  def onCommand(topic: Topic, response: Response[Body]) = {
     hyperBus.onCommand(topic, Method.GET, None) { request: DynamicRequest ⇒
       Future {
         response
@@ -83,9 +83,9 @@ class TestService(hyperBus: HyperBus) {
   def subscribeAndPublishDefaultResponseOnReceived(messageId: String = "123", correlationId: String = "456",
                                                    revisionId: Long = 0, optionalTestCallback: (FeedTestRequest => Any) = defaultCallback) = {
     unsubscribe()
-    subscriptionId = hyperBus |> { request: FeedTestRequest =>
-      unsubscribe()
+    subscriptionId = Some(hyperBus |> { request: FeedTestRequest =>
       Future {
+        unsubscribe()
         optionalTestCallback(request)
         val requestNumber = requestCounter.incrementAndGet()
         hyperBus <| FeedTestRequest(
@@ -93,7 +93,7 @@ class TestService(hyperBus: HyperBus) {
           messageId + requestNumber,
           correlationId + requestNumber)
       }
-    }
+    })
   }
 
   /**
@@ -109,19 +109,19 @@ class TestService(hyperBus: HyperBus) {
    */
   def subscribeAndPublishOnReceived(requestToReplyWith: FeedTestRequest, optionalTestCallback: (FeedTestRequest => Any) = defaultCallback): Unit = {
     unsubscribe()
-    subscriptionId = hyperBus |> { request: FeedTestRequest =>
+    subscriptionId = Some(hyperBus |> { request: FeedTestRequest =>
       unsubscribe()
       Future {
         optionalTestCallback(request)
         hyperBus <| requestToReplyWith
       }
-    }
+    })
   }
 
   /**
    * Unsubscribes from events in `HyperBus` if already subscribed to
    */
   def unsubscribe() = {
-    if(subscriptionId != null) hyperBus.off(subscriptionId)
+    if(subscriptionId.isDefined) hyperBus.off(subscriptionId.get)
   }
 }

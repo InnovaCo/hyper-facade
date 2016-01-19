@@ -13,7 +13,7 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
 
   var subscriptionId: Option[String] = None
 
-  def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit
+  def fetchAndReplyWithResource(url: String)(implicit mvx: MessagingContextFactory): Unit
   def process: Receive
 
   override def receive: Receive = process orElse interruptProcessing

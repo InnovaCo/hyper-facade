@@ -22,7 +22,7 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
   def process: Receive = {
     case request @ DynamicRequest(RequestHeader(url, "subscribe", _, messageId, correlationId), body) ⇒
       subscribe(request, self)
-      fetchAndReplyWithResource(request)
+      fetchAndReplyWithResource(request.url)
 
     case request @ DynamicRequest(RequestHeader(_, "post", _, _, _), body) ⇒
       val revisionId = body.content.revisionId[Long]
@@ -32,12 +32,12 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
       }
   }
 
-  override def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory) = {
+  override def fetchAndReplyWithResource(url: String)(implicit mvx: MessagingContextFactory) = {
     import akka.pattern.pipe
     import context._
 
     // todo: update front correlationId <> back correlationId!
-    hyperBus <~ DynamicGet(request.url.replace("{content}/events", "resource"), DynamicBody(EmptyBody.contentType, Null)) map {
+    hyperBus <~ DynamicGet(url.replace("{content}/events", "resource"), DynamicBody(EmptyBody.contentType, Null)) map {
       case e: Response[DynamicBody] ⇒
         resourceStateFetched = true
         lastRevisionId = e.body.content.revisionId[Long]
@@ -68,6 +68,7 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
     if (resubscriptionCount > 10) context.stop(self) // todo: inject from config
     lastRevisionId = 0
     pendingEvents.clear()
+    fetchAndReplyWithResource(request.url)
     subscribe(request, self)
   }
 }

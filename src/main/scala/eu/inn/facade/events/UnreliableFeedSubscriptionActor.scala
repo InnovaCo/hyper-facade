@@ -15,15 +15,15 @@ class UnreliableFeedSubscriptionActor(websocketWorker: ActorRef,
   def process: Receive = {
     case request @ DynamicRequest(RequestHeader(url, "subscribe", _, messageId, correlationId), body) ⇒
       subscribe(request, websocketWorker)
-      fetchAndReplyWithResource(request)
+      fetchAndReplyWithResource(request.url)
   }
 
-  override def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit = {
+  override def fetchAndReplyWithResource(url: String)(implicit mvx: MessagingContextFactory): Unit = {
     import akka.pattern.pipe
     import context._
 
     // todo: update front correlationId <> back correlationId!
-    hyperBus <~ DynamicGet(request.url, DynamicBody(EmptyBody.contentType, Null)) recover {
+    hyperBus <~ DynamicGet(url.replace("{content}/events", "resource"), DynamicBody(EmptyBody.contentType, Null)) map {
       case e: Response[DynamicBody] ⇒ e
       case t: Throwable ⇒ exceptionToResponse(t)
     } pipeTo websocketWorker
