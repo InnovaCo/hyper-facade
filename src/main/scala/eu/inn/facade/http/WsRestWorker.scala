@@ -102,7 +102,7 @@ class WsRestWorker(val serverConnection: ActorRef,
       catch {
         case t: Throwable ⇒
           val msg = message.payload.utf8String
-//          val msgShort = msg.substring(0, Math.min(msg.length, 240))
+          //          val msgShort = msg.substring(0, Math.min(msg.length, 240))
           log.warning(s"Can't deserialize websocket message '$msg' from ${sender()}/$remoteAddress. $t")
           None
       }
@@ -136,7 +136,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   }
 
   def processRequest(request: DynamicRequest) = request match {
-    case request@DynamicRequest(RequestHeader(url, _, _, messageId, correlationId), _) ⇒
+    case request @ DynamicRequest(RequestHeader(url, _, _, messageId, correlationId), _) ⇒
       val key = correlationId.getOrElse(messageId)
       val actorName = "Subscr-" + key
       context.child(actorName) match {
@@ -159,7 +159,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   }
 
   def pong(dynamicRequest: DynamicRequest) = request match {
-    case request@DynamicRequest(RequestHeader(_, _, _, messageId, correlationId), _) ⇒
+    case request @ DynamicRequest(RequestHeader(_, _, _, messageId, correlationId), _) ⇒
       val finalCorrelationId = correlationId.getOrElse(messageId)
       implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
       send(Ok(DynamicBody(Text("pong"))))

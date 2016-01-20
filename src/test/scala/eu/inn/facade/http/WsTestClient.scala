@@ -16,7 +16,6 @@ case class Connect()
 
 abstract class WsTestClient(connect: Http.Connect, val upgradeRequest: HttpRequest) extends WebSocketClientWorker {
   implicit val system = ActorSystem()
-  val messageQueue: mutable.Queue[TextFrame] = mutable.Queue()
 
   override def receive = {
     case message: Connect ⇒

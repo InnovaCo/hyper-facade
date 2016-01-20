@@ -24,7 +24,8 @@ class UnreliableFeedSubscriptionActor(websocketWorker: ActorRef,
 
     // todo: update front correlationId <> back correlationId!
     hyperBus <~ DynamicGet(url.replace("{content}/events", "resource"), DynamicBody(EmptyBody.contentType, Null)) map {
-      case e: Response[DynamicBody] ⇒ e
+      case response: Response[DynamicBody] ⇒ response
+    } recover {
       case t: Throwable ⇒ exceptionToResponse(t)
     } pipeTo websocketWorker
   }

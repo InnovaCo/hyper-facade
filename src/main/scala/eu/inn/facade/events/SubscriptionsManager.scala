@@ -4,7 +4,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.atomic.AtomicLong
 
 import akka.actor.{ActorRef, ActorSystem}
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.Config
+import eu.inn.facade.HyperBusFactory
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model.DynamicRequest
 import eu.inn.hyperbus.model.standard.Method
@@ -29,7 +30,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
   private val subscriptionManager = new Manager
 
   class Manager {
-    val groupName = Some(ConfigFactory.load.getString("hyperbus.facade.group-name"))
+    val groupName = HyperBusFactory.defaultHyperBusGroup(inject[Config])
     val idCounter = new AtomicLong(0)
     val groupSubscriptions = scala.collection.mutable.Map[Topic,GroupSubscription]()
     val groupSubscriptionById = TrieMap[String, Topic]()

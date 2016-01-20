@@ -18,8 +18,12 @@ import scala.concurrent.Future
 @body("application/vnd+test-1.json")
 case class FeedTestBody(content: String, revisionId: Long = 0) extends Body
 
-@request("/test-service/{content}/events")
-case class FeedTestRequest(body: FeedTestBody, messageId: String, correlationId: String) extends StaticPost(body)
+@request("/test-service/reliable/{content}/events")
+case class ReliableFeedTestRequest(body: FeedTestBody, messageId: String, correlationId: String) extends StaticPost(body)
+with DefinedResponse[Ok[DynamicBody]]
+
+@request("/test-service/unreliable/{content}/events")
+case class UnreliableFeedTestRequest(body: FeedTestBody, messageId: String, correlationId: String) extends StaticPost(body)
 with DefinedResponse[Ok[DynamicBody]]
 
 object TestService extends App {
@@ -45,26 +49,39 @@ object TestService extends App {
  */
 class TestService(hyperBus: HyperBus) {
   val requestCounter = new AtomicInteger
-  val defaultCallback = { request: FeedTestRequest => ()}
+  val defaultCallback = { request: ReliableFeedTestRequest => ()}
 
-  var subscriptionId: Option[String] = None
+  var eventSubscriptionId: Option[String] = None
+  var commandSubscriptionId: Option[String] = None
 
   /**
    * Unsubscribes (if already subscribed to) from events and then publishes event passed as an argument
    * @param request request to be published
    * @return future with result of publishing
    */
-  def publish (request: FeedTestRequest): Future[PublishResult] = {
-    unsubscribe()
+  def publish (request: ReliableFeedTestRequest): Future[PublishResult] = {
+    unsubscribe(eventSubscriptionId)
     hyperBus <| request
   }
 
-  def onCommand(topic: Topic, response: Response[Body]) = {
-    hyperBus.onCommand(topic, Method.GET, None) { request: DynamicRequest ⇒
+  /**
+   * Unsubscribes (if already subscribed to) from events and then publishes event passed as an argument
+   * @param request request to be published
+   * @return future with result of publishing
+   */
+  def publish (request: UnreliableFeedTestRequest): Future[PublishResult] = {
+    unsubscribe(eventSubscriptionId)
+    hyperBus <| request
+  }
+
+  def onCommand(topic: Topic, response: Response[Body], optionalTestCallback: (() ⇒ Unit) = () ⇒ ()) = {
+    commandSubscriptionId = Some(hyperBus.onCommand(topic, Method.GET, None) { request: DynamicRequest ⇒
+      unsubscribe(commandSubscriptionId)
       Future {
+        optionalTestCallback()
         response
       }
-    }
+    })
   }
 
   /**
@@ -81,14 +98,14 @@ class TestService(hyperBus: HyperBus) {
    *                             default one will be used (default callback does nothing)
    */
   def subscribeAndPublishDefaultResponseOnReceived(messageId: String = "123", correlationId: String = "456",
-                                                   revisionId: Long = 0, optionalTestCallback: (FeedTestRequest => Any) = defaultCallback) = {
-    unsubscribe()
-    subscriptionId = Some(hyperBus |> { request: FeedTestRequest =>
+                                                   revisionId: Long = 0, optionalTestCallback: (ReliableFeedTestRequest => Any) = defaultCallback) = {
+    unsubscribe(eventSubscriptionId)
+    eventSubscriptionId = Some(hyperBus |> { request: ReliableFeedTestRequest =>
       Future {
-        unsubscribe()
+        unsubscribe(eventSubscriptionId)
         optionalTestCallback(request)
         val requestNumber = requestCounter.incrementAndGet()
-        hyperBus <| FeedTestRequest(
+        hyperBus <| ReliableFeedTestRequest(
           FeedTestBody("ha ha", revisionId),
           messageId + requestNumber,
           correlationId + requestNumber)
@@ -107,10 +124,10 @@ class TestService(hyperBus: HyperBus) {
    * @param optionalTestCallback callback function which will be called when `EventPublishingService` got new event from `HyperBus`. If not passed then
    *                             default one will be used (default callback does nothing)
    */
-  def subscribeAndPublishOnReceived(requestToReplyWith: FeedTestRequest, optionalTestCallback: (FeedTestRequest => Any) = defaultCallback): Unit = {
-    unsubscribe()
-    subscriptionId = Some(hyperBus |> { request: FeedTestRequest =>
-      unsubscribe()
+  def subscribeAndPublishOnReceived(requestToReplyWith: ReliableFeedTestRequest, optionalTestCallback: (ReliableFeedTestRequest => Any) = defaultCallback): Unit = {
+    unsubscribe(eventSubscriptionId)
+    eventSubscriptionId = Some(hyperBus |> { request: ReliableFeedTestRequest =>
+      unsubscribe(eventSubscriptionId)
       Future {
         optionalTestCallback(request)
         hyperBus <| requestToReplyWith
@@ -121,7 +138,7 @@ class TestService(hyperBus: HyperBus) {
   /**
    * Unsubscribes from events in `HyperBus` if already subscribed to
    */
-  def unsubscribe() = {
+  def unsubscribe(subscriptionId: Option[String]) = {
     if(subscriptionId.isDefined) hyperBus.off(subscriptionId.get)
   }
 }

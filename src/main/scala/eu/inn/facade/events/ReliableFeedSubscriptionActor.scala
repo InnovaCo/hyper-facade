@@ -14,7 +14,7 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
                                     subscriptionManager: SubscriptionsManager)
   extends SubscriptionActor(websocketWorker, hyperBus, subscriptionManager) {
 
-  val pendingEvents: mutable.Queue[(Long, DynamicRequest)] = mutable.Queue()
+  val pendingEvents: mutable.Queue[DynamicRequest] = mutable.Queue()
   var resourceStateFetched = false
   var lastRevisionId: Long = 0
   var resubscriptionCount: Int = 0
@@ -25,29 +25,33 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
       fetchAndReplyWithResource(request.url)
 
     case request @ DynamicRequest(RequestHeader(_, "post", _, _, _), body) ⇒
-      val revisionId = body.content.revisionId[Long]
-      if (lastRevisionId == 0 || pendingEvents.nonEmpty) pendingEvents += ((revisionId, request))
+      if (!resourceStateFetched) {
+        pendingEvents += request
+      }
       else {
         sendEvent(request)
       }
   }
 
   override def fetchAndReplyWithResource(url: String)(implicit mvx: MessagingContextFactory) = {
-    import akka.pattern.pipe
     import context._
 
     // todo: update front correlationId <> back correlationId!
-    hyperBus <~ DynamicGet(url.replace("{content}/events", "resource"), DynamicBody(EmptyBody.contentType, Null)) map {
-      case e: Response[DynamicBody] ⇒
-        resourceStateFetched = true
-        lastRevisionId = e.body.content.revisionId[Long]
-        e
+    val resourceStateFuture = hyperBus <~ DynamicGet(url.replace("{content}/events", "resource"), DynamicBody(EmptyBody.contentType, Null)) map {
+      case response: Response[DynamicBody] ⇒
+        lastRevisionId = response.body.content.revisionId[Long]
+        response
+    } recover {
       case t: Throwable ⇒ exceptionToResponse(t)
-    } pipeTo websocketWorker
-    while (pendingEvents.nonEmpty) {
-      val (revisionId, request) = pendingEvents.dequeue()
-      lastRevisionId = revisionId
-      sendEvent(request)
+    }
+    resourceStateFuture onSuccess {
+      case response: Response[DynamicBody] ⇒
+        websocketWorker ! response
+        while (pendingEvents.nonEmpty) {
+          val request = pendingEvents.dequeue()
+          sendEvent(request)
+        }
+        resourceStateFetched = true
     }
   }
 

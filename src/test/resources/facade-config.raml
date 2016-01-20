@@ -125,6 +125,10 @@ traits:
       application/vnd+app-server-status-update.json:
         type: ReliableResourceUpdate
 
-/test-service/{content}/events:
+/test-service/reliable/{content}/events:
   post:
     is: [ streamed-reliable ]
+
+/test-service/unreliable/{content}/events:
+  post:
+    is: [ streamed-unreliable ]

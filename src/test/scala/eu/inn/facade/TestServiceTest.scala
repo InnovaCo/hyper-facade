@@ -20,10 +20,6 @@ class TestServiceTest extends FreeSpec with ScalaFutures with Matchers with Befo
   val transportManager = new TransportManager(transportConfiguration)
   val hyperBus = new HyperBus(transportManager, Some("group1"))
   val publishingService = new TestService(new HyperBus(transportManager, Some("group1")))
-  
-  after {
-    publishingService.unsubscribe()
-  }
 
   override def afterAll(): Unit = {
     val timeout = 10.seconds
@@ -36,11 +32,11 @@ class TestServiceTest extends FreeSpec with ScalaFutures with Matchers with Befo
   
   "TestServiceForFacade " - {
     "publish" in {
-      val request = FeedTestRequest(FeedTestBody("ha ha"),
+      val request = ReliableFeedTestRequest(FeedTestBody("ha ha"),
         "123",
         "456")
       val receiveFuture = Future {}
-      val subscriptionId = hyperBus |> { request: FeedTestRequest =>
+      val subscriptionId = hyperBus |> { request: ReliableFeedTestRequest =>
         receiveFuture
       }
 
@@ -50,17 +46,17 @@ class TestServiceTest extends FreeSpec with ScalaFutures with Matchers with Befo
     }
 
     "subscribeAndPublishOnReceived" in {
-      val initialRequest = FeedTestRequest(FeedTestBody("ha ha"),
+      val initialRequest = ReliableFeedTestRequest(FeedTestBody("ha ha"),
         "requestMessage",
         "requestCorrelationId")
-      val requestToReplyWith = FeedTestRequest(FeedTestBody("ha ha"),
+      val requestToReplyWith = ReliableFeedTestRequest(FeedTestBody("ha ha"),
         "responseMessage",
         "responseCorrelationId")
-      var echoRequest: FeedTestRequest = null
+      var echoRequest: ReliableFeedTestRequest = null
       val onEchoReceived: Promise[Unit] = Promise()
       var subscriptionId: String = null
-      val onReceive = { received: FeedTestRequest =>
-        subscriptionId = hyperBus |> { request: FeedTestRequest =>
+      val onReceive = { received: ReliableFeedTestRequest =>
+        subscriptionId = hyperBus |> { request: ReliableFeedTestRequest =>
           onEchoReceived.success({echoRequest = request})
           onEchoReceived.future
         }
@@ -76,17 +72,17 @@ class TestServiceTest extends FreeSpec with ScalaFutures with Matchers with Befo
     }
 
     "subscribeAndPublishDefaultResponseOnReceived" in {
-      val initialRequest = FeedTestRequest(FeedTestBody("ha ha"),
+      val initialRequest = ReliableFeedTestRequest(FeedTestBody("ha ha"),
         "requestMessage",
         "requestCorrelationId")
-      val expectedEchoRequest = FeedTestRequest(FeedTestBody("ha ha"),
+      val expectedEchoRequest = ReliableFeedTestRequest(FeedTestBody("ha ha"),
         "responseMessage1",
         "responseCorrelationId1")
-      var echoRequest: FeedTestRequest = null
+      var echoRequest: ReliableFeedTestRequest = null
       val onEchoReceived: Promise[Unit] = Promise()
       var subscriptionId: String = null
-      val onReceive = {received: FeedTestRequest =>
-        subscriptionId = hyperBus |> { request: FeedTestRequest =>
+      val onReceive = {received: ReliableFeedTestRequest =>
+        subscriptionId = hyperBus |> { request: ReliableFeedTestRequest =>
           onEchoReceived.success({echoRequest = request})
           onEchoReceived.future
         }
