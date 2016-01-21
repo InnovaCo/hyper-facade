@@ -1,11 +1,12 @@
 package eu.inn.facade.events
 
-import akka.actor.ActorRef
+import akka.actor.{Props, ActorRef}
 import eu.inn.binders.dynamic.Null
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard._
 import eu.inn.hyperbus.serialization.RequestHeader
+import scaldi.Injector
 
 class UnreliableFeedSubscriptionActor(websocketWorker: ActorRef,
                         hyperBus: HyperBus,
@@ -29,4 +30,13 @@ class UnreliableFeedSubscriptionActor(websocketWorker: ActorRef,
       case t: Throwable ⇒ exceptionToResponse(t)
     } pipeTo websocketWorker
   }
+}
+
+object UnreliableFeedSubscriptionActor {
+  def props(websocketWorker: ActorRef,
+            hyperBus: HyperBus,
+            subscriptionManager: SubscriptionsManager) = Props(new UnreliableFeedSubscriptionActor(
+    websocketWorker,
+    hyperBus,
+    subscriptionManager))
 }

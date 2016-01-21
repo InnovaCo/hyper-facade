@@ -20,8 +20,8 @@ class FiltersModule extends Module {
 
   def initOuterBindings: Unit = {
     val config = inject[Config]
-    if (config.hasPath("inn.facade.raml.filters")) {
-      val declaredRamlFilters = config.getConfig("inn.facade.raml.filters")
+    if (config.hasPath("inn.facade.filters")) {
+      val declaredRamlFilters = config.getConfig("inn.facade.filters")
       declaredRamlFilters.entrySet.foreach { filterConfigEntry ⇒
         val filterName = filterConfigEntry.getKey
         val filterClass: String = filterConfigEntry.getValue.unwrapped.asInstanceOf[String]

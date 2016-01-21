@@ -1,20 +1,25 @@
 package eu.inn.facade.events
 
-import akka.actor.ActorRef
+import akka.actor.{Props, ActorRef}
+import com.typesafe.config.Config
 import eu.inn.binders.dynamic.Null
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard.{DynamicGet, EmptyBody}
 import eu.inn.hyperbus.serialization.RequestHeader
+import scaldi.{Injectable, Injector}
 
 import scala.collection.mutable
 
 class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
                                     hyperBus: HyperBus,
                                     subscriptionManager: SubscriptionsManager)
-  extends SubscriptionActor(websocketWorker, hyperBus, subscriptionManager) {
+                                   (implicit inj: Injector)
+  extends SubscriptionActor(websocketWorker, hyperBus, subscriptionManager)
+  with Injectable {
 
   val pendingEvents: mutable.Queue[DynamicRequest] = mutable.Queue()
+  val maxResubscriptionsCount = inject[Config].getInt("inn.facade.maxResubscriptionsCount")
   var resourceStateFetched = false
   var lastRevisionId: Long = 0
   var resubscriptionCount: Int = 0
@@ -69,10 +74,21 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
   private def resubscribe(request: DynamicRequest): Unit = {
     unsubscribe()
     resubscriptionCount += 1
-    if (resubscriptionCount > 10) context.stop(self) // todo: inject from config
+    if (resubscriptionCount > maxResubscriptionsCount)
+      context.stop(self)
     lastRevisionId = 0
     pendingEvents.clear()
     fetchAndReplyWithResource(request.url)
     subscribe(request, self)
   }
+}
+
+object ReliableFeedSubscriptionActor {
+  def props(websocketWorker: ActorRef,
+            hyperBus: HyperBus,
+            subscriptionManager: SubscriptionsManager)
+           (implicit inj: Injector) = Props(new ReliableFeedSubscriptionActor(
+  websocketWorker,
+  hyperBus,
+  subscriptionManager))
 }

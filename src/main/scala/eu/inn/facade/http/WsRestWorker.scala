@@ -148,9 +148,9 @@ class WsRestWorker(val serverConnection: ActorRef,
   def feedSubscriptionActorProps(url: String): Props = {
     val traits = ramlConfig.traitNames(url, raml.Method.POST)
     if (traits.contains(Trait.STREAMED_RELIABLE)) {
-      Props(classOf[ReliableFeedSubscriptionActor], self, hyperBus, subscriptionManager)
+      ReliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
     } else {
-      Props(classOf[UnreliableFeedSubscriptionActor], self, hyperBus, subscriptionManager)
+      UnreliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
     }
   }
 
