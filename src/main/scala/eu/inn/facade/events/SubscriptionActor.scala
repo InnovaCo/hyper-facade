@@ -1,22 +1,45 @@
 package eu.inn.facade.events
 
-import akka.actor.{ActorLogging, Actor, ActorRef}
+import akka.actor.{Actor, ActorLogging, ActorRef}
+import eu.inn.facade.filter.chain.FilterChainFactory
+import eu.inn.facade.filter.model.{DynamicRequestHeaders, Headers}
+import eu.inn.facade.http.RequestMapper
+import eu.inn.facade.raml.RamlConfig
+import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard.{ErrorBody, InternalServerError}
-import eu.inn.hyperbus.{IdGenerator, HyperBus}
-import eu.inn.hyperbus.model.{Body, Response, MessagingContextFactory, DynamicRequest}
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api.Topic
+import eu.inn.hyperbus.{HyperBus, IdGenerator}
+import scaldi.{Injectable, Injector}
+
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+import scala.util.Success
 
 abstract class SubscriptionActor(websocketWorker: ActorRef,
-                        hyperBus: HyperBus,
-                        subscriptionManager: SubscriptionsManager) extends Actor with ActorLogging {
+                                  hyperBus: HyperBus,
+                                  subscriptionManager: SubscriptionsManager)
+                                  (implicit inj: Injector)
+  extends Actor
+  with ActorLogging
+  with Injectable {
+
+  val filterChainComposer = inject[FilterChainFactory]
+  val ramlConfig = inject[RamlConfig]
 
   var subscriptionId: Option[String] = None
+  var subscriptionRequest: Option[DynamicRequest] = None
 
-  def fetchAndReplyWithResource(url: String)(implicit mvx: MessagingContextFactory): Unit
-  def process: Receive
+  def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit
 
   override def receive: Receive = process orElse interruptProcessing
+
+  def process: Receive = {
+    // Request for subscription to resource event feed
+    case request @ DynamicRequest(RequestHeader(_, "subscribe", _, _, _), _) ⇒
+      subscriptionRequest = Some(request)
+      filterAndSubscribe(request)
+  }
 
   def interruptProcessing: Receive = {
     case request @ DynamicRequest(RequestHeader(_, "unsubscribe", _, _, _), _) ⇒
@@ -36,13 +59,51 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
     subscriptionId = None
   }
 
+  def filterAndSubscribe(request: DynamicRequest): Unit = {
+    filterIn(request) onComplete {
+      case Success((headers, body)) ⇒
+        if (headers.hasStatusCode) {
+          // it means that request didn't pass filters and declined with error
+          websocketWorker ! RequestMapper.toDynamicResponse(headers, body)
+        } else {
+          val filteredRequest = RequestMapper.toDynamicRequest(headers, body)
+          subscribe(filteredRequest, self)
+          fetchAndReplyWithResource(filteredRequest)
+        }
+    }
+  }
+
   def subscribe(request: DynamicRequest, replyTo: ActorRef): Unit = {
     request match {
       case DynamicRequest(RequestHeader(url, _, _, messageId, correlationId), _) ⇒
         val finalCorrelationId = correlationId.getOrElse(messageId)
         implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
-        subscriptionId = Some(subscriptionManager.subscribe(Topic(url), replyTo, finalCorrelationId))  // todo: Topic logic/raml
+        val resourceFeedUri = ramlConfig.resourceFeedUri(url)
+        subscriptionId = Some(subscriptionManager.subscribe(Topic(resourceFeedUri), replyTo, finalCorrelationId))  // todo: Topic logic/raml
     }
+  }
+
+  def filterIn(dynamicRequest: DynamicRequest): Future[(Headers, DynamicBody)] = {
+    val url = dynamicRequest.url
+    val method = dynamicRequest.method
+    val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
+    val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
+    filterChainComposer.inputFilterChain(url, method, contentType).applyFilters(headers, dynamicBody)
+  }
+
+  def filterOut(dynamicRequest: DynamicRequest, responseEvent: DynamicRequest): Future[(Headers, DynamicBody)] = {
+    val url = dynamicRequest.url
+    val method = dynamicRequest.method
+    val (headers, dynamicBody) = RequestMapper.unfold(responseEvent)
+    filterChainComposer.outputFilterChain(url, method).applyFilters(headers, dynamicBody)
+  }
+
+  def filterOut(request: DynamicRequest, response: Response[DynamicBody]): Future[(Headers, DynamicBody)] = {
+    val statusCode = response.status
+    val url = request.url
+    val method = request.method
+    val body = response.body
+    filterChainComposer.outputFilterChain(url, method).applyFilters(Headers(Map(), Some(statusCode)), body)
   }
 
   def exceptionToResponse(t: Throwable)(implicit mcf: MessagingContextFactory): Response[Body] = {

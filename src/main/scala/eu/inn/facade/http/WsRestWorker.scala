@@ -2,11 +2,9 @@ package eu.inn.facade.http
 
 import akka.actor._
 import eu.inn.binders.dynamic.Text
-import eu.inn.facade.events.{ReliableFeedSubscriptionActor, UnreliableFeedSubscriptionActor, SubscriptionsManager}
+import eu.inn.facade.events.{ReliableFeedSubscriptionActor, SubscriptionsManager, UnreliableFeedSubscriptionActor}
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.filter.model.{Headers, DynamicRequestHeaders}
-import eu.inn.facade.raml
-import eu.inn.facade.raml.{Trait, RamlConfig}
+import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard.Ok
@@ -85,18 +83,8 @@ class WsRestWorker(val serverConnection: ActorRef,
         val method = dynamicRequest.method
         if (isPingRequest(url, method)) pong(dynamicRequest)
         else {
-          val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-          val headersWithIP = Headers(headers.headers + (("http_x_forwarded_for", remoteAddress)), headers.statusCode)
-          val contentType = headersWithIP.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
-          filterChainComposer.inputFilterChain(url, method, contentType).applyFilters(headersWithIP, dynamicBody) onComplete {
-            case Success((filteredHeaders, filteredBody)) ⇒
-              val filteredDynamicRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
-              processRequest(filteredDynamicRequest)
-
-            case Failure(ex) ⇒
-              val msg = message.payload.utf8String
-              log.error(ex, s"Failed to apply input filter chain for request $msg")
-          }
+          val requestWithClientIp = RequestMapper.addField("http_x_forwarded_for", remoteAddress, dynamicRequest)
+          processRequest(requestWithClientIp)
         }
       }
       catch {
@@ -111,21 +99,10 @@ class WsRestWorker(val serverConnection: ActorRef,
       log.error(s"Frame command $x failed from ${sender()}/$remoteAddress")
 
     case response: Response[DynamicBody] ⇒
-      // todo add filter chain
       send(response)
 
     case dynamicRequest: DynamicRequest ⇒
-      val url = dynamicRequest.url
-      val method = dynamicRequest.method
-      val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-      filterChainComposer.outputFilterChain(url, method).applyFilters(headers, dynamicBody) onComplete {
-        case Success((filteredHeaders, filteredBody)) ⇒
-          send(RequestMapper.toDynamicRequest(filteredHeaders, filteredBody))
-
-        case Failure(ex) ⇒
-          val msg = dynamicRequest.toString()
-          log.error(ex, s"Failed to apply output filter chain for response $msg")
-      }
+      send(dynamicRequest)
   }
 
   def httpRequests: Receive = {
@@ -146,12 +123,9 @@ class WsRestWorker(val serverConnection: ActorRef,
   }
 
   def feedSubscriptionActorProps(url: String): Props = {
-    val traits = ramlConfig.traitNames(url, raml.Method.POST)
-    if (traits.contains(Trait.STREAMED_RELIABLE)) {
-      ReliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
-    } else {
-      UnreliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
-    }
+    if (ramlConfig.isReliableEventFeed(url)) ReliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
+    else if (ramlConfig.isUnreliableEventFeed(url)) UnreliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
+    else throw new IllegalArgumentException("This resource doesn't contain an event feed")
   }
 
   def isPingRequest(url: String, method: String): Boolean = {

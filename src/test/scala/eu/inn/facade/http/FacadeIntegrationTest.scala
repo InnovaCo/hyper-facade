@@ -87,7 +87,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))))
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! DynamicRequest(RequestHeader("/test-service/unreliable/{content}/events", "subscribe", Some("application/vnd+test-1.json"),
+        client ! DynamicRequest(RequestHeader("/test-service/unreliable", "subscribe", Some("application/vnd+test-1.json"),
           "messageId", Some("correlationId")), DynamicBody(Obj(Map("content" → Text("haha"), "revisionId" → Number(100)))))
       }
 
@@ -110,7 +110,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         } else fail("Event wasn't sent to the client")
 
         client ! DynamicRequest(
-          RequestHeader("/test-service/unreliable/{content}/events", "unsubscribe", None, "messageId", Some("correlationId")),
+          RequestHeader("/test-service/unreliable", "unsubscribe", None, "messageId", Some("correlationId")),
           DynamicBody(Obj(Map()))
         )
       }
@@ -158,7 +158,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         () ⇒ Thread.sleep(10000))
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! DynamicRequest(RequestHeader("/test-service/reliable/{content}/events", "subscribe", Some("application/vnd+test-1.json"),
+        client ! DynamicRequest(RequestHeader("/test-service/reliable", "subscribe", Some("application/vnd+test-1.json"),
           "messageId", Some("correlationId")), DynamicBody(Obj(Map())))
         Thread.sleep(3000)
         testService.publish(ReliableFeedTestRequest(FeedTestBody("haha", 2), "messageId", "correlationId"))
@@ -214,7 +214,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         } else fail("Last event wasn't sent to the client")
 
         client ! DynamicRequest(
-          RequestHeader("/test-service/reliable/{content}/events", "unsubscribe", None, "messageId", Some("correlationId")),
+          RequestHeader("/test-service/reliable", "unsubscribe", None, "messageId", Some("correlationId")),
           DynamicBody(Obj(Map()))
         )
       }

@@ -11,8 +11,6 @@ import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
 import com.typesafe.config.Config
 
-import eu.inn.facade.raml.DataType._
-
 import scala.collection.JavaConversions._
 
 class RamlConfigParser(val api: Api) {
@@ -45,7 +43,7 @@ class RamlConfigParser(val api: Api) {
       val dataTypes: Map[Option[ContentType], DataStructure] = extractTypeDefinitions(RamlRequestResponseWrapper(ramlMethod))
       dataTypes.foldLeft(requestMap) { (requestMap, mapEntry) ⇒
         val (contentType, dataStructure) = mapEntry
-        requestMap + (((method, contentType), dataStructure))
+        requestMap + ((method, contentType) → dataStructure)
       }
     }
     Requests(requestsByMethodAndType)
@@ -60,7 +58,7 @@ class RamlConfigParser(val api: Api) {
         val dataTypesMap: Map[Option[ContentType], DataStructure] = extractTypeDefinitions(RamlRequestResponseWrapper(ramlResponse))
         dataTypesMap.foldLeft(responseMap) { (responseMap, mapEntry) ⇒
           val dataStructure = mapEntry._2
-          responseMap + (((method, statusCode), dataStructure))
+          responseMap + ((method, statusCode) → dataStructure)
         }
       }
     }
@@ -96,7 +94,7 @@ class RamlConfigParser(val api: Api) {
 
         case None ⇒ DataStructure(headers, Some(Body(DataType())))
       }
-      typeDefinitions + ((contentType, dataStructure))
+      typeDefinitions + (contentType → dataStructure)
     }
   }
 
@@ -108,8 +106,7 @@ class RamlConfigParser(val api: Api) {
       ramlReqRspWrapper.body.foldLeft(Map[Option[String], Option[String]]()) { (typeNames, body) ⇒
         val contentType = if (body.name == null || body.name == "body") None else Some(body.name)
         val typeName = body.`type`.get(0)
-        val typeNameOption = if ( typeName == null) None else Some(typeName)
-        typeNames + ((contentType, typeNameOption))
+        typeNames + (contentType → Option(typeName))
       }
     }
   }
@@ -118,10 +115,9 @@ class RamlConfigParser(val api: Api) {
     api.types.foldLeft[Option[DataElement]](None) { (matchedType, typeDef) ⇒
       matchedType match {
         case Some(foundType) ⇒ Some(foundType)
-        case None ⇒ {
+        case None ⇒
           if (typeDef.name == typeName) Some(typeDef)
           else None
-        }
       }
     }
   }
@@ -137,7 +133,7 @@ class RamlConfigParser(val api: Api) {
     val methodSpecificTraits = resource.methods().foldLeft(Map[Method, Seq[Trait]]()) { (specificTraits, ramlMethod) ⇒
       val method = Method(ramlMethod.method)
       val methodTraits = extractTraits(ramlMethod.is())
-      specificTraits + ((method, (methodTraits ++ commonResourceTraits)))
+      specificTraits + (method → (methodTraits ++ commonResourceTraits))
     }
     Traits(commonResourceTraits, methodSpecificTraits)
   }
@@ -145,7 +141,18 @@ class RamlConfigParser(val api: Api) {
   private def extractTraits(traits: java.util.List[TraitRef]): Seq[Trait] = {
     traits.foldLeft(Seq[Trait]()) {
       (accumulator, traitRef) ⇒
-        accumulator :+ Trait(traitRef.value.getRAMLValueName)
+        val traitName = traitRef.value.getRAMLValueName
+        if (Trait.hasMappedUri(traitName)) {
+          val traitInstance = traitRef.value
+          val traitClass = traitInstance.getClass
+          val resourceStateURI: String = traitClass.getDeclaredField(Trait.RESOURCE_STATE_URI).get(traitInstance).asInstanceOf[String]
+          var parameters = Map(Trait.RESOURCE_STATE_URI → resourceStateURI)
+          if (Trait.isFeed(traitName)) {
+            val eventFeedURI: String = traitClass.getDeclaredField(Trait.EVENT_FEED_URI).get(traitInstance).asInstanceOf[String]
+            parameters += Trait.EVENT_FEED_URI → eventFeedURI
+          }
+          accumulator :+ Trait(traitName, parameters)
+        } else accumulator :+ Trait(traitName)
     }
   }
 }
@@ -172,12 +179,12 @@ object RamlConfigParser {
 private[raml] class RamlRequestResponseWrapper(val method: Option[methodsAndResources.Method], val response: Option[Response]) {
 
   def body: java.util.List[DataElement] = {
-    if (method == None) response.get.body
+    if (method.isEmpty) response.get.body
     else method.get.body
   }
 
   def headers: java.util.List[DataElement] = {
-    if (method == None) response.get.headers
+    if (method.isEmpty) response.get.headers
     else method.get.headers
   }
 }

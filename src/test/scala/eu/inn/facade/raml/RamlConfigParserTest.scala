@@ -87,5 +87,19 @@ class RamlConfigParserTest extends FreeSpec with Matchers {
       ramlConfig.requestDataStructure("/reliable-feed", POST, resourceStateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceStateBody)))
       ramlConfig.requestDataStructure("/reliable-feed", POST, resourceUpdateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceUpdateBody)))
     }
+
+    "request URI substitution" in {
+      val unreliableResourceUriGeneral = ramlConfig.resourceStateUri("/unreliable-feed")
+      unreliableResourceUriGeneral shouldBe "/unreliable-feed/resource"
+
+      val unreliableFeedUri = ramlConfig.resourceFeedUri("/unreliable-feed")
+      unreliableFeedUri shouldBe "/unreliable-feed/{content}/events"
+
+      val reliableResourceUriGeneral = ramlConfig.resourceStateUri("/reliable-feed")
+      reliableResourceUriGeneral shouldBe "/reliable-feed/resource"
+
+      val reliableFeedUri = ramlConfig.resourceFeedUri("/reliable-feed")
+      reliableFeedUri shouldBe "/reliable-feed/{content}/events"
+    }
   }
 }

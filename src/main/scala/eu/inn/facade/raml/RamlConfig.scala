@@ -1,12 +1,30 @@
 package eu.inn.facade.raml
 
 class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
+  import Trait._
 
   def traitNames(url: String, method: String): Seq[String] = {
-    val traits = resourcesByUrl(url).traits
-    traits.methodSpecificTraits
-      .getOrElse(Method(method), traits.commonTraits)
-      .map(foundTrait ⇒ foundTrait.name)
+    traits(url, method) map (foundTrait ⇒ foundTrait.name)
+  }
+
+  def isReliableEventFeed(url: String) = {
+    traitNames(url, Method.POST).contains(STREAMED_RELIABLE)
+  }
+
+  def isUnreliableEventFeed(url: String) = {
+    traitNames(url, Method.POST).contains(Trait.STREAMED_UNRELIABLE)
+  }
+
+  def resourceFeedUri(url: String): String = {
+    val resourceTraits = traits(url, Method.POST)
+    val feedTrait = resourceTraits.find(resourceTrait ⇒ isFeed(resourceTrait.name)).get // todo: fix usage of option
+    feedTrait.parameters(EVENT_FEED_URI)
+  }
+
+  def resourceStateUri(url: String): String = {
+    val resourceTraits = traits(url, Method.POST)
+    val resourceTrait = resourceTraits.find(resourceTrait ⇒ hasMappedUri(resourceTrait.name)).get
+    resourceTrait.parameters(RESOURCE_STATE_URI)
   }
 
   def requestDataStructure(url: String, method: String, contentType: Option[String]): Option[DataStructure] = {
@@ -27,7 +45,13 @@ class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
     }
   }
 
-  def getContentType(contentTypeName: Option[String]): Option[ContentType] = {
+  private def traits(url: String, method: String): Seq[Trait] = {
+    val traits = resourcesByUrl(url).traits
+    traits.methodSpecificTraits
+      .getOrElse(Method(method), traits.commonTraits)
+  }
+
+  private def getContentType(contentTypeName: Option[String]): Option[ContentType] = {
     contentTypeName match {
       case Some(contentType) ⇒ Some(ContentType(contentType))
       case None ⇒ None
@@ -48,10 +72,29 @@ case class Requests(dataStructures: Map[(Method, Option[ContentType]), DataStruc
 
 case class Responses(dataStructures: Map[(Method, Int), DataStructure])
 
-case class Trait(name: String)
+case class Trait(name: String, parameters: Map[String, String])
 object Trait {
   val STREAMED_RELIABLE = "streamed-reliable"
   val STREAMED_UNRELIABLE = "streamed-unreliable"
+  val PLAIN_RESOURCE = "plain-resource"
+
+  val EVENT_FEED_URI = "eventFeedUri"
+  val RESOURCE_STATE_URI = "resourceStateUri"
+
+  def apply(name: String): Trait = {
+    Trait(name, Map())
+  }
+
+  def hasMappedUri(traitName: String): Boolean = {
+    traitName == STREAMED_RELIABLE ||
+      traitName == STREAMED_UNRELIABLE ||
+      traitName == PLAIN_RESOURCE
+  }
+
+  def isFeed(traitName: String): Boolean = {
+    traitName == STREAMED_RELIABLE ||
+      traitName == STREAMED_UNRELIABLE
+  }
 }
 
 case class Method(name: String)

@@ -55,7 +55,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
                     eventRequest.method,
                     eventRequest.body.contentType,
                     eventRequest.messageId,
-                    Some(consumer.correlationId)), // todo: clarify!
+                    Some(consumer.correlationId)),
                   eventRequest.body
                 )
                 consumer.clientActor ! request
