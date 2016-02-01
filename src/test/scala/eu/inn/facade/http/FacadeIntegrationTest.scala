@@ -34,7 +34,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
   new WsRestServiceApp("localhost", 54321) {
     start {
       pathPrefix("status") {
-        statusMonitorFacade.statusMonitorRoutes.routes
+        statusMonitorFacade.restRoutes.routes
       }
     }
   }
