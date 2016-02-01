@@ -4,7 +4,7 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import akka.actor.ActorSystem
 import akka.cluster.Cluster
-import com.typesafe.config.ConfigFactory
+import com.typesafe.config.{Config, ConfigFactory}
 import eu.inn.binders.dynamic.{Obj, Text}
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
@@ -32,10 +32,10 @@ object TestService extends App {
   val hyperBus = new HyperBus(transportManager, Some("group1"))
   val publishingService = new TestService(new HyperBus(transportManager, Some("group1")))
   val config = ConfigFactory.load()
-  startSeedNode()
+  startSeedNode(config)
   publishingService.onCommand(Topic("/test-service"), Ok(DynamicBody(Text("another result"))))
 
-  def startSeedNode(): Unit = {
+  def startSeedNode(config: Config): Unit = {
     val serviceConfig = config.getConfig("seed-node-service")
     val system = ActorSystem("eu-inn", serviceConfig)
 
@@ -140,14 +140,14 @@ class TestService(hyperBus: HyperBus) {
   }
 }
 
-object TestService4Perf extends App {
+object TestService4WebsocketPerf extends App {
 
   val config = new ConfigsFactory().config
   val hyperBus = new HyperBusFactory(config).hyperBus
   val testService = new TestService(hyperBus)
   val eventsPerSecond = config.getInt("perf-test.events-per-second")
   var canStart = new AtomicBoolean(false)
-  startSeedNode()
+  TestService.startSeedNode(config)
   testService.onCommand(Topic("/test-service/unreliable/resource"),
     Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), () ⇒ canStart.compareAndSet(false, true))
   while(!canStart.get()) {
@@ -166,11 +166,12 @@ object TestService4Perf extends App {
       if (remainingTime > 0) Thread.sleep(remainingTime)
     }
   }
+}
 
-  def startSeedNode(): Unit = {
-    val serviceConfig = config.getConfig("seed-node-service")
-    val system = ActorSystem("eu-inn", serviceConfig)
-
-    Cluster(system)
-  }
+object TestService4HttpPerf extends App {
+  val config = new ConfigsFactory().config
+  val hyperBus = new HyperBusFactory(config).hyperBus
+  val testService = new TestService(hyperBus)
+  TestService.startSeedNode(config)
+  testService.onCommand(Topic("/status/test-service"), Ok(DynamicBody(Text("response"))))
 }

@@ -28,7 +28,7 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
   implicit val actorSystem = inject[ActorSystem]
   implicit val executionContext = inject[ExecutionContext]
 
-  val statusMonitorRoutes = new RestRoutes {
+  val restRoutes = new RestRoutes {
     val anyMethod = get | put | post | head | patch | delete | options
     val request = extract(_.request)
 

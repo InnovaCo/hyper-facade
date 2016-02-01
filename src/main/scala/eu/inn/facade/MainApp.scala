@@ -9,13 +9,13 @@ import scaldi.{Injector, Injectable}
 object MainApp extends App with Injectable {
 
   implicit val injector = getInjector
-  val statusMonitorFacade = inject [HttpWorker]
+  val httpWorker = inject [HttpWorker]
   val log = LoggerFactory.getLogger(MainApp.getClass.getName)
 
   new WsRestServiceApp("localhost", 8080) {
     start {
       pathPrefix("test-service") {
-        statusMonitorFacade.statusMonitorRoutes.routes
+        httpWorker.restRoutes.routes
       }
     }
   }

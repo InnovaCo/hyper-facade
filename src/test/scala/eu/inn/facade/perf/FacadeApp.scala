@@ -16,8 +16,8 @@ object FacadeApp extends App with Injectable {
 
   new WsRestServiceApp(host, port) {
     start {
-      pathPrefix("test-service") {
-        statusMonitorFacade.statusMonitorRoutes.routes
+      pathPrefix("status") {
+        statusMonitorFacade.restRoutes.routes
       }
     }
   }
