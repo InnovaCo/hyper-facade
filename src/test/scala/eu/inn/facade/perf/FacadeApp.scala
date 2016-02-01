@@ -1,18 +1,20 @@
-package eu.inn.facade
+package eu.inn.facade.perf
 
+import com.typesafe.config.Config
 import eu.inn.facade.http.{HttpWorker, WsRestServiceApp}
 import eu.inn.facade.modules.{ConfigModule, FiltersModule, ServiceModule}
 import eu.inn.hyperbus.HyperBus
-import org.slf4j.LoggerFactory
-import scaldi.{Injector, Injectable}
+import scaldi.{Injectable, Injector}
 
-object MainApp extends App with Injectable {
+object FacadeApp extends App with Injectable {
 
   implicit val injector = getInjector
   val statusMonitorFacade = inject [HttpWorker]
-  val log = LoggerFactory.getLogger(MainApp.getClass.getName)
+  val config = inject[Config]
+  val host = config.getString("perf-test.host")
+  val port = config.getInt("perf-test.port")
 
-  new WsRestServiceApp("localhost", 8080) {
+  new WsRestServiceApp(host, port) {
     start {
       pathPrefix("test-service") {
         statusMonitorFacade.statusMonitorRoutes.routes
@@ -20,7 +22,6 @@ object MainApp extends App with Injectable {
     }
   }
   val hyperBus = inject [HyperBus]  // it's time to initialize hyperbus
-  log.info("hyperbus is starting...: {}", hyperBus)
 
   def getInjector: Injector = {
     val filtersModule = new FiltersModule

@@ -18,7 +18,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   class TestInputFilter extends InputFilter {
     override def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
       if (requestHeaders.headers.nonEmpty) Future(requestHeaders, body)
-      else Future(requestHeaders withResponseCode Some(403), DynamicBody(Text("Forbidden")))
+      else Future(requestHeaders withStatusCode Some(403), DynamicBody(Text("Forbidden")))
     }
   }
 

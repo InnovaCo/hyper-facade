@@ -86,7 +86,7 @@ class WsRestServiceApp(interface: String, port: Int)(implicit inj: Injector)
       case b: Http.Bound ⇒ Future.successful(b)
       case Tcp.CommandFailed(b: Http.Bind) ⇒
         // TODO: replace by actual exception when Akka #3861 is fixed.
-        //       see https://www.assembla.com/spaces/akka/tickets/3861
+        //       see https://github.com/akka/akka/issues/13861
         Future.failed(new RuntimeException(
           "Binding failed. Switch on DEBUG-level logging for `akka.io.TcpListener` to log the cause."))
     }(system.dispatcher)

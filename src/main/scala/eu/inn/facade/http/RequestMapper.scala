@@ -27,7 +27,8 @@ object RequestMapper {
   }
 
   def toDynamicRequest(httpRequest: HttpRequest): DynamicRequest = {
-    DynamicRequest(httpRequest.entity.data.toByteString.iterator.asInputStream)
+    if (httpRequest.entity.isEmpty) DynamicRequest(RequestHeader(null, null, None, null, None), DynamicBody(Obj(Map())))
+    else DynamicRequest(httpRequest.entity.data.toByteString.iterator.asInputStream)
   }
 
   def toDynamicResponse(headers: Headers, dynamicBody: DynamicBody): Response[Body] = {

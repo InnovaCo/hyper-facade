@@ -36,7 +36,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         val filteredHeaders = requestHeaders.headers.filterNot{ _._1 == CORRELATION_ID }
         Future(Headers(filteredHeaders, None), body)
       }
-      else Future(requestHeaders withResponseCode Some(403), DynamicBody(Text("Forbidden")))
+      else Future(requestHeaders withStatusCode Some(403), DynamicBody(Text("Forbidden")))
     }
   }
 

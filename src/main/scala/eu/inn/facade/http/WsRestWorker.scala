@@ -16,9 +16,6 @@ import spray.can.{Http, websocket}
 import spray.http.HttpRequest
 import spray.routing.HttpServiceActor
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.util.{Failure, Success}
-
 class WsRestWorker(val serverConnection: ActorRef,
                    workerRoutes: WsRestRoutes,
                    hyperBus: HyperBus,
@@ -98,11 +95,8 @@ class WsRestWorker(val serverConnection: ActorRef,
     case x: FrameCommandFailed =>
       log.error(s"Frame command $x failed from ${sender()}/$remoteAddress")
 
-    case response: Response[DynamicBody] ⇒
-      send(response)
-
-    case dynamicRequest: DynamicRequest ⇒
-      send(dynamicRequest)
+    case message: Message[Body] ⇒
+      send(message)
   }
 
   def httpRequests: Receive = {

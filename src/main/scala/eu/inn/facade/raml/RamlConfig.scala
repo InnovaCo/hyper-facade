@@ -17,14 +17,18 @@ class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
 
   def resourceFeedUri(url: String): String = {
     val resourceTraits = traits(url, Method.POST)
-    val feedTrait = resourceTraits.find(resourceTrait ⇒ isFeed(resourceTrait.name)).get // todo: fix usage of option
-    feedTrait.parameters(EVENT_FEED_URI)
+    resourceTraits.find(resourceTrait ⇒ isFeed(resourceTrait.name)) match {
+      case Some(feedTrait) ⇒ feedTrait.parameters(EVENT_FEED_URI)
+      case None ⇒ url // todo: is it correct?
+    }
   }
 
   def resourceStateUri(url: String): String = {
     val resourceTraits = traits(url, Method.POST)
-    val resourceTrait = resourceTraits.find(resourceTrait ⇒ hasMappedUri(resourceTrait.name)).get
-    resourceTrait.parameters(RESOURCE_STATE_URI)
+    resourceTraits.find(resourceTrait ⇒ hasMappedUri(resourceTrait.name)) match {
+      case Some(resourceStateTrait) ⇒ resourceStateTrait.parameters(RESOURCE_STATE_URI)
+      case None ⇒ url // todo: is it correct?
+    }
   }
 
   def requestDataStructure(url: String, method: String, contentType: Option[String]): Option[DataStructure] = {

@@ -38,11 +38,12 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
   override def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory) = {
     import context._
 
-    // todo: update front correlationId <> back correlationId!
     val resourceUri = ramlConfig.resourceStateUri(request.url)
+    println(s"resource $resourceUri")
     hyperBus <~ DynamicGet(resourceUri, DynamicBody(EmptyBody.contentType, Null)) flatMap {
       case response: Response[DynamicBody] ⇒
         lastRevisionId = response.body.content.revisionId[Long]
+        println(s"rev $lastRevisionId")
         filterOut(request, response)
     } recover {
       case t: Throwable ⇒ exceptionToResponse(t)

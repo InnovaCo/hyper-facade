@@ -87,7 +87,6 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
     def subscribe(topicFilter: Topic, clientActor: ActorRef, correlationId: String): String = {
       val subscriptionId = idCounter.incrementAndGet().toHexString
       val subscriptionData = ClientSubscriptionData(subscriptionId, topicFilter, clientActor, correlationId)
-//      val groupTopic = normalize(topicFilter)
       val groupTopic = topicFilter
       groupSubscriptionById += subscriptionId → groupTopic
       groupSubscriptions.synchronized {
@@ -113,16 +112,6 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
           }
         }
       }
-    }
-
-    // todo: move mapping to the config
-    def normalize(topicFilter: Topic): Topic = {
-      // todo: remove debug!!!
-      Topic("/test-facade")
-      /*if (topicFilter.url.specific.startsWith("/events/user/"))
-        Topic(RegexFilter("^\\/events\\/user\\/.*$"))
-      else
-        Topic(RegexFilter("^\\/events\\/.*$"))*/
     }
   }
 }

@@ -32,7 +32,6 @@ class UnreliableFeedSubscriptionActor(websocketWorker: ActorRef,
   override def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit = {
     import context._
 
-    // todo: update front correlationId <> back correlationId!
     val resourceUri = ramlConfig.resourceStateUri(request.url)
     hyperBus <~ DynamicGet(resourceUri, DynamicBody(EmptyBody.contentType, Null)) flatMap {
       case response: Response[DynamicBody] ⇒

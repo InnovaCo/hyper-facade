@@ -3,7 +3,7 @@ package eu.inn.facade.modules
 import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import eu.inn.facade.events.SubscriptionsManager
-import eu.inn.facade.http.{StatusMonitorFacade, HandleErrorsDirectives}
+import eu.inn.facade.http.{HttpWorker, HandleErrorsDirectives}
 import eu.inn.facade.{HyperBusFactory, StatsReporterFactory}
 import eu.inn.hyperbus.HyperBus
 import scaldi.Module
@@ -17,6 +17,6 @@ class ServiceModule extends Module {
   bind [ActorSystem]            identifiedBy 'actorSystem          to ActorSystem("Inn", inject [Config])
   bind [ExecutionContext]       identifiedBy 'executionContext     to inject [ActorSystem].dispatcher
   bind [HandleErrorsDirectives] identifiedBy 'errorsDirectives     to new HandleErrorsDirectives
-  bind [StatusMonitorFacade]    identifiedBy 'statusMonitorFacade  to new StatusMonitorFacade
+  bind [HttpWorker]    identifiedBy 'statusMonitorFacade  to new HttpWorker
   bind [SubscriptionsManager]   identifiedBy 'subscriptionsManager to new SubscriptionsManager
 }

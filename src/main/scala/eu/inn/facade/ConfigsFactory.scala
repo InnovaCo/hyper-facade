@@ -5,7 +5,7 @@ import java.nio.file.Paths
 import ch.qos.logback.classic.{Level, Logger}
 import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.typesafe.config.{Config, ConfigFactory}
-import eu.inn.facade.raml.{RamlConfig, RamlConfigParser, RamlConfigParser$}
+import eu.inn.facade.raml.{RamlConfig, RamlConfigParser}
 import org.slf4j.LoggerFactory
 
 import scala.collection.JavaConversions._

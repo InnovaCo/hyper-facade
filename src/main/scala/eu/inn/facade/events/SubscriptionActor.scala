@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef}
 import eu.inn.facade.filter.chain.FilterChainFactory
 import eu.inn.facade.filter.model.{DynamicRequestHeaders, Headers}
 import eu.inn.facade.http.RequestMapper
-import eu.inn.facade.raml.RamlConfig
+import eu.inn.facade.raml.{Method, RamlConfig}
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard.{ErrorBody, InternalServerError}
 import eu.inn.hyperbus.serialization.RequestHeader
@@ -67,43 +67,57 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
           websocketWorker ! RequestMapper.toDynamicResponse(headers, body)
         } else {
           val filteredRequest = RequestMapper.toDynamicRequest(headers, body)
-          subscribe(filteredRequest, self)
+          subscribe(filteredRequest)
+          implicit val mvx = MessagingContextFactory.withCorrelationId(serverCorrelationId(filteredRequest))
           fetchAndReplyWithResource(filteredRequest)
         }
     }
   }
 
-  def subscribe(request: DynamicRequest, replyTo: ActorRef): Unit = {
+  def subscribe(request: DynamicRequest): Unit = {
     request match {
       case DynamicRequest(RequestHeader(url, _, _, messageId, correlationId), _) ⇒
-        val finalCorrelationId = correlationId.getOrElse(messageId)
-        implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
         val resourceFeedUri = ramlConfig.resourceFeedUri(url)
-        subscriptionId = Some(subscriptionManager.subscribe(Topic(resourceFeedUri), replyTo, finalCorrelationId))  // todo: Topic logic/raml
+        val finalCorrelationId = clientCorrelationId(correlationId, messageId)
+        subscriptionId = Some(subscriptionManager.subscribe(Topic(resourceFeedUri), self, finalCorrelationId))
     }
+  }
+
+  def serverCorrelationId(request: DynamicRequest): String = {
+    request match {
+      case DynamicRequest(RequestHeader(_, _, _, messageId, correlationId), _) ⇒
+        clientCorrelationId(correlationId, messageId) + self.path
+    }
+  }
+
+  def clientCorrelationId(requestCorrelationId: Option[String], messageId: String): String = {
+    requestCorrelationId.getOrElse(messageId)
   }
 
   def filterIn(dynamicRequest: DynamicRequest): Future[(Headers, DynamicBody)] = {
     val url = dynamicRequest.url
-    val method = dynamicRequest.method
     val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
     val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
-    filterChainComposer.inputFilterChain(url, method, contentType).applyFilters(headers, dynamicBody)
+    // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
+    // HTTP method and we treat all websocket requests as sent with POST method
+    filterChainComposer.inputFilterChain(url, Method.POST, contentType).applyFilters(headers, dynamicBody)
   }
 
   def filterOut(dynamicRequest: DynamicRequest, responseEvent: DynamicRequest): Future[(Headers, DynamicBody)] = {
     val url = dynamicRequest.url
-    val method = dynamicRequest.method
     val (headers, dynamicBody) = RequestMapper.unfold(responseEvent)
-    filterChainComposer.outputFilterChain(url, method).applyFilters(headers, dynamicBody)
+    // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
+    // HTTP method and we treat all websocket requests as sent with POST method
+    filterChainComposer.outputFilterChain(url, Method.POST).applyFilters(headers, dynamicBody)
   }
 
   def filterOut(request: DynamicRequest, response: Response[DynamicBody]): Future[(Headers, DynamicBody)] = {
     val statusCode = response.status
     val url = request.url
-    val method = request.method
     val body = response.body
-    filterChainComposer.outputFilterChain(url, method).applyFilters(Headers(Map(), Some(statusCode)), body)
+    // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
+    // HTTP method and we treat all websocket requests as sent with POST method
+    filterChainComposer.outputFilterChain(url, Method.POST).applyFilters(Headers(Map(), Some(statusCode)), body)
   }
 
   def exceptionToResponse(t: Throwable)(implicit mcf: MessagingContextFactory): Response[Body] = {

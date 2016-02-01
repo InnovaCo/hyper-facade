@@ -29,11 +29,11 @@ import scala.util.Success
 class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with Injectable {
   implicit val injector = getInjector
   implicit val actorSystem = inject[ActorSystem]
-  val statusMonitorFacade = inject[StatusMonitorFacade]
+  val statusMonitorFacade = inject[HttpWorker]
 
   new WsRestServiceApp("localhost", 54321) {
     start {
-      pathPrefix("test-service") {
+      pathPrefix("status") {
         statusMonitorFacade.statusMonitorRoutes.routes
       }
     }
@@ -44,20 +44,20 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
   "Facade integration" - {
     "simple http request" in {
 
-      testService.onCommand(Topic("/test-service"), Ok(DynamicBody(Text("response"))))
+      testService.onCommand(Topic("/status/test-service"), Ok(DynamicBody(Text("response"))))
 
       // Unfortunately WsRestServiceApp doesn't provide a Future or any other way to ensure that listener is
       // bound to socket, so we need this stupid timeout to initialize the listener
       Thread.sleep(1000)
 
-      Source.fromURL("http://localhost:54321/test-service", "UTF-8").mkString shouldBe """"response""""
+      Source.fromURL("http://localhost:54321/status/test-service", "UTF-8").mkString shouldBe """"response""""
     }
 
     "websocket: unreliable feed" in {
 
       val host = "localhost"
       val port = 54321
-      val url = "/test-service"
+      val url = "/status/test-service"
 
       val connect = Http.Connect(host, port)
       val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
@@ -120,7 +120,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       val host = "localhost"
       val port = 54321
-      val url = "/test-service"
+      val url = "/status/test-service"
 
       val connect = Http.Connect(host, port)
       val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
@@ -132,7 +132,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       val refreshedResourceStatePromise = Promise[Boolean]()
       val afterResubscriptionEventPromise = Promise[Boolean]()
 
-      var clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
+      val clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
       val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
         override def onMessage(frame: TextFrame): Unit = {
           clientMessageQueue += frame
