@@ -1,6 +1,6 @@
 package eu.inn.facade.http
 
-import java.io.ByteArrayOutputStream
+import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 
 import akka.util.ByteString
 import eu.inn.binders.dynamic.{Null, Obj, Text}
@@ -28,7 +28,7 @@ object RequestMapper {
 
   def toDynamicRequest(httpRequest: HttpRequest): DynamicRequest = {
     if (httpRequest.entity.isEmpty) DynamicRequest(RequestHeader(null, null, None, null, None), DynamicBody(Obj(Map())))
-    else DynamicRequest(httpRequest.entity.data.toByteString.iterator.asInputStream)
+    else DynamicRequest(new ByteArrayInputStream(httpRequest.entity.data.toByteArray))
   }
 
   def toDynamicResponse(headers: Headers, dynamicBody: DynamicBody): Response[Body] = {

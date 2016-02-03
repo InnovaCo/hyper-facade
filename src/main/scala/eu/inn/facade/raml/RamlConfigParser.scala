@@ -1,15 +1,11 @@
 package eu.inn.facade.raml
 
-import java.nio.file.Paths
-
-import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.mulesoft.raml1.java.parser.impl.datamodel.ObjectFieldImpl
 import com.mulesoft.raml1.java.parser.model.api.Api
 import com.mulesoft.raml1.java.parser.model.bodies.Response
 import com.mulesoft.raml1.java.parser.model.datamodel.DataElement
 import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
-import com.typesafe.config.Config
 
 import scala.collection.JavaConversions._
 
@@ -160,19 +156,6 @@ class RamlConfigParser(val api: Api) {
 object RamlConfigParser {
   def apply(api: Api) = {
     new RamlConfigParser(api)
-  }
-
-  def apply(config: Config) = {
-    val factory = new JavaNodeFactory
-    val ramlConfigPath = ramlFilePath(config)
-    new RamlConfigParser(factory.createApi(ramlConfigPath))
-  }
-
-  private def ramlFilePath(config: Config): String = {
-    val fileRelativePath = config.getString("inn.facade.raml.file")
-    val fileUri = Thread.currentThread().getContextClassLoader.getResource(fileRelativePath).toURI
-    val file = Paths.get(fileUri).toFile
-    file.getCanonicalPath
   }
 }
 

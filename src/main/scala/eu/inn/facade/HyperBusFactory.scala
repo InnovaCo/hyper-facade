@@ -23,7 +23,7 @@ class HyperBusFactory(val config: Config) {
 }
 
 object HyperBusFactory {
-  val HYPERBUS_GROUP_NAME = "hyperbus.transports.kafka-server.defaultGroupName"
+  val HYPERBUS_GROUP_NAME = "hyperbus.facade.group-name"
 
   def defaultHyperBusGroup(config: Config) = {
     if (config.hasPath(HyperBusFactory.HYPERBUS_GROUP_NAME))

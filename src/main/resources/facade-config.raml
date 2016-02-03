@@ -1,9 +1,24 @@
 #%RAML 1.0
 title: Facade API
 version: v1
+mediaType: application/json
+annotationTypes:
+  x-client-ip:
+  x-client-language:
+  privateField:
 traits:
-  streamed-reliable:
   streamed-unreliable:
-/test-service/{content}/events:
-    get:
-      is: [ streamed-reliable ]
+    queryParameters:
+      <<resourceStateUri>>:
+      <<eventFeedUri>>:
+  streamed-reliable:
+    queryParameters:
+      <<resourceStateUri>>:
+      <<eventFeedUri>>:
+  plain-resource:
+    queryParameters:
+      <<resourceStateUri>>:
+  privateResource:
+/test-service/reliable:
+  post:
+    is: [ streamed-reliable: { "resourceStateUri": "/test-service/reliable/resource", "eventFeedUri": "/test-service/reliable/{content}/events" } ]

@@ -3,7 +3,7 @@ package eu.inn.facade.modules
 import com.typesafe.config.Config
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.raml.RamlConfig
-import scaldi.Module
+import scaldi.{OpenInjectable, Module}
 
 class ConfigModule extends Module {
 

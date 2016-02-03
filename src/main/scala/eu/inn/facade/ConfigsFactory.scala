@@ -57,9 +57,14 @@ class ConfigsFactory {
   }
 
   private def ramlFilePath(config: Config): String = {
-    val fileRelativePath = config.getString("inn.facade.raml.file")
+    var fileRelativePath = System.getProperty(ConfigsFactory.RAML_CONFIG_RELATIVE_PATH)
+    if (fileRelativePath == null) fileRelativePath = config.getString("inn.facade.raml.file")
     val fileUri = Thread.currentThread().getContextClassLoader.getResource(fileRelativePath).toURI
     val file = Paths.get(fileUri).toFile
     file.getCanonicalPath
   }
+}
+
+object ConfigsFactory {
+  val RAML_CONFIG_RELATIVE_PATH = "raml.config.relative-path"
 }

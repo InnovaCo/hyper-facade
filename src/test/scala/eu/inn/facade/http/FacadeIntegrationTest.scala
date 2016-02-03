@@ -1,22 +1,22 @@
 package eu.inn.facade.http
 
-import java.util.concurrent.{SynchronousQueue, TimeUnit, ThreadPoolExecutor, Executor}
+import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, TimeUnit}
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.Config
 import eu.inn.binders.dynamic.{Number, Obj, Text}
-import eu.inn.facade.modules.{ConfigModule, FiltersModule, ServiceModule}
-import eu.inn.facade.{UnreliableFeedTestRequest, FeedTestBody, ReliableFeedTestRequest, TestService}
+import eu.inn.facade.modules.Injectors
+import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model.standard.Ok
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest}
 import eu.inn.hyperbus.serialization.RequestHeader
-import eu.inn.hyperbus.transport.api.{TransportConfigurationLoader, TransportManager, Topic}
+import eu.inn.hyperbus.transport.api.{Topic, TransportConfigurationLoader, TransportManager}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{FreeSpec, Matchers}
-import scaldi.{Injectable, Injector}
+import scaldi.Injectable
 import spray.can.Http
 import spray.can.websocket.frame.TextFrame
 import spray.http.{HttpHeaders, HttpMethods, HttpRequest}
@@ -27,7 +27,7 @@ import scala.io.Source
 import scala.util.Success
 
 class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with Injectable {
-  implicit val injector = getInjector
+  implicit val injector = Injectors()
   implicit val actorSystem = inject[ActorSystem]
   val statusMonitorFacade = inject[HttpWorker]
 
@@ -76,7 +76,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           }
         }
 
-        override def onUpgrade: Unit = {
+        override def onUpgrade(): Unit = {
           onClientUpgradePromise.complete(Success(true))
         }
       }), "unreliable-feed-client")
@@ -145,7 +145,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           }
         }
 
-        override def onUpgrade: Unit = {
+        override def onUpgrade(): Unit = {
           onClientUpgradePromise.complete(Success(true))
         }
       }), "reliable-feed-client")
@@ -228,14 +228,6 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
     HttpHeaders.RawHeader("Sec-WebSocket-Version", "13"),
     HttpHeaders.RawHeader("Sec-WebSocket-Key", "x3JJHMbDL1EzLkh9GBhXDw=="),
     HttpHeaders.RawHeader("Sec-WebSocket-Extensions", "permessage-deflate"))
-
-  def getInjector: Injector = {
-    val filtersModule = new FiltersModule
-    val injector = new ConfigModule :: filtersModule :: new ServiceModule
-    filtersModule.initOuterBindings
-    injector.initNonLazy()
-    injector
-  }
 
   def testServiceHyperBus: HyperBus = {
     val config = inject[Config]

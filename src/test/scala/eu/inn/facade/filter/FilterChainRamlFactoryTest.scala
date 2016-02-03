@@ -1,5 +1,6 @@
 package eu.inn.facade.filter
 
+import com.typesafe.config.Config
 import eu.inn.facade.filter.chain.FilterChainFactory
 import eu.inn.facade.filter.model.Filter
 import eu.inn.facade.modules.{ConfigModule, FiltersModule}
@@ -7,6 +8,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import scaldi.{Module, Injectable}
 
 class FilterChainRamlFactoryTest extends FreeSpec with Matchers with Injectable {
+
 
   implicit val injector = new ConfigModule :: new FiltersModule :: new Module {
     bind [Seq[Filter]] identifiedBy "paged" to Seq(new NoOpFilter)
