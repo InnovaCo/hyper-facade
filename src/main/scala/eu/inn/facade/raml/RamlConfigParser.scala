@@ -100,7 +100,7 @@ class RamlConfigParser(val api: Api) {
       Map(None → None)
     else {
       ramlReqRspWrapper.body.foldLeft(Map[Option[String], Option[String]]()) { (typeNames, body) ⇒
-        val contentType = if (body.name == null || body.name == "body") None else Some(body.name)
+        val contentType = if (body.name == null || body.name == "body" || body.name.equalsIgnoreCase("none")) None else Some(body.name)
         val typeName = body.`type`.get(0)
         typeNames + (contentType → Option(typeName))
       }
@@ -162,13 +162,17 @@ object RamlConfigParser {
 private[raml] class RamlRequestResponseWrapper(val method: Option[methodsAndResources.Method], val response: Option[Response]) {
 
   def body: java.util.List[DataElement] = {
-    if (method.isEmpty) response.get.body
-    else method.get.body
+    var bodyList = Seq[DataElement]()
+    if (method.isDefined) bodyList = bodyList ++ method.get.body
+    if (response.isDefined) bodyList = bodyList ++ response.get.body
+    bodyList
   }
 
   def headers: java.util.List[DataElement] = {
-    if (method.isEmpty) response.get.headers
-    else method.get.headers
+    var bodyList = Seq[DataElement]()
+    if (method.isDefined) bodyList = bodyList ++ method.get.headers
+    if (response.isDefined) bodyList = bodyList ++ response.get.headers
+    bodyList
   }
 }
 

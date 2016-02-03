@@ -129,6 +129,8 @@ traits:
   is: [ streamed-reliable: { "resourceStateUri": "/reliable-feed/resource", "eventFeedUri": "/reliable-feed/{content}/events" } ]
   post:
     body:
+      none:
+        type: TestRequest
       application/vnd+app-server-status.json:
         type: ReliableResourceState
       application/vnd+app-server-status-update.json:

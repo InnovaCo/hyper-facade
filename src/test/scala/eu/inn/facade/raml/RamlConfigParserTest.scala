@@ -81,11 +81,19 @@ class RamlConfigParserTest extends FreeSpec with Matchers {
           Seq(Field("revisionId", DataType("number", Seq(), Seq())),
               Field("update", DataType())),
           Seq()))
+      val testRequestBody = Body(
+        DataType("TestRequest",
+          Seq(Field("mode", DataType("string", Seq(), Seq())),
+              Field("resultType", DataType("string", Seq(), Seq())),
+              Field("clientIP", DataType("string", Seq(), Seq(Annotation(CLIENT_IP)))),
+              Field("clientLanguage", DataType("string", Seq(), Seq(Annotation(CLIENT_LANGUAGE))))),
+        Seq()))
       val resourceStateContentType = Some("application/vnd+app-server-status.json")
       val resourceUpdateContentType = Some("application/vnd+app-server-status-update.json")
 
       ramlConfig.requestDataStructure("/reliable-feed", POST, resourceStateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceStateBody)))
       ramlConfig.requestDataStructure("/reliable-feed", POST, resourceUpdateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceUpdateBody)))
+      ramlConfig.requestDataStructure("/reliable-feed", POST, None) shouldBe Some(DataStructure(feedHeaders, Some(testRequestBody)))
     }
 
     "request URI substitution" in {
