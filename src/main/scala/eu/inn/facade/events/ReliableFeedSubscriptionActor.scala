@@ -39,11 +39,9 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
     import context._
 
     val resourceUri = ramlConfig.resourceStateUri(request.url)
-    println(s"resource $resourceUri")
     hyperBus <~ DynamicGet(resourceUri, DynamicBody(EmptyBody.contentType, Null)) flatMap {
       case response: Response[DynamicBody] ⇒
         lastRevisionId = response.body.content.revisionId[Long]
-        println(s"rev $lastRevisionId")
         filterOut(request, response)
     } recover {
       case t: Throwable ⇒ exceptionToResponse(t)

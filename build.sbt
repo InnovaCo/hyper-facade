@@ -5,6 +5,7 @@ scalaVersion := "2.11.7"
 version := "0.1.SNAPSHOT"
 
 scalacOptions ++= Seq(
+  "-language:postfixOps",
   "-feature",
   "-deprecation",
   "-unchecked",
@@ -20,6 +21,20 @@ javacOptions ++= Seq(
   "-Xlint:unchecked",
   "-Xlint:deprecation"
 )
+
+packSettings
+
+packMain := Map("start" -> "'$@' eu.inn.facade.MainApp #")
+
+packJarNameConvention := "full"
+
+buildInfoSettings
+
+sourceGenerators in Compile <+= buildInfo
+
+buildInfoKeys := Seq[BuildInfoKey](BuildInfoKey.action("name")("inn-hyperbus-facade"), version, BuildInfoKey.action("buildTime")(System.currentTimeMillis))
+
+buildInfoPackage := "eu.inn.forgame.api"
 
 resolvers ++= Seq(
   "Innova libs repo" at "http://repproxy.srv.inn.ru/artifactory/libs-release-local",
@@ -42,12 +57,12 @@ libraryDependencies ++= Seq(
   "com.typesafe.akka"              %% "akka-cluster"                 % "2.3.11",
   "com.typesafe.akka"              %% "akka-testkit"                 % "2.3.11"           % "test",
   "com.wandoulabs.akka"            %% "spray-websocket"              % "0.1.4",
-  "eu.inn"                         %% "hyperbus"                     % "0.1.48",
-  "eu.inn"                         %% "hyperbus-model"               % "0.1.48",
-  "eu.inn"                         %% "hyperbus-standard-model"      % "0.1.48",
-  "eu.inn"                         %% "hyperbus-transport"           % "0.1.48",
-  "eu.inn"                         %% "hyperbus-t-kafka"             % "0.1.48",
-  "eu.inn"                         %% "hyperbus-t-distributed-akka"  % "0.1.48",
+  "eu.inn"                         %% "hyperbus"                     % "0.1.53",
+  "eu.inn"                         %% "hyperbus-model"               % "0.1.53",
+  "eu.inn"                         %% "hyperbus-standard-model"      % "0.1.53",
+  "eu.inn"                         %% "hyperbus-transport"           % "0.1.53",
+  "eu.inn"                         %% "hyperbus-t-kafka"             % "0.1.53",
+  "eu.inn"                         %% "hyperbus-t-distributed-akka"  % "0.1.53",
   "jline"                          %  "jline"                        % "2.12.1",
   "io.spray"                       %% "spray-can"                    % "1.3.3",
   "io.spray"                       %% "spray-routing-shapeless2"     % "1.3.3",
@@ -55,6 +70,7 @@ libraryDependencies ++= Seq(
   "java-raml1-tools"               % "java-raml1-parser"             % "0.0.1-SNAPSHOT",
   "java-raml1-tools"               % "javascript-module-holders"     % "0.0.1-SNAPSHOT",
   "org.scaldi"                     %% "scaldi"                       % "0.5.7",
+  "ru.inn"                         % "jmx-javaagent"                 % "1.0",
   "org.scalatest"                  %% "scalatest"                    % "2.2.1"            % "test"
 )
 
