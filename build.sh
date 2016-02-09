@@ -22,9 +22,7 @@ KAFKA_PID=$!
 sleep 5
 
 if [ -n "$publish" ] ; then
-  sbt ';set version <<= (version)(_ + ".'${patch_version:-0}'")' 'set testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/test-reports")' clean test publish
-elif [ -n "$BUILD_VERSION" ] ; then
-  sbt ';set version := "'${BUILD_VERSION:-0}'"' clean test pack -Dsbt.override.build.repos=true
+  sbt ';set every projectBuildNumber := "'${patch_version:-SNAPSHOT}'"' 'set testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/test-reports")' clean test publish
 fi
 
 kill $KAFKA_PID
