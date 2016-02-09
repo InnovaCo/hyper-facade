@@ -56,6 +56,10 @@ class TestService(hyperBus: HyperBus) {
       }
     }
   }
+
+  def unsubscribe(subscriptionId: String) = {
+    hyperBus.off(subscriptionId)
+  }
 }
 
 object TestService4WebsocketPerf extends App {

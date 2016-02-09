@@ -55,7 +55,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       implicit val system = ActorSystem()
 
       val host = "localhost"
-      val port = 54321
+      val port = 12345
       val url = "/testFilterChain"
 
       val connect = Http.Connect(host, port)
@@ -106,7 +106,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       implicit val system = ActorSystem()
 
       val host = "localhost"
-      val port = 54321
+      val port = 12345
       val url = "/testFilterChain"
 
       val connect = Http.Connect(host, port)
@@ -157,7 +157,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       implicit val system = ActorSystem()
 
       val host = "localhost"
-      val port = 54321
+      val port = 12345
       val url = "/testFilterChain"
 
       val connect = Http.Connect(host, port)
@@ -207,7 +207,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       implicit val system = ActorSystem()
 
       val host = "localhost"
-      val port = 54321
+      val port = 12345
       val url = "/testFilterChain"
 
       val connect = Http.Connect(host, port)

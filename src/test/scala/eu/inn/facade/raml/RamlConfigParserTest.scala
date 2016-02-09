@@ -24,7 +24,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers {
 
   "RamlConfig" - {
     "traits" in {
-      ramlConfig.traitNames("/status", GET) shouldBe Seq("rateLimited")
+      ramlConfig.traitNames("/status", POST) shouldBe Seq("rateLimited")
       ramlConfig.traitNames("/users", GET) shouldBe Seq("paged", "rateLimited", "secured")
       ramlConfig.traitNames("/users", POST) shouldBe Seq("secured")
       ramlConfig.traitNames("/status/test-service", GET) shouldBe Seq("paged")

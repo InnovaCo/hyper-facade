@@ -152,7 +152,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       client ! Connect() // init websocket connection
 
-      testService.onCommand(Topic("/test-service/reliable/resource"),
+      val subscriptionId = testService.onCommand(Topic("/test-service/reliable/resource"),
         Ok(DynamicBody(Obj(Map("content" → Text("fullResource"), "revisionId" → Number(1))))),
       // emulate latency between request for full resource state and response
         () ⇒ Thread.sleep(10000))
@@ -190,6 +190,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           directEventMessage.get.payload.utf8String shouldBe referenceRequest
         } else fail("Last event wasn't sent to the client")
 
+        testService.unsubscribe(subscriptionId)
         testService.onCommand(Topic("/test-service/reliable/resource"),
           Ok(DynamicBody(Obj(Map("content" → Text("fullResource"), "revisionId" → Number(4))))))
         testService.publish(ReliableFeedTestRequest(FeedTestBody("updateFromFuture", 5), "messageId", "correlationId"))

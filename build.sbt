@@ -36,6 +36,8 @@ buildInfoKeys := Seq[BuildInfoKey](BuildInfoKey.action("name")("inn-hyperbus-fac
 
 buildInfoPackage := "eu.inn.forgame.api"
 
+fork in Test := true
+
 resolvers ++= Seq(
   "Innova libs repo" at "http://repproxy.srv.inn.ru/artifactory/libs-release-local",
   "Innova ext repo" at "http://repproxy.srv.inn.ru/artifactory/ext-release-local",
@@ -70,7 +72,6 @@ libraryDependencies ++= Seq(
   "java-raml1-tools"               % "java-raml1-parser"             % "0.0.1-SNAPSHOT",
   "java-raml1-tools"               % "javascript-module-holders"     % "0.0.1-SNAPSHOT",
   "org.scaldi"                     %% "scaldi"                       % "0.5.7",
-  "ru.inn"                         % "jmx-javaagent"                 % "1.0",
   "org.scalatest"                  %% "scalatest"                    % "2.2.1"            % "test"
 )
 
