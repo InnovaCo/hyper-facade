@@ -75,4 +75,8 @@ libraryDependencies ++= Seq(
   "org.scalatest"                  %% "scalatest"                    % "2.2.1"            % "test"
 )
 
+publishTo := Some("Innova libs repo" at "http://repproxy.srv.inn.ru/artifactory/libs-release-local")
+
+credentials += Credentials(Path.userHome / ".ivy2" / ".innova_credentials")
+
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.0-M5" cross CrossVersion.full)
