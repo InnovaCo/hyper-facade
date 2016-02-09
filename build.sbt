@@ -44,6 +44,7 @@ resolvers ++= Seq(
   "Innova libs repo" at "http://repproxy.srv.inn.ru/artifactory/libs-release-local",
   "Innova ext repo" at "http://repproxy.srv.inn.ru/artifactory/ext-release-local",
   Resolver.sonatypeRepo("public"),
+  Resolver.sonatypeRepo("snapshots"),
   Resolver.mavenLocal
 )
 
