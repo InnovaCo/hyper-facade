@@ -75,7 +75,8 @@ libraryDependencies ++= Seq(
   "eu.inn"                         % "java-raml1-parser"             % "0.0.30",
   "eu.inn"                         % "javascript-module-holders"     % "0.0.30",
   "org.scaldi"                     %% "scaldi"                       % "0.5.7",
-  "org.scalatest"                  %% "scalatest"                    % "2.2.1"            % "test"
+  "org.scalatest"                  %% "scalatest"                    % "2.2.1"            % "test",
+  "org.pegdown"                    % "pegdown"                       % "1.4.2"            % "test"
 )
 
 publishTo := Some("Innova libs repo" at "http://repproxy.srv.inn.ru/artifactory/libs-release-local")
