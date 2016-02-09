@@ -69,8 +69,8 @@ libraryDependencies ++= Seq(
   "io.spray"                       %% "spray-can"                    % "1.3.3",
   "io.spray"                       %% "spray-routing-shapeless2"     % "1.3.3",
   "io.spray"                       %% "spray-testkit"                % "1.3.3"            % "test",
-  "java-raml1-tools"               % "java-raml1-parser"             % "0.0.1-SNAPSHOT",
-  "java-raml1-tools"               % "javascript-module-holders"     % "0.0.1-SNAPSHOT",
+  "eu.inn"                         % "java-raml1-parser"             % "0.0.1-SNAPSHOT",
+  "eu.inn"                         % "javascript-module-holders"     % "0.0.1-SNAPSHOT",
   "org.scaldi"                     %% "scaldi"                       % "0.5.7",
   "org.scalatest"                  %% "scalatest"                    % "2.2.1"            % "test"
 )
