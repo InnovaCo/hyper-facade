@@ -1,7 +1,5 @@
 package eu.inn.facade
 
-import java.nio.file.Paths
-
 import ch.qos.logback.classic.{Level, Logger}
 import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.typesafe.config.{Config, ConfigFactory}
@@ -57,11 +55,9 @@ class ConfigsFactory {
   }
 
   private def ramlFilePath(config: Config): String = {
-    var fileRelativePath = System.getProperty(ConfigsFactory.RAML_CONFIG_RELATIVE_PATH)
-    if (fileRelativePath == null) fileRelativePath = config.getString("inn.facade.raml.file")
-    val fileUri = Thread.currentThread().getContextClassLoader.getResource(fileRelativePath).toURI
-    val file = Paths.get(fileUri).toFile
-    file.getCanonicalPath
+    var filePath = System.getProperty(ConfigsFactory.RAML_CONFIG_RELATIVE_PATH)
+    if (filePath == null) filePath = config.getString("inn.facade.raml.file")
+    filePath
   }
 }
 
