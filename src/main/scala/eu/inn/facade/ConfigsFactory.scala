@@ -55,9 +55,16 @@ class ConfigsFactory {
   }
 
   private def ramlFilePath(config: Config): String = {
-    var filePath = System.getProperty(ConfigsFactory.RAML_CONFIG_RELATIVE_PATH)
-    if (filePath == null) filePath = config.getString("inn.facade.raml.file")
-    filePath
+    val absoluteFilePath = System.getProperty(ConfigsFactory.RAML_CONFIG_RELATIVE_PATH)
+    if (absoluteFilePath != null) absoluteFilePath
+    else {
+      val filePath = config.getString("inn.facade.raml.file")
+
+      // it means that config contains absolute file path
+      if (filePath.startsWith("/")) filePath
+      // otherwise treat it as relative file path
+      else Thread.currentThread().getContextClassLoader.getResource(filePath).getFile
+    }
   }
 }
 
