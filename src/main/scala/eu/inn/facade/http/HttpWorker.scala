@@ -8,6 +8,7 @@ import eu.inn.facade.filter.model.{DynamicRequestHeaders, Headers}
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.model.standard.{DynamicGet, EmptyBody}
 import eu.inn.hyperbus.model.{DynamicBody, Response}
+import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.{HyperBus, IdGenerator}
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
@@ -35,22 +36,23 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
     val routes: Route =
       anyMethod {
         (request & requestUri) { (request, uri) ⇒
-          onSuccess(processRequest(request, uri)) { response ⇒
+          onSuccess(processRequest(request, uri.path.toString)) { response ⇒
             complete(response)
           }
         }
       }
   }
 
-  def processRequest(request: HttpRequest, uri: Uri): Future[HttpResponse] = {
-    val resourceUri = ramlConfig.resourceStateUri(uri.path.toString())
+  def processRequest(request: HttpRequest, uri: String): Future[HttpResponse] = {
+    val resourceUriPattern = ramlConfig.resourceStateUri(uri)
     val responsePromise = Promise[HttpResponse]()
-    filterIn(request, resourceUri) map {
+    filterIn(request, resourceUriPattern) map {
       case (headers, body) ⇒
         if (headers.hasStatusCode) responsePromise.complete(Success(RequestMapper.toHttpResponse(headers, body)))
         else {
+          val resourceUri = api.uri.Uri(resourceUriPattern)
           val responseFuture = hyperBus <~ DynamicGet(resourceUri, DynamicBody(EmptyBody.contentType, Null)) flatMap {
-            case response: Response[DynamicBody] ⇒ filterOut(response, resourceUri, request.method.name)
+            case response: Response[DynamicBody] ⇒ filterOut(response, resourceUriPattern, request.method.name)
           } map {
             case (headers: Headers, body: DynamicBody) ⇒
               val intStatusCode = headers.statusCode.getOrElse(200)
@@ -69,14 +71,14 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
   def filterIn(request: HttpRequest, uri: String): Future[(Headers, DynamicBody)] = {
     val dynamicRequest = RequestMapper.toDynamicRequest(request)
     val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-    val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
+    val contentType = headers.singleValueHeader(DynamicRequestHeaders.CONTENT_TYPE)
     filterChainComposer.inputFilterChain(uri, request.method.name, contentType).applyFilters(headers, dynamicBody)
   }
 
-  def filterOut(response: Response[DynamicBody], uri: String, method: String): Future[(Headers, DynamicBody)] = {
+  def filterOut(response: Response[DynamicBody], uriPattern: String, method: String): Future[(Headers, DynamicBody)] = {
     val statusCode = response.status
     val body = response.body
-    filterChainComposer.outputFilterChain(uri, method).applyFilters(Headers(Map(), Some(statusCode)), body)
+    filterChainComposer.outputFilterChain(uriPattern, method).applyFilters(Headers(api.uri.Uri(uriPattern), response.headers, Some(statusCode)), body)
   }
 
   private def exceptionToHttpResponse(t: Throwable): HttpResponse = {

@@ -76,9 +76,9 @@ class WsRestWorker(val serverConnection: ActorRef,
     case message: Frame ⇒
       try {
         val dynamicRequest = RequestMapper.toDynamicRequest(message)
-        val url = dynamicRequest.url
+        val uriPattern = dynamicRequest.uri.pattern.specific.toString
         val method = dynamicRequest.method
-        if (isPingRequest(url, method)) pong(dynamicRequest)
+        if (isPingRequest(uriPattern, method)) pong(dynamicRequest)
         else {
           val requestWithClientIp = RequestMapper.addField("http_x_forwarded_for", remoteAddress, dynamicRequest)
           processRequest(requestWithClientIp)
@@ -89,6 +89,7 @@ class WsRestWorker(val serverConnection: ActorRef,
           val msg = message.payload.utf8String
           //          val msgShort = msg.substring(0, Math.min(msg.length, 240))
           log.warning(s"Can't deserialize websocket message '$msg' from ${sender()}/$remoteAddress. $t")
+          t.printStackTrace()
           None
       }
 
@@ -107,27 +108,27 @@ class WsRestWorker(val serverConnection: ActorRef,
   }
 
   def processRequest(request: DynamicRequest) = request match {
-    case request @ DynamicRequest(RequestHeader(url, _, _, messageId, correlationId), _) ⇒
+    case request @ DynamicRequest(RequestHeader(uri, _, _, messageId, correlationId, _), _) ⇒
       val key = correlationId.getOrElse(messageId)
       val actorName = "Subscr-" + key
       context.child(actorName) match {
         case Some(actor) ⇒ actor.forward(request)
-        case None ⇒ context.actorOf(feedSubscriptionActorProps(url), actorName) ! request
+        case None ⇒ context.actorOf(feedSubscriptionActorProps(uri.pattern.specific.toString), actorName) ! request
       }
   }
 
-  def feedSubscriptionActorProps(url: String): Props = {
-    if (ramlConfig.isReliableEventFeed(url)) ReliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
-    else if (ramlConfig.isUnreliableEventFeed(url)) UnreliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
+  def feedSubscriptionActorProps(uri: String): Props = {
+    if (ramlConfig.isReliableEventFeed(uri)) ReliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
+    else if (ramlConfig.isUnreliableEventFeed(uri)) UnreliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
     else throw new IllegalArgumentException("This resource doesn't contain an event feed")
   }
 
-  def isPingRequest(url: String, method: String): Boolean = {
-    url == "/meta/ping" && method == "ping"
+  def isPingRequest(uri: String, method: String): Boolean = {
+    uri == "/meta/ping" && method == "ping"
   }
 
   def pong(dynamicRequest: DynamicRequest) = request match {
-    case request @ DynamicRequest(RequestHeader(_, _, _, messageId, correlationId), _) ⇒
+    case request @ DynamicRequest(RequestHeader(_, _, _, messageId, correlationId, _), _) ⇒
       val finalCorrelationId = correlationId.getOrElse(messageId)
       implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
       send(Ok(DynamicBody(Text("pong"))))

@@ -19,7 +19,7 @@ class UnreliableFeedSubscriptionActor(websocketWorker: ActorRef,
 
   override def process: Receive = super.process orElse {
     // Received event from HyperBus. Should be sent to client
-    case event @ DynamicRequest(RequestHeader(_, "post", _, _, _), body) ⇒
+    case event @ DynamicRequest(RequestHeader(_, "post", _, _, _, _), body) ⇒
       import context._
 
       subscriptionRequest foreach { request ⇒
@@ -32,8 +32,7 @@ class UnreliableFeedSubscriptionActor(websocketWorker: ActorRef,
   override def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit = {
     import context._
 
-    val resourceUri = ramlConfig.resourceStateUri(request.url)
-    hyperBus <~ DynamicGet(resourceUri, DynamicBody(EmptyBody.contentType, Null)) flatMap {
+    hyperBus <~ DynamicGet(resourceStateUri(request.uri), DynamicBody(EmptyBody.contentType, Null)) flatMap {
       case response: Response[DynamicBody] ⇒
         filterOut(request, response)
     } recover {

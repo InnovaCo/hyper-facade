@@ -2,14 +2,18 @@ package eu.inn.facade.perf
 
 import java.util.concurrent.atomic.AtomicInteger
 
-import akka.actor.{ActorRef, ActorSystem, PoisonPill, Props}
+import akka.actor.{ActorRef, ActorSystem, Props}
 import eu.inn.binders.dynamic.Obj
 import eu.inn.facade.ConfigsFactory
-import eu.inn.facade.http.{Disconnect, Connect, WsTestClient}
+import eu.inn.facade.http.{Connect, Disconnect, WsTestClient}
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest}
 import eu.inn.hyperbus.serialization.RequestHeader
+import eu.inn.hyperbus.transport.api.uri.Uri
 import spray.can.Http
 import spray.http.{HttpHeaders, HttpMethods, HttpRequest}
+
+import scala.concurrent.Await
+import scala.concurrent.duration.Duration
 
 object WsLoadGenerator extends App {
 
@@ -18,9 +22,9 @@ object WsLoadGenerator extends App {
   val config = new ConfigsFactory().config.getConfig("perf-test")
   val host = config.getString("host")
   val port = config.getInt("port")
-  val uri = config.getString("ws.endpoint")
+  val uriPattern = config.getString("ws.endpoint")
   val connect = Http.Connect(host, port)
-  val onUpgradeGetReq = HttpRequest(HttpMethods.GET, uri, upgradeHeaders(host, port))
+  val onUpgradeGetReq = HttpRequest(HttpMethods.GET, uriPattern, upgradeHeaders(host, port))
   val initialClientsCount = config.getInt("ws.loader-count")
   val connectionFailureRate = config.getDouble("ws.connection-failure-rate")
   val loadIterationInterval = config.getInt("ws.load-iteration-interval-seconds") * 1000
@@ -40,8 +44,8 @@ object WsLoadGenerator extends App {
       clients = restoreClients(clients, iterationNumber)
       Thread.sleep(loadIterationInterval)
     }
-    actorSystem.shutdown()
-    actorSystem.awaitTermination()
+
+    Await.result(actorSystem.terminate(), Duration.Inf)
   }
 
   def sessionFinished(sessionLengthSeconds: Int, startTime: Long): Boolean = {
@@ -70,8 +74,8 @@ object WsLoadGenerator extends App {
 
   def startLoad(clients: Seq[ActorRef]): Unit = {
     clients foreach { client ⇒
-      client ! DynamicRequest(RequestHeader(uri, "subscribe", Some("application/vnd+test-1.json"),
-        client.path.name, Some(client.path.name)), DynamicBody(Obj(Map())))
+      client ! DynamicRequest(RequestHeader(Uri(uriPattern), "subscribe", Some("application/vnd+test-1.json"),
+        client.path.name, Some(client.path.name), Map()), DynamicBody(Obj(Map())))
     }
   }
 

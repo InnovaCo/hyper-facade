@@ -3,7 +3,7 @@ package eu.inn.facade.events
 import akka.actor.{ActorRef, Props}
 import com.typesafe.config.Config
 import eu.inn.binders.dynamic.Null
-import eu.inn.facade.filter.model.Headers
+import eu.inn.facade.filter.model.{DynamicRequestHeaders, Headers}
 import eu.inn.facade.http.RequestMapper
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
@@ -30,18 +30,21 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
 
   override def process: Receive = super.process orElse {
     // Received event from HyperBus. Should be sent to client
-    case request @ DynamicRequest(RequestHeader(_, "post", _, _, _), body) ⇒
-      if (!resourceStateFetched) pendingEvents += request
-      else sendEvent(request)
+    case request @ DynamicRequest(RequestHeader(_, "post", _, _, _, _), body) ⇒
+      if (!resourceStateFetched) {
+        pendingEvents += request
+      }
+      else {
+        sendEvent(request)
+      }
   }
 
   override def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory) = {
     import context._
 
-    val resourceUri = ramlConfig.resourceStateUri(request.url)
-    hyperBus <~ DynamicGet(resourceUri, DynamicBody(EmptyBody.contentType, Null)) flatMap {
+    hyperBus <~ DynamicGet(resourceStateUri(request.uri), DynamicBody(EmptyBody.contentType, Null)) flatMap {
       case response: Response[DynamicBody] ⇒
-        lastRevisionId = response.body.content.revisionId[Long]
+        lastRevisionId = response.headers(DynamicRequestHeaders.REVISION).head.toLong
         filterOut(request, response)
     } recover {
       case t: Throwable ⇒ exceptionToResponse(t)
@@ -64,7 +67,7 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
     import akka.pattern.pipe
     import context._
 
-    val revisionId = event.body.content.revisionId[Long]
+    val revisionId = event.headers(DynamicRequestHeaders.REVISION).head.toLong
     subscriptionRequest foreach { request ⇒
       if (revisionId == lastRevisionId + 1)
         filterOut(request, event) map {

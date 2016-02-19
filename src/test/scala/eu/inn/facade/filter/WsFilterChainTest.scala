@@ -14,6 +14,7 @@ import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
 import eu.inn.hyperbus.model.standard.Method
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest}
 import eu.inn.hyperbus.serialization.RequestHeader
+import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Seconds, Span}
@@ -23,7 +24,8 @@ import spray.can.server.UHttp
 import spray.can.websocket.frame.TextFrame
 import spray.http.{HttpHeaders, HttpMethods, HttpRequest}
 
-import scala.concurrent.{Future, Promise}
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future, Promise}
 import scala.util.Success
 
 class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
@@ -34,7 +36,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     override def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
       if (requestHeaders.headers.nonEmpty) {
         val filteredHeaders = requestHeaders.headers.filterNot{ _._1 == CORRELATION_ID }
-        Future(Headers(filteredHeaders, None), body)
+        Future(Headers(requestHeaders.uri, filteredHeaders, None), body)
       }
       else Future(requestHeaders withStatusCode Some(403), DynamicBody(Text("Forbidden")))
     }
@@ -44,9 +46,9 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     override def apply(responseHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
       if (responseHeaders.headers.nonEmpty) {
         val filteredHeaders = responseHeaders.headers.filterNot { _._1 == CORRELATION_ID }
-        Future(Headers(filteredHeaders, None), body)
+        Future(Headers(responseHeaders.uri, filteredHeaders, None), body)
       }
-      else Future(Headers(Map("x-http-header" → "Accept-Language"), Some(200)), null)
+      else Future(Headers(responseHeaders.uri, Map("x-http-header" → Seq("Accept-Language")), Some(200)), null)
     }
   }
 
@@ -65,7 +67,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
         override def onMessage(frame: TextFrame): Unit = ()
 
-        override def onUpgrade: Unit = {
+        override def onUpgrade(): Unit = {
           onClientUpgradePromise.complete(Success(true))
         }
       }), "websocket-client")
@@ -84,11 +86,11 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
           client ! Connect()
 
           whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-            client ! DynamicRequest(RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId")), DynamicBody(Text("haha")))
+            client ! DynamicRequest(RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map()), DynamicBody(Text("haha")))
 
             whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
               case DynamicRequest(header, body) ⇒
-                header shouldBe RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId"))
+                header shouldBe RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map())
                 body shouldBe DynamicBody(Text("haha"))
             }
           }
@@ -97,8 +99,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         case ex: Throwable ⇒
           fail(ex)
       } finally {
-        system.shutdown()
-        system.awaitTermination()
+        Await.result(system.terminate(), Duration.Inf)
       }
     }
 
@@ -116,7 +117,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       val client = system.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
         override def onMessage(frame: TextFrame): Unit = ()
 
-        override def onUpgrade: Unit = {
+        override def onUpgrade(): Unit = {
           onClientUpgradePromise.complete(Success(true))
         }
       }), "websocket-client")
@@ -135,19 +136,18 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         client ! Connect()
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-          client ! DynamicRequest(RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId")), DynamicBody(Text("haha")))
+          client ! DynamicRequest(RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map()), DynamicBody(Text("haha")))
 
           try {
             whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
               case DynamicRequest(header, body) ⇒
-                header shouldBe RequestHeader("/test", Method.GET, None, "messageId", None)
+                header shouldBe RequestHeader(Uri("/test"), Method.GET, None, "messageId", None, Map())
                 body shouldBe DynamicBody(Text("haha"))
             }
           } catch {
             case ex: Throwable ⇒ fail(ex)
           } finally {
-            system.shutdown()
-            system.awaitTermination()
+            Await.result(system.terminate(), Duration.Inf)
           }
         }
       }
@@ -170,7 +170,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
           onClientReceivedPromise.complete(Success(toDynamicRequest(frame)))
         }
 
-        override def onUpgrade: Unit = {
+        override def onUpgrade(): Unit = {
           onClientUpgradePromise.complete(Success(true))
         }
       }), "websocket-client")
@@ -185,19 +185,18 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         client ! Connect()
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-          server ! DynamicRequest(RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId")), DynamicBody(Text("haha")))
+          server ! DynamicRequest(RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map()), DynamicBody(Text("haha")))
 
           try {
             whenReady(onClientReceivedPromise.future, Timeout(Span(5, Seconds))) {
               case DynamicRequest(header, body) ⇒
-                header shouldBe RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId"))
+                header shouldBe RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map())
                 body shouldBe DynamicBody(Text("haha"))
             }
           } catch {
             case ex: Throwable ⇒ fail(ex)
           } finally {
-            system.shutdown()
-            system.awaitTermination()
+            Await.result(system.terminate(), Duration.Inf)
           }
         }
       }
@@ -220,7 +219,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
             onClientReceivedPromise.complete(Success(toDynamicRequest(frame)))
         }
 
-        override def onUpgrade: Unit = {
+        override def onUpgrade(): Unit = {
           onClientUpgradePromise.complete(Success(true))
         }
       }), "websocket-client")
@@ -235,19 +234,18 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         client ! Connect()
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-          server ! DynamicRequest(RequestHeader("/test", Method.GET, None, "messageId", Some("correlationId")), DynamicBody(Text("haha")))
+          server ! DynamicRequest(RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map()), DynamicBody(Text("haha")))
 
           try {
             whenReady(onClientReceivedPromise.future, Timeout(Span(5, Seconds))) {
               case DynamicRequest(header, body) ⇒
-                header shouldBe RequestHeader("/test", Method.GET, None, "messageId", None)
+                header shouldBe RequestHeader(Uri("/test"), Method.GET, None, "messageId", None, Map())
                 body shouldBe DynamicBody(Text("haha"))
             }
           } catch {
             case ex: Throwable ⇒ fail(ex)
           } finally {
-            system.shutdown()
-            system.awaitTermination()
+            Await.result(system.terminate(), Duration.Inf)
           }
         }
       }

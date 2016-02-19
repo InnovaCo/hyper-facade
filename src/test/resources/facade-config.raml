@@ -138,11 +138,11 @@ traits:
 
 /test-service/reliable:
   post:
-    is: [ streamed-reliable: { "resourceStateUri": "/test-service/reliable/resource", "eventFeedUri": "/test-service/reliable/{content}/events" } ]
+    is: [ streamed-reliable: { "resourceStateUri": "/test-service/reliable/resource", "eventFeedUri": "/test-service/reliable/events" } ]
 
 /test-service/unreliable:
   post:
-    is: [ streamed-unreliable: { "resourceStateUri": "/test-service/unreliable/resource", "eventFeedUri": "/test-service/unreliable/{content}/events" } ]
+    is: [ streamed-unreliable: { "resourceStateUri": "/test-service/unreliable/resource", "eventFeedUri": "/test-service/unreliable/events" } ]
 
 /perf-test-service/ws:
   post:

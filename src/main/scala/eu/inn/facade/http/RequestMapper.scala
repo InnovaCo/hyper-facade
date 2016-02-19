@@ -27,66 +27,68 @@ object RequestMapper {
   }
 
   def toDynamicRequest(httpRequest: HttpRequest): DynamicRequest = {
-    if (httpRequest.entity.isEmpty) DynamicRequest(RequestHeader(null, null, None, null, None), DynamicBody(Obj(Map())))
+    if (httpRequest.entity.isEmpty) DynamicRequest(RequestHeader(null, null, None, null, None, null), DynamicBody(Obj(Map())))
     else DynamicRequest(new ByteArrayInputStream(httpRequest.entity.data.toByteArray))
   }
 
   def toDynamicResponse(headers: Headers, dynamicBody: DynamicBody): Response[Body] = {
+    val messageId = headers.headers(MESSAGE_ID).head
+    val correlationId = headers.headers(CORRELATION_ID).head
     headers.statusCode match {
-      case Some(200) ⇒ Ok(dynamicBody)
-      case Some(201) ⇒ Created(DynamicCreatedBody(dynamicBody.content))
-      case Some(202) ⇒ Accepted(dynamicBody)
-      case Some(203) ⇒ NonAuthoritativeInformation(dynamicBody)
-      case Some(204) ⇒ NoContent(dynamicBody)
-      case Some(205) ⇒ ResetContent(dynamicBody)
-      case Some(206) ⇒ PartialContent(dynamicBody)
-      case Some(207) ⇒ MultiStatus(dynamicBody)
+      case Some(200) ⇒ Ok(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(201) ⇒ Created(DynamicCreatedBody(dynamicBody.content), headers.headers, messageId, correlationId)
+      case Some(202) ⇒ Accepted(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(203) ⇒ NonAuthoritativeInformation(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(204) ⇒ NoContent(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(205) ⇒ ResetContent(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(206) ⇒ PartialContent(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(207) ⇒ MultiStatus(dynamicBody, headers.headers, messageId, correlationId)
 
-      case Some(300) ⇒ MultipleChoices(dynamicBody)
-      case Some(301) ⇒ MovedPermanently(dynamicBody)
-      case Some(302) ⇒ Found(dynamicBody)
-      case Some(303) ⇒ SeeOther(dynamicBody)
-      case Some(304) ⇒ NotModified(dynamicBody)
-      case Some(305) ⇒ UseProxy(dynamicBody)
-      case Some(307) ⇒ TemporaryRedirect(dynamicBody)
+      case Some(300) ⇒ MultipleChoices(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(301) ⇒ MovedPermanently(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(302) ⇒ Found(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(303) ⇒ SeeOther(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(304) ⇒ NotModified(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(305) ⇒ UseProxy(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(307) ⇒ TemporaryRedirect(dynamicBody, headers.headers, messageId, correlationId)
 
-      case Some(400) ⇒ BadRequest(errorBody(dynamicBody))
-      case Some(401) ⇒ Unauthorized(errorBody(dynamicBody))
-      case Some(402) ⇒ PaymentRequired(errorBody(dynamicBody))
-      case Some(403) ⇒ Forbidden(errorBody(dynamicBody))
-      case Some(404) ⇒ NotFound(errorBody(dynamicBody))
-      case Some(405) ⇒ MethodNotAllowed(errorBody(dynamicBody))
-      case Some(406) ⇒ NotAcceptable(errorBody(dynamicBody))
-      case Some(407) ⇒ ProxyAuthenticationRequired(errorBody(dynamicBody))
-      case Some(408) ⇒ RequestTimeout(errorBody(dynamicBody))
-      case Some(409) ⇒ Conflict(errorBody(dynamicBody))
-      case Some(410) ⇒ Gone(errorBody(dynamicBody))
-      case Some(411) ⇒ LengthRequired(errorBody(dynamicBody))
-      case Some(412) ⇒ PreconditionFailed(errorBody(dynamicBody))
-      case Some(413) ⇒ RequestEntityTooLarge(errorBody(dynamicBody))
-      case Some(414) ⇒ RequestUriTooLong(errorBody(dynamicBody))
-      case Some(415) ⇒ UnsupportedMediaType(errorBody(dynamicBody))
-      case Some(416) ⇒ RequestedRangeNotSatisfiable(errorBody(dynamicBody))
-      case Some(417) ⇒ ExpectationFailed(errorBody(dynamicBody))
-      case Some(422) ⇒ UnprocessableEntity(errorBody(dynamicBody))
-      case Some(423) ⇒ Locked(errorBody(dynamicBody))
-      case Some(424) ⇒ FailedDependency(errorBody(dynamicBody))
-      case Some(429) ⇒ TooManyRequest(errorBody(dynamicBody))
+      case Some(400) ⇒ BadRequest(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(401) ⇒ Unauthorized(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(402) ⇒ PaymentRequired(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(403) ⇒ Forbidden(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(404) ⇒ NotFound(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(405) ⇒ MethodNotAllowed(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(406) ⇒ NotAcceptable(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(407) ⇒ ProxyAuthenticationRequired(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(408) ⇒ RequestTimeout(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(409) ⇒ Conflict(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(410) ⇒ Gone(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(411) ⇒ LengthRequired(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(412) ⇒ PreconditionFailed(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(413) ⇒ RequestEntityTooLarge(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(414) ⇒ RequestUriTooLong(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(415) ⇒ UnsupportedMediaType(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(416) ⇒ RequestedRangeNotSatisfiable(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(417) ⇒ ExpectationFailed(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(422) ⇒ UnprocessableEntity(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(423) ⇒ Locked(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(424) ⇒ FailedDependency(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(429) ⇒ TooManyRequest(errorBody(dynamicBody), headers.headers, messageId, correlationId)
 
-      case Some(500) ⇒ eu.inn.hyperbus.model.standard.InternalServerError(errorBody(dynamicBody))
-      case Some(501) ⇒ NotImplemented(errorBody(dynamicBody))
-      case Some(502) ⇒ BadGateway(errorBody(dynamicBody))
-      case Some(503) ⇒ ServiceUnavailable(errorBody(dynamicBody))
-      case Some(504) ⇒ GatewayTimeout(errorBody(dynamicBody))
-      case Some(505) ⇒ HttpVersionNotSupported(errorBody(dynamicBody))
-      case Some(507) ⇒ InsufficientStorage(errorBody(dynamicBody))
+      case Some(500) ⇒ eu.inn.hyperbus.model.standard.InternalServerError(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(501) ⇒ NotImplemented(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(502) ⇒ BadGateway(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(503) ⇒ ServiceUnavailable(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(504) ⇒ GatewayTimeout(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(505) ⇒ HttpVersionNotSupported(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(507) ⇒ InsufficientStorage(errorBody(dynamicBody), headers.headers, messageId, correlationId)
     }
   }
 
   def unfold(dynamicRequest: DynamicRequest): (Headers, DynamicBody) = {
     dynamicRequest match {
       case DynamicRequest(requestHeader, dynamicBody) ⇒
-        val headers = extractHeaders(requestHeader)
+        val headers = extractRequestHeaders(requestHeader)
         (headers, dynamicBody)
     }
   }
@@ -111,25 +113,33 @@ object RequestMapper {
     HttpResponse(httpStatusCode, HttpEntity(httpContentType, jsonBody), List())
   }
 
-  def extractHeaders(dynamicHeader: RequestHeader): Headers = {
-    var headers = Map[String, String]()
-    headers += (URL → dynamicHeader.url)
-    headers += (METHOD → dynamicHeader.method)
+  def extractRequestHeaders(dynamicHeader: RequestHeader): Headers = {
+    var headers = Map[String, Seq[String]]()
+    headers += (METHOD → Seq(dynamicHeader.method))
     dynamicHeader.contentType match {
-      case Some(contentType) ⇒ headers += (CONTENT_TYPE → contentType)
+      case Some(contentType) ⇒ headers += (CONTENT_TYPE → Seq(contentType))
       case None ⇒
     }
-    headers += (MESSAGE_ID → dynamicHeader.messageId)
+    headers += (MESSAGE_ID → Seq(dynamicHeader.messageId))
     dynamicHeader.correlationId match {
-      case Some(correlationId) ⇒ headers += (CORRELATION_ID → correlationId)
+      case Some(correlationId) ⇒ headers += (CORRELATION_ID → Seq(correlationId))
       case None ⇒
     }
-    Headers(headers, None)
+    Headers(dynamicHeader.uri, headers, None)
+  }
+
+  def extractResponseHeaders(statusCode: Int, headers: Map[String, Seq[String]], messageId: String, correlationId: String): Headers = {
+    val responseHeaders = headers + (MESSAGE_ID → Seq(messageId), CORRELATION_ID → Seq(correlationId))
+    Headers(null, responseHeaders, Some(statusCode))
   }
 
   def extractDynamicHeader(headers: Headers): RequestHeader = {
-    val headersMap = headers.headers
-    RequestHeader(headersMap(URL), headersMap(METHOD), headersMap.get(CONTENT_TYPE), headersMap(MESSAGE_ID), headersMap.get(CORRELATION_ID))
+    val method = headers.singleValueHeader(METHOD).getOrElse(Method.GET)
+    val contentType = headers.singleValueHeader(CONTENT_TYPE)
+    val messageId = headers.singleValueHeader(MESSAGE_ID).get
+    val correlationId = headers.singleValueHeader(CORRELATION_ID)
+    val otherHeaders = headers.headers - (METHOD, CONTENT_TYPE, MESSAGE_ID, CORRELATION_ID)
+    RequestHeader(headers.uri, method, contentType, messageId, correlationId, otherHeaders)
   }
 
   def addField(fieldName: String, fieldValue: String, dynamicRequest: DynamicRequest): DynamicRequest = {
@@ -170,7 +180,7 @@ object RequestMapper {
     var httpHeaders = List[HttpHeader]()
     headers.headers.foreach {
       case (name, value) ⇒
-        if (!isDynamicHeader(name)) httpHeaders = httpHeaders :+ RawHeader(name, value)
+        if (!isDynamicHeader(name)) httpHeaders = httpHeaders :+ RawHeader(name, value.head)
     }
     httpHeaders
   }

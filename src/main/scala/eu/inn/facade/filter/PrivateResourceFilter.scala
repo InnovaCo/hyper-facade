@@ -15,6 +15,6 @@ class PrivateResourceFilter extends InputFilter {
   override def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
     val error = new ByteArrayOutputStream()
     ErrorBody("Not Found").serialize(error)
-    Future(Headers(Map(), Some(404)), DynamicBody(Text(error.toString("UTF-8"))))
+    Future(Headers(requestHeaders.uri, Map(), Some(404)), DynamicBody(Text(error.toString("UTF-8"))))
   }
 }

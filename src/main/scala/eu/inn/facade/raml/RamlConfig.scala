@@ -1,46 +1,46 @@
 package eu.inn.facade.raml
 
-class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
+class RamlConfig(val resourcesByUri: Map[String, ResourceConfig]) {
   import Trait._
 
-  def traitNames(url: String, method: String): Seq[String] = {
-    traits(url, method) map (foundTrait ⇒ foundTrait.name)
+  def traitNames(uriPattern: String, method: String): Seq[String] = {
+    traits(uriPattern, method) map (foundTrait ⇒ foundTrait.name)
   }
 
-  def isReliableEventFeed(url: String) = {
-    traitNames(url, Method.POST).contains(STREAMED_RELIABLE)
+  def isReliableEventFeed(uriPattern: String) = {
+    traitNames(uriPattern, Method.POST).contains(STREAMED_RELIABLE)
   }
 
-  def isUnreliableEventFeed(url: String) = {
-    traitNames(url, Method.POST).contains(Trait.STREAMED_UNRELIABLE)
+  def isUnreliableEventFeed(uriPattern: String) = {
+    traitNames(uriPattern, Method.POST).contains(Trait.STREAMED_UNRELIABLE)
   }
 
-  def resourceFeedUri(url: String): String = {
-    val resourceTraits = traits(url, Method.POST)
+  def resourceFeedUri(uriPattern: String): String = {
+    val resourceTraits = traits(uriPattern, Method.POST)
     resourceTraits.find(resourceTrait ⇒ isFeed(resourceTrait.name)) match {
       case Some(feedTrait) ⇒ feedTrait.parameters(EVENT_FEED_URI)
-      case None ⇒ url // todo: is it correct?
+      case None ⇒ uriPattern // todo: is it correct?
     }
   }
 
-  def resourceStateUri(url: String): String = {
-    val resourceTraits = traits(url, Method.POST)
+  def resourceStateUri(uriPattern: String): String = {
+    val resourceTraits = traits(uriPattern, Method.POST)
     resourceTraits.find(resourceTrait ⇒ hasMappedUri(resourceTrait.name)) match {
       case Some(resourceStateTrait) ⇒ resourceStateTrait.parameters(RESOURCE_STATE_URI)
-      case None ⇒ url // todo: is it correct?
+      case None ⇒ uriPattern // todo: is it correct?
     }
   }
 
-  def requestDataStructure(url: String, method: String, contentType: Option[String]): Option[DataStructure] = {
-    resourcesByUrl(url).requests.dataStructures.get(Method(method), getContentType(contentType))
+  def requestDataStructure(uriPattern: String, method: String, contentType: Option[String]): Option[DataStructure] = {
+    resourcesByUri(uriPattern).requests.dataStructures.get(Method(method), getContentType(contentType))
   }
 
-  def responseDataStructure(url: String, method: String, statusCode: Int): Option[DataStructure] = {
-    resourcesByUrl(url).responses.dataStructures.get((Method(method), statusCode))
+  def responseDataStructure(uriPattern: String, method: String, statusCode: Int): Option[DataStructure] = {
+    resourcesByUri(uriPattern).responses.dataStructures.get((Method(method), statusCode))
   }
 
-  def responseDataStructures(url: String, method: String): Seq[DataStructure] = {
-    val allStructures = resourcesByUrl(url).responses.dataStructures
+  def responseDataStructures(uriPattern: String, method: String): Seq[DataStructure] = {
+    val allStructures = resourcesByUri(uriPattern).responses.dataStructures
     allStructures.foldLeft(Seq[DataStructure]()) { (structuresByMethod, kv) ⇒
       val (httpMethod, _) = kv._1
       val structure = kv._2
@@ -49,8 +49,8 @@ class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
     }
   }
 
-  private def traits(url: String, method: String): Seq[Trait] = {
-    val traits = resourcesByUrl(url).traits
+  private def traits(uriPattern: String, method: String): Seq[Trait] = {
+    val traits = resourcesByUri(uriPattern).traits
     traits.methodSpecificTraits
       .getOrElse(Method(method), traits.commonTraits)
   }

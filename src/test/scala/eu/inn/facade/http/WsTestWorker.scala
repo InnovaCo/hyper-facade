@@ -30,7 +30,7 @@ abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterC
     case frame: TextFrame =>
       toDynamicRequest(frame) match {
         case DynamicRequest(requestHeader, dynamicBody) ⇒
-          val headers = extractHeaders(requestHeader)
+          val headers = extractRequestHeaders(requestHeader)
           inputFilterChain.applyFilters(headers, dynamicBody) onComplete {
             case Success((headers, body)) ⇒ exposeDynamicRequest(toDynamicRequest(headers, body))
           }
@@ -39,7 +39,7 @@ abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterC
     case request: DynamicRequest =>
       request match {
         case DynamicRequest(requestHeader, dynamicBody) ⇒
-          val headers = extractHeaders(requestHeader)
+          val headers = extractRequestHeaders(requestHeader)
           outputFilterChain.applyFilters(headers, dynamicBody) onComplete {
             case Success((headers, body)) ⇒
               send(toFrame(toDynamicRequest(headers, body)))

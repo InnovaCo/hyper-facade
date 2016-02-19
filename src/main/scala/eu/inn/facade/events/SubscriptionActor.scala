@@ -8,7 +8,7 @@ import eu.inn.facade.raml.{Method, RamlConfig}
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.standard.{ErrorBody, InternalServerError}
 import eu.inn.hyperbus.serialization.RequestHeader
-import eu.inn.hyperbus.transport.api.Topic
+import eu.inn.hyperbus.transport.api.uri.{UriPart, Uri}
 import eu.inn.hyperbus.{HyperBus, IdGenerator}
 import scaldi.{Injectable, Injector}
 
@@ -36,13 +36,13 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
 
   def process: Receive = {
     // Request for subscription to resource event feed
-    case request @ DynamicRequest(RequestHeader(_, "subscribe", _, _, _), _) ⇒
+    case request @ DynamicRequest(RequestHeader(_, "subscribe", _, _, _, _), _) ⇒
       subscriptionRequest = Some(request)
       filterAndSubscribe(request)
   }
 
   def interruptProcessing: Receive = {
-    case request @ DynamicRequest(RequestHeader(_, "unsubscribe", _, _, _), _) ⇒
+    case request @ DynamicRequest(RequestHeader(_, "unsubscribe", _, _, _, _), _) ⇒
       context.stop(self)
 
     case other @ DynamicRequest(_,_) ⇒
@@ -76,16 +76,15 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
 
   def subscribe(request: DynamicRequest): Unit = {
     request match {
-      case DynamicRequest(RequestHeader(url, _, _, messageId, correlationId), _) ⇒
-        val resourceFeedUri = ramlConfig.resourceFeedUri(url)
+      case DynamicRequest(RequestHeader(uri, _, _, messageId, correlationId, _), _) ⇒
         val finalCorrelationId = clientCorrelationId(correlationId, messageId)
-        subscriptionId = Some(subscriptionManager.subscribe(Topic(resourceFeedUri), self, finalCorrelationId))
+        subscriptionId = Some(subscriptionManager.subscribe(resourceFeedUri(uri), self, finalCorrelationId))
     }
   }
 
   def serverCorrelationId(request: DynamicRequest): String = {
     request match {
-      case DynamicRequest(RequestHeader(_, _, _, messageId, correlationId), _) ⇒
+      case DynamicRequest(RequestHeader(_, _, _, messageId, correlationId, _), _) ⇒
         clientCorrelationId(correlationId, messageId) + self.path
     }
   }
@@ -95,34 +94,52 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
   }
 
   def filterIn(dynamicRequest: DynamicRequest): Future[(Headers, DynamicBody)] = {
-    val url = dynamicRequest.url
+    val uriPattern = dynamicRequest.uri.pattern.specific.toString
     val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-    val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
+    val contentType = headers.singleValueHeader(DynamicRequestHeaders.CONTENT_TYPE)
     // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
     // HTTP method and we treat all websocket requests as sent with POST method
-    filterChainComposer.inputFilterChain(url, Method.POST, contentType).applyFilters(headers, dynamicBody)
+    filterChainComposer.inputFilterChain(uriPattern, Method.POST, contentType).applyFilters(headers, dynamicBody)
   }
 
   def filterOut(dynamicRequest: DynamicRequest, responseEvent: DynamicRequest): Future[(Headers, DynamicBody)] = {
-    val url = dynamicRequest.url
+    val uriPattern = dynamicRequest.uri.pattern.specific.toString
     val (headers, dynamicBody) = RequestMapper.unfold(responseEvent)
     // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
     // HTTP method and we treat all websocket requests as sent with POST method
-    filterChainComposer.outputFilterChain(url, Method.POST).applyFilters(headers, dynamicBody)
+    filterChainComposer.outputFilterChain(uriPattern, Method.POST).applyFilters(headers, dynamicBody)
   }
 
   def filterOut(request: DynamicRequest, response: Response[DynamicBody]): Future[(Headers, DynamicBody)] = {
     val statusCode = response.status
-    val url = request.url
+    val uriPattern = request.uri.pattern.specific.toString
     val body = response.body
+    val headers = RequestMapper.extractResponseHeaders(statusCode, response.headers, response.messageId, response.correlationId)
     // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
     // HTTP method and we treat all websocket requests as sent with POST method
-    filterChainComposer.outputFilterChain(url, Method.POST).applyFilters(Headers(Map(), Some(statusCode)), body)
+    filterChainComposer.outputFilterChain(uriPattern, Method.POST).applyFilters(headers, body)
   }
 
   def exceptionToResponse(t: Throwable)(implicit mcf: MessagingContextFactory): Response[Body] = {
     val errorId = IdGenerator.create()
     log.error(t, "Can't handle request. #" + errorId)
     InternalServerError(ErrorBody("unhandled-exception", Some(t.getMessage + " #"+errorId), errorId = errorId))
+  }
+
+  def resourceStateUri(uri: Uri): Uri = {
+    val resourceStateUriPattern = ramlConfig.resourceStateUri(uri.pattern.specific.toString)
+    composeUri(resourceStateUriPattern, uri.args)
+  }
+
+  def resourceFeedUri(uri: Uri): Uri = {
+    val resourceFeedUriPattern = ramlConfig.resourceFeedUri(uri.pattern.specific.toString)
+    composeUri(resourceFeedUriPattern, uri.args)
+  }
+
+  def composeUri(pattern: String, args: Map[String, UriPart]): Uri = {
+    val resourceUriArgs = args map {
+      case (argName, argValue) ⇒ argName → argValue.toString
+    }
+    Uri(pattern, resourceUriArgs)
   }
 }
