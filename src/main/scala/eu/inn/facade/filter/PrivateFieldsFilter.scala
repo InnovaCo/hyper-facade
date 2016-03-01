@@ -11,7 +11,7 @@ import scala.concurrent.Future
 
 class PrivateFieldsFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
 
-  override def apply(headers: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
+  override def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
     Future {
       getDataStructure(headers) match {
         case Some(structure) ⇒

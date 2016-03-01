@@ -2,13 +2,12 @@ package eu.inn.facade.events
 
 import akka.actor.{Actor, ActorLogging, ActorRef}
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.filter.model.{DynamicRequestHeaders, Headers}
+import eu.inn.facade.filter.model.{DynamicRequestHeaders, TransitionalHeaders}
 import eu.inn.facade.http.RequestMapper
 import eu.inn.facade.raml.{Method, RamlConfig}
 import eu.inn.hyperbus.model._
-import eu.inn.hyperbus.model.standard.{ErrorBody, InternalServerError}
-import eu.inn.hyperbus.serialization.RequestHeader
-import eu.inn.hyperbus.transport.api.uri.{UriPart, Uri}
+import eu.inn.hyperbus.transport.api.matchers.TextMatcher
+import eu.inn.hyperbus.transport.api.uri.Uri
 import eu.inn.hyperbus.{HyperBus, IdGenerator}
 import scaldi.{Injectable, Injector}
 
@@ -31,21 +30,27 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
   var subscriptionRequest: Option[DynamicRequest] = None
 
   def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit
+  def process(request: DynamicRequest): Unit
 
-  override def receive: Receive = process orElse interruptProcessing
+  override def receive: Receive = {
 
-  def process: Receive = {
-    // Request for subscription to resource event feed
-    case request @ DynamicRequest(RequestHeader(_, "subscribe", _, _, _, _), _) ⇒
-      subscriptionRequest = Some(request)
-      filterAndSubscribe(request)
-  }
+    case request : DynamicRequest ⇒
+      request.headers.get(Header.METHOD) match {
 
-  def interruptProcessing: Receive = {
-    case request @ DynamicRequest(RequestHeader(_, "unsubscribe", _, _, _, _), _) ⇒
-      context.stop(self)
+        case Some(Seq("subscribe")) ⇒
+          subscriptionRequest = Some(request)
+          filterAndSubscribe(request)
 
-    case other @ DynamicRequest(_,_) ⇒
+        case Some(Seq("unsubscribe")) ⇒
+          context.stop(self)
+
+        // This request received from backend sevice via HyperBus. Will be sent to client
+        case _ ⇒
+          process(request)
+      }
+
+
+    case other ⇒
       log.error(s"Invalid request received on $self: $other")
       context.stop(self)
   }
@@ -75,25 +80,20 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
   }
 
   def subscribe(request: DynamicRequest): Unit = {
-    request match {
-      case DynamicRequest(RequestHeader(uri, _, _, messageId, correlationId, _), _) ⇒
-        val finalCorrelationId = clientCorrelationId(correlationId, messageId)
-        subscriptionId = Some(subscriptionManager.subscribe(resourceFeedUri(uri), self, finalCorrelationId))
-    }
+    val finalCorrelationId = RequestMapper.correlationId(request.headers)
+    subscriptionId = Some(subscriptionManager.subscribe(resourceFeedUri(request.uri), self, finalCorrelationId))
   }
 
   def serverCorrelationId(request: DynamicRequest): String = {
-    request match {
-      case DynamicRequest(RequestHeader(_, _, _, messageId, correlationId, _), _) ⇒
-        clientCorrelationId(correlationId, messageId) + self.path
-    }
+    val clientCorrelationId = RequestMapper.correlationId(request.headers)
+    clientCorrelationId + self.path
   }
 
   def clientCorrelationId(requestCorrelationId: Option[String], messageId: String): String = {
     requestCorrelationId.getOrElse(messageId)
   }
 
-  def filterIn(dynamicRequest: DynamicRequest): Future[(Headers, DynamicBody)] = {
+  def filterIn(dynamicRequest: DynamicRequest): Future[(TransitionalHeaders, DynamicBody)] = {
     val uriPattern = dynamicRequest.uri.pattern.specific.toString
     val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
     val contentType = headers.singleValueHeader(DynamicRequestHeaders.CONTENT_TYPE)
@@ -102,7 +102,7 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
     filterChainComposer.inputFilterChain(uriPattern, Method.POST, contentType).applyFilters(headers, dynamicBody)
   }
 
-  def filterOut(dynamicRequest: DynamicRequest, responseEvent: DynamicRequest): Future[(Headers, DynamicBody)] = {
+  def filterOut(dynamicRequest: DynamicRequest, responseEvent: DynamicRequest): Future[(TransitionalHeaders, DynamicBody)] = {
     val uriPattern = dynamicRequest.uri.pattern.specific.toString
     val (headers, dynamicBody) = RequestMapper.unfold(responseEvent)
     // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
@@ -110,7 +110,7 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
     filterChainComposer.outputFilterChain(uriPattern, Method.POST).applyFilters(headers, dynamicBody)
   }
 
-  def filterOut(request: DynamicRequest, response: Response[DynamicBody]): Future[(Headers, DynamicBody)] = {
+  def filterOut(request: DynamicRequest, response: Response[DynamicBody]): Future[(TransitionalHeaders, DynamicBody)] = {
     val statusCode = response.status
     val uriPattern = request.uri.pattern.specific.toString
     val body = response.body
@@ -136,7 +136,7 @@ abstract class SubscriptionActor(websocketWorker: ActorRef,
     composeUri(resourceFeedUriPattern, uri.args)
   }
 
-  def composeUri(pattern: String, args: Map[String, UriPart]): Uri = {
+  def composeUri(pattern: String, args: Map[String, TextMatcher]): Uri = {
     val resourceUriArgs = args map {
       case (argName, argValue) ⇒ argName → argValue.toString
     }

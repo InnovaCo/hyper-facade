@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.chain
 
-import eu.inn.facade.filter.model.{Filter, Headers}
+import eu.inn.facade.filter.model.{Filter, TransitionalHeaders}
 import eu.inn.hyperbus.model.DynamicBody
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -9,11 +9,11 @@ import scala.language.postfixOps
 
 class FilterChain(val filters: Seq[Filter]) {
 
-  def applyFilters(headers: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
-    val accumulator: Future[(Headers, DynamicBody)] = Future {
+  def applyFilters(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
+    val accumulator: Future[(TransitionalHeaders, DynamicBody)] = Future {
       (headers, body)
     }
-    val promisedResult = Promise[(Headers, DynamicBody)]()
+    val promisedResult = Promise[(TransitionalHeaders, DynamicBody)]()
     if (filters nonEmpty) {
       filters.foldLeft(accumulator) { (previousResult, filter) ⇒
         previousResult.flatMap { result ⇒

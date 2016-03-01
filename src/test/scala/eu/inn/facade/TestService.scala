@@ -9,8 +9,8 @@ import eu.inn.binders.dynamic.{Obj, Text}
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.annotations.{body, request}
-import eu.inn.hyperbus.model.standard._
 import eu.inn.hyperbus.transport.api._
+import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
 import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -19,12 +19,12 @@ import scala.concurrent.Future
 @body("application/vnd+test-1.json")
 case class FeedTestBody(content: String) extends Body
 
-@request("/test-service/reliable/events")
-case class ReliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]], messageId: String, correlationId: String) extends StaticPost(body)
+@request(Method.FEED_POST, "/test-service/reliable/feed")
+case class ReliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
 with DefinedResponse[Ok[DynamicBody]]
 
-@request("/test-service/unreliable/events")
-case class UnreliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]], messageId: String, correlationId: String) extends StaticPost(body)
+@request(Method.FEED_POST, "/test-service/unreliable/feed")
+case class UnreliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
 with DefinedResponse[Ok[DynamicBody]]
 
 object TestService extends App {
@@ -49,8 +49,8 @@ class TestService(hyperBus: HyperBus) {
     hyperBus <| request
   }
 
-  def onCommand(uri: Uri, response: Response[Body], optionalTestCallback: (() ⇒ Unit) = () ⇒ ()) = {
-    hyperBus.onCommand(uri, Method.GET, None) { request: DynamicRequest ⇒
+  def onCommand(matcher: RequestMatcher, response: Response[Body], optionalTestCallback: (() ⇒ Unit) = () ⇒ ()) = {
+    hyperBus.onCommand(matcher) { request: DynamicRequest ⇒
       Future {
         optionalTestCallback()
         response
@@ -58,8 +58,8 @@ class TestService(hyperBus: HyperBus) {
     }
   }
 
-  def unsubscribe(subscriptionId: String) = {
-    hyperBus.off(subscriptionId)
+  def unsubscribe(subscription: Subscription) = {
+    hyperBus.off(subscription)
   }
 }
 
@@ -71,7 +71,7 @@ object TestService4WebsocketPerf extends App {
   val eventsPerSecond = config.getInt("perf-test.events-per-second")
   var canStart = new AtomicBoolean(false)
   TestService.startSeedNode(config)
-  testService.onCommand(Uri("/test-service/unreliable/resource"),
+  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable/resource")), Map(Header.METHOD → Specific("subscribe"))),
     Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), () ⇒ canStart.compareAndSet(false, true))
   while(!canStart.get()) {
     Thread.sleep(1000)
@@ -83,7 +83,7 @@ object TestService4WebsocketPerf extends App {
     while (true) {
       val startTime = System.currentTimeMillis()
       for ( i ← 1 to eventsPerSecond) {
-        testService.publish(UnreliableFeedTestRequest(FeedTestBody("perfEvent"), Map(), "messageId", "correlationId"))
+        testService.publish(UnreliableFeedTestRequest(FeedTestBody("perfEvent"), Headers()))
       }
       val remainingTime = 1000 - (startTime - System.currentTimeMillis())
       if (remainingTime > 0) Thread.sleep(remainingTime)
@@ -96,5 +96,6 @@ object TestService4HttpPerf extends App {
   val hyperBus = new HyperBusFactory(config).hyperBus
   val testService = new TestService(hyperBus)
   TestService.startSeedNode(config)
-  testService.onCommand(Uri("/status/test-service"), Ok(DynamicBody(Text("response"))))
+  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable/resource")), Map(Header.METHOD → Specific(Method.GET))),
+    Ok(DynamicBody(Text("response"))))
 }

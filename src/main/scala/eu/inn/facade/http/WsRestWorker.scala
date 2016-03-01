@@ -7,8 +7,6 @@ import eu.inn.facade.filter.chain.FilterChainFactory
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
-import eu.inn.hyperbus.model.standard.Ok
-import eu.inn.hyperbus.serialization.RequestHeader
 import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
 import spray.can.websocket.frame.Frame
@@ -29,7 +27,7 @@ class WsRestWorker(val serverConnection: ActorRef,
 
   var isConnectionTerminated = false
   var remoteAddress = clientAddress
-  var request: Option[HttpRequest] = None
+  var httpRequest: Option[HttpRequest] = None
 
   val filterChainComposer = inject[FilterChainFactory]
   val ramlConfig = inject[RamlConfig]
@@ -50,7 +48,7 @@ class WsRestWorker(val serverConnection: ActorRef,
     case handshakeRequest@websocket.HandshakeRequest(state) ⇒
       state match {
         case wsContext: websocket.HandshakeContext ⇒
-          request = Some(wsContext.request)
+          httpRequest = Some(wsContext.request)
 
           // todo: this is dangerous, network infrastructure should guarantee that http_x_forwarded_for is always overridden at server-side
           remoteAddress = wsContext.request.headers.find(_.is("http_x_forwarded_for")).map(_.value).getOrElse(clientAddress)
@@ -107,14 +105,13 @@ class WsRestWorker(val serverConnection: ActorRef,
     }
   }
 
-  def processRequest(request: DynamicRequest) = request match {
-    case request @ DynamicRequest(RequestHeader(uri, _, _, messageId, correlationId, _), _) ⇒
-      val key = correlationId.getOrElse(messageId)
-      val actorName = "Subscr-" + key
-      context.child(actorName) match {
-        case Some(actor) ⇒ actor.forward(request)
-        case None ⇒ context.actorOf(feedSubscriptionActorProps(uri.pattern.specific.toString), actorName) ! request
-      }
+  def processRequest(request: DynamicRequest) = {
+    val key = RequestMapper.correlationId(request.headers)
+    val actorName = "Subscr-" + key
+    context.child(actorName) match {
+      case Some(actor) ⇒ actor.forward(request)
+      case None ⇒ context.actorOf(feedSubscriptionActorProps(request.uri.pattern.specific.toString), actorName) ! request
+    }
   }
 
   def feedSubscriptionActorProps(uri: String): Props = {
@@ -127,11 +124,10 @@ class WsRestWorker(val serverConnection: ActorRef,
     uri == "/meta/ping" && method == "ping"
   }
 
-  def pong(dynamicRequest: DynamicRequest) = request match {
-    case request @ DynamicRequest(RequestHeader(_, _, _, messageId, correlationId, _), _) ⇒
-      val finalCorrelationId = correlationId.getOrElse(messageId)
-      implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
-      send(Ok(DynamicBody(Text("pong"))))
+  def pong(dynamicRequest: DynamicRequest) = {
+    val finalCorrelationId = RequestMapper.correlationId(dynamicRequest.headers)
+    implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
+    send(Ok(DynamicBody(Text("pong"))))
   }
 
   def send(message: Message[Body]): Unit = {

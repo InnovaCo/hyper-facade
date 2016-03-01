@@ -2,10 +2,10 @@ package eu.inn.facade.filter.model
 
 import eu.inn.hyperbus.transport.api.uri.Uri
 
-case class Headers(uri: Uri, headers: Map[String, Seq[String]], statusCode: Option[Int]) {
+case class TransitionalHeaders(uri: Uri, headers: Map[String, Seq[String]], statusCode: Option[Int]) {
 
   def withStatusCode(newResponseCode: Option[Int]) = {
-    Headers(uri, headers, newResponseCode)
+    TransitionalHeaders(uri, headers, newResponseCode)
   }
 
   def singleValueHeader(name: String): Option[String] = {

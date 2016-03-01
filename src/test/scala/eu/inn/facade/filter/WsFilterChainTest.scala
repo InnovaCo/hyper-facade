@@ -8,11 +8,10 @@ import akka.pattern.ask
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.filter.model.DynamicRequestHeaders._
-import eu.inn.facade.filter.model.{Headers, InputFilter, OutputFilter}
+import eu.inn.facade.filter.model.{InputFilter, OutputFilter, TransitionalHeaders}
 import eu.inn.facade.http.RequestMapper._
 import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
-import eu.inn.hyperbus.model.standard.Method
-import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest}
+import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest, Header, Method}
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -33,22 +32,22 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   class TestInputFilter extends InputFilter {
-    override def apply(requestHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
+    override def apply(requestHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
       if (requestHeaders.headers.nonEmpty) {
-        val filteredHeaders = requestHeaders.headers.filterNot{ _._1 == CORRELATION_ID }
-        Future(Headers(requestHeaders.uri, filteredHeaders, None), body)
+        val filteredHeaders = requestHeaders.headers.filterNot{ _._1 == "toBeFiltered" }
+        Future(TransitionalHeaders(requestHeaders.uri, filteredHeaders, None), body)
       }
       else Future(requestHeaders withStatusCode Some(403), DynamicBody(Text("Forbidden")))
     }
   }
 
   class TestOutputFilter extends OutputFilter {
-    override def apply(responseHeaders: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
+    override def apply(responseHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
       if (responseHeaders.headers.nonEmpty) {
-        val filteredHeaders = responseHeaders.headers.filterNot { _._1 == CORRELATION_ID }
-        Future(Headers(responseHeaders.uri, filteredHeaders, None), body)
+        val filteredHeaders = responseHeaders.headers.filterNot { _._1 == "toBeFiltered" }
+        Future(TransitionalHeaders(responseHeaders.uri, filteredHeaders, None), body)
       }
-      else Future(Headers(responseHeaders.uri, Map("x-http-header" → Seq("Accept-Language")), Some(200)), null)
+      else Future(TransitionalHeaders(responseHeaders.uri, Map("x-http-header" → Seq("Accept-Language")), Some(200)), null)
     }
   }
 
@@ -86,11 +85,22 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
           client ! Connect()
 
           whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-            client ! DynamicRequest(RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map()), DynamicBody(Text("haha")))
+            client ! DynamicRequest(
+              RequestHeader(
+                Uri("/test"),
+                Map(Header.METHOD → Seq(Method.GET),
+                    Header.MESSAGE_ID → Seq("messageId"),
+                    Header.CORRELATION_ID → Seq("correlationId"),
+                    "toBeFiltered" → Seq("This header should be dropped by filter"))
+              ),
+              DynamicBody(Text("haha")))
 
             whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
-              case DynamicRequest(header, body) ⇒
-                header shouldBe RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map())
+              case DynamicRequest(uri, body, headers) ⇒
+                uri shouldBe Uri("/test")
+                headers(Header.METHOD) shouldBe Seq(Method.GET)
+                headers(Header.MESSAGE_ID) shouldBe Seq("messageId")
+                headers(Header.CORRELATION_ID) shouldBe Seq("correlationId")
                 body shouldBe DynamicBody(Text("haha"))
             }
           }
@@ -136,12 +146,22 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         client ! Connect()
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-          client ! DynamicRequest(RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map()), DynamicBody(Text("haha")))
+          client ! DynamicRequest(
+            RequestHeader(
+              Uri("/test"),
+              Map(Header.METHOD → Seq(Method.GET),
+                Header.MESSAGE_ID → Seq("messageId"),
+                Header.CORRELATION_ID → Seq("correlationId"))
+            ),
+            DynamicBody(Text("haha")))
 
           try {
             whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
-              case DynamicRequest(header, body) ⇒
-                header shouldBe RequestHeader(Uri("/test"), Method.GET, None, "messageId", None, Map())
+              case DynamicRequest(uri, body, headers) ⇒
+                uri shouldBe Uri("/test")
+                headers(Header.METHOD) shouldBe Seq(Method.GET)
+                headers(Header.MESSAGE_ID) shouldBe Seq("messageId")
+                headers(Header.CORRELATION_ID) shouldBe Seq("correlationId")
                 body shouldBe DynamicBody(Text("haha"))
             }
           } catch {
@@ -185,12 +205,23 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         client ! Connect()
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-          server ! DynamicRequest(RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map()), DynamicBody(Text("haha")))
+          server ! DynamicRequest(
+            RequestHeader(
+              Uri("/test"),
+              Map(Header.METHOD → Seq(Method.GET),
+                Header.MESSAGE_ID → Seq("messageId"),
+                Header.CORRELATION_ID → Seq("correlationId"),
+                "toBeFiltered" → Seq("This header should be dropped by filter"))
+            ),
+            DynamicBody(Text("haha")))
 
           try {
             whenReady(onClientReceivedPromise.future, Timeout(Span(5, Seconds))) {
-              case DynamicRequest(header, body) ⇒
-                header shouldBe RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map())
+              case DynamicRequest(uri, body, headers) ⇒
+                uri shouldBe Uri("/test")
+                headers(Header.METHOD) shouldBe Seq(Method.GET)
+                headers(Header.MESSAGE_ID) shouldBe Seq("messageId")
+                headers(Header.CORRELATION_ID) shouldBe Seq("correlationId")
                 body shouldBe DynamicBody(Text("haha"))
             }
           } catch {
@@ -234,12 +265,22 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         client ! Connect()
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-          server ! DynamicRequest(RequestHeader(Uri("/test"), Method.GET, None, "messageId", Some("correlationId"), Map()), DynamicBody(Text("haha")))
+          server ! DynamicRequest(
+            RequestHeader(
+              Uri("/test"),
+              Map(Header.METHOD → Seq(Method.GET),
+                Header.MESSAGE_ID → Seq("messageId"),
+                Header.CORRELATION_ID → Seq("correlationId"))
+            ),
+            DynamicBody(Text("haha")))
 
           try {
             whenReady(onClientReceivedPromise.future, Timeout(Span(5, Seconds))) {
-              case DynamicRequest(header, body) ⇒
-                header shouldBe RequestHeader(Uri("/test"), Method.GET, None, "messageId", None, Map())
+              case DynamicRequest(uri, body, headers) ⇒
+                uri shouldBe Uri("/test")
+                headers(Header.METHOD) shouldBe Seq(Method.GET)
+                headers(Header.MESSAGE_ID) shouldBe Seq("messageId")
+                headers(Header.CORRELATION_ID) shouldBe Seq("correlationId")
                 body shouldBe DynamicBody(Text("haha"))
             }
           } catch {

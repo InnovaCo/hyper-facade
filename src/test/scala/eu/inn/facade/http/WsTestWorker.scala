@@ -29,20 +29,20 @@ abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterC
   def businessLogic: Receive = {
     case frame: TextFrame =>
       toDynamicRequest(frame) match {
-        case DynamicRequest(requestHeader, dynamicBody) ⇒
-          val headers = extractRequestHeaders(requestHeader)
+        case DynamicRequest(uri, dynamicBody, requestHeaders) ⇒
+          val headers = extractRequestHeaders(uri, requestHeaders)
           inputFilterChain.applyFilters(headers, dynamicBody) onComplete {
-            case Success((headers, body)) ⇒ exposeDynamicRequest(toDynamicRequest(headers, body))
+            case Success((filteredHeaders, body)) ⇒ exposeDynamicRequest(toDynamicRequest(filteredHeaders, body))
           }
       }
 
     case request: DynamicRequest =>
       request match {
-        case DynamicRequest(requestHeader, dynamicBody) ⇒
-          val headers = extractRequestHeaders(requestHeader)
+        case DynamicRequest(uri, dynamicBody, requestHeader) ⇒
+          val headers = extractRequestHeaders(uri, requestHeader)
           outputFilterChain.applyFilters(headers, dynamicBody) onComplete {
-            case Success((headers, body)) ⇒
-              send(toFrame(toDynamicRequest(headers, body)))
+            case Success((filteredHeaders, body)) ⇒
+              send(toFrame(toDynamicRequest(filteredHeaders, body)))
           }
       }
 

@@ -1,15 +1,16 @@
 package eu.inn.facade.events
 
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
 
 import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.Config
 import eu.inn.facade.HyperBusFactory
 import eu.inn.hyperbus.HyperBus
-import eu.inn.hyperbus.model.DynamicRequest
-import eu.inn.hyperbus.model.standard.Method
+import eu.inn.hyperbus.model.{DynamicRequest, Header}
 import eu.inn.hyperbus.serialization.RequestHeader
+import eu.inn.hyperbus.transport.api.Subscription
+import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, RequestMatcher, Specific}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
@@ -39,9 +40,11 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
 
     class GroupSubscription(groupUri: Uri, initialSubscription: ClientSubscriptionData) {
       val clientSubscriptions = new ConcurrentLinkedQueue[ClientSubscriptionData]()
+      var hyperBusSubscription: Option[Subscription] = None
       addClient(initialSubscription)
 
-      val hyperBusSubscriptionId = hyperBus.onEvent(groupUri, Method.POST, None, groupName) { eventRequest: DynamicRequest ⇒
+      val methodFilter = Map(Header.METHOD → RegexMatcher("feed:.*"))
+      hyperBus.onEvent(RequestMatcher(Some(groupUri), methodFilter), groupName) { eventRequest: DynamicRequest ⇒
         Future{
           log.debug(s"Event received ($groupName): $eventRequest")
           import scala.collection.JavaConversions._
@@ -51,12 +54,10 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
               log.debug(s"Event #(${eventRequest.messageId}) ${if (matched) "forwarded" else "NOT matched"} to ${consumer.clientActor}/${consumer.correlationId}")
               if (matched) {
                 val request = DynamicRequest(
-                  RequestHeader(eventRequest.uri,
-                    eventRequest.method,
-                    eventRequest.body.contentType,
-                    eventRequest.messageId,
-                    Some(consumer.correlationId),
-                    eventRequest.headers),
+                  RequestHeader(
+                    eventRequest.uri,
+                    eventRequest.headers + (Header.CORRELATION_ID → Seq(consumer.correlationId))
+                  ),
                   eventRequest.body
                 )
                 consumer.clientActor ! request
@@ -68,6 +69,8 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
             }
           }
         }
+      } onSuccess {
+        case subscription: Subscription ⇒ hyperBusSubscription = Some(subscription)
       }
 
       def addClient(subscription: ClientSubscriptionData) = clientSubscriptions.add(subscription)
@@ -81,7 +84,10 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       }
 
       def off() = {
-        hyperBus.off(hyperBusSubscriptionId)
+        hyperBusSubscription match {
+          case Some(subscription) ⇒ hyperBus.off(subscription)
+          case None ⇒ log.warn("You cannot unsubscribe because you are not subscribed yet!")
+        }
       }
     }
 

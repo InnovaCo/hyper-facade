@@ -6,10 +6,12 @@ import akka.util.ByteString
 import eu.inn.binders.dynamic.{Null, Obj, Text}
 import eu.inn.binders.json._
 import eu.inn.facade.filter.model.DynamicRequestHeaders._
-import eu.inn.facade.filter.model.Headers
+import eu.inn.facade.filter.model.TransitionalHeaders
 import eu.inn.hyperbus.model._
-import eu.inn.hyperbus.model.standard._
+import eu.inn.hyperbus._
 import eu.inn.hyperbus.serialization.RequestHeader
+import eu.inn.hyperbus.transport.api
+import eu.inn.hyperbus.transport.api.uri
 import spray.can.websocket.frame.{Frame, TextFrame}
 import spray.http.HttpCharsets._
 import spray.http.HttpHeaders.RawHeader
@@ -18,78 +20,79 @@ import spray.http._
 
 object RequestMapper {
 
-  def toDynamicRequest(headers: Headers, body: DynamicBody): DynamicRequest = {
-    DynamicRequest(extractDynamicHeader(headers), body)
+  def toDynamicRequest(headers: TransitionalHeaders, body: DynamicBody): DynamicRequest = {
+    DynamicRequest(RequestHeader(headers.uri, headers.headers), body)
   }
 
   def toDynamicRequest(frame: Frame): DynamicRequest = {
     DynamicRequest(frame.payload.iterator.asInputStream)
   }
 
-  def toDynamicRequest(httpRequest: HttpRequest): DynamicRequest = {
-    if (httpRequest.entity.isEmpty) DynamicRequest(RequestHeader(null, null, None, null, None, null), DynamicBody(Obj(Map())))
+  def toDynamicRequest(httpRequest: HttpRequest, uri: String): DynamicRequest = {
+    if (httpRequest.entity.isEmpty) DynamicRequest(
+      RequestHeader(
+        api.uri.Uri(uri),
+        Headers(Header.METHOD → Seq(httpRequest.method.name.toLowerCase))),
+      DynamicBody(Obj(Map())))
     else DynamicRequest(new ByteArrayInputStream(httpRequest.entity.data.toByteArray))
   }
 
-  def toDynamicResponse(headers: Headers, dynamicBody: DynamicBody): Response[Body] = {
-    val messageId = headers.headers(MESSAGE_ID).head
-    val correlationId = headers.headers(CORRELATION_ID).head
+  def toDynamicResponse(headers: TransitionalHeaders, dynamicBody: DynamicBody): Response[Body] = {
     headers.statusCode match {
-      case Some(200) ⇒ Ok(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(201) ⇒ Created(DynamicCreatedBody(dynamicBody.content), headers.headers, messageId, correlationId)
-      case Some(202) ⇒ Accepted(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(203) ⇒ NonAuthoritativeInformation(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(204) ⇒ NoContent(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(205) ⇒ ResetContent(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(206) ⇒ PartialContent(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(207) ⇒ MultiStatus(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(200) ⇒ Ok(dynamicBody, Headers.plain(headers.headers))
+      case Some(201) ⇒ Created(DynamicCreatedBody(dynamicBody.content), Headers.plain(headers.headers))
+      case Some(202) ⇒ Accepted(dynamicBody, Headers.plain(headers.headers))
+      case Some(203) ⇒ NonAuthoritativeInformation(dynamicBody, Headers.plain(headers.headers))
+      case Some(204) ⇒ NoContent(dynamicBody, Headers.plain(headers.headers))
+      case Some(205) ⇒ ResetContent(dynamicBody, Headers.plain(headers.headers))
+      case Some(206) ⇒ PartialContent(dynamicBody, Headers.plain(headers.headers))
+      case Some(207) ⇒ MultiStatus(dynamicBody, Headers.plain(headers.headers))
 
-      case Some(300) ⇒ MultipleChoices(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(301) ⇒ MovedPermanently(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(302) ⇒ Found(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(303) ⇒ SeeOther(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(304) ⇒ NotModified(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(305) ⇒ UseProxy(dynamicBody, headers.headers, messageId, correlationId)
-      case Some(307) ⇒ TemporaryRedirect(dynamicBody, headers.headers, messageId, correlationId)
+      case Some(300) ⇒ MultipleChoices(dynamicBody, Headers.plain(headers.headers))
+      case Some(301) ⇒ MovedPermanently(dynamicBody, Headers.plain(headers.headers))
+      case Some(302) ⇒ Found(dynamicBody, Headers.plain(headers.headers))
+      case Some(303) ⇒ SeeOther(dynamicBody, Headers.plain(headers.headers))
+      case Some(304) ⇒ NotModified(dynamicBody, Headers.plain(headers.headers))
+      case Some(305) ⇒ UseProxy(dynamicBody, Headers.plain(headers.headers))
+      case Some(307) ⇒ TemporaryRedirect(dynamicBody, Headers.plain(headers.headers))
 
-      case Some(400) ⇒ BadRequest(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(401) ⇒ Unauthorized(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(402) ⇒ PaymentRequired(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(403) ⇒ Forbidden(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(404) ⇒ NotFound(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(405) ⇒ MethodNotAllowed(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(406) ⇒ NotAcceptable(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(407) ⇒ ProxyAuthenticationRequired(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(408) ⇒ RequestTimeout(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(409) ⇒ Conflict(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(410) ⇒ Gone(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(411) ⇒ LengthRequired(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(412) ⇒ PreconditionFailed(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(413) ⇒ RequestEntityTooLarge(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(414) ⇒ RequestUriTooLong(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(415) ⇒ UnsupportedMediaType(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(416) ⇒ RequestedRangeNotSatisfiable(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(417) ⇒ ExpectationFailed(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(422) ⇒ UnprocessableEntity(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(423) ⇒ Locked(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(424) ⇒ FailedDependency(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(429) ⇒ TooManyRequest(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(400) ⇒ BadRequest(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(401) ⇒ Unauthorized(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(402) ⇒ PaymentRequired(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(403) ⇒ Forbidden(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(404) ⇒ NotFound(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(405) ⇒ MethodNotAllowed(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(406) ⇒ NotAcceptable(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(407) ⇒ ProxyAuthenticationRequired(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(408) ⇒ RequestTimeout(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(409) ⇒ Conflict(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(410) ⇒ Gone(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(411) ⇒ LengthRequired(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(412) ⇒ PreconditionFailed(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(413) ⇒ RequestEntityTooLarge(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(414) ⇒ RequestUriTooLong(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(415) ⇒ UnsupportedMediaType(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(416) ⇒ RequestedRangeNotSatisfiable(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(417) ⇒ ExpectationFailed(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(422) ⇒ UnprocessableEntity(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(423) ⇒ Locked(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(424) ⇒ FailedDependency(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(429) ⇒ TooManyRequest(errorBody(dynamicBody), Headers.plain(headers.headers))
 
-      case Some(500) ⇒ eu.inn.hyperbus.model.standard.InternalServerError(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(501) ⇒ NotImplemented(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(502) ⇒ BadGateway(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(503) ⇒ ServiceUnavailable(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(504) ⇒ GatewayTimeout(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(505) ⇒ HttpVersionNotSupported(errorBody(dynamicBody), headers.headers, messageId, correlationId)
-      case Some(507) ⇒ InsufficientStorage(errorBody(dynamicBody), headers.headers, messageId, correlationId)
+      case Some(500) ⇒ model.InternalServerError(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(501) ⇒ NotImplemented(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(502) ⇒ BadGateway(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(503) ⇒ ServiceUnavailable(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(504) ⇒ GatewayTimeout(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(505) ⇒ HttpVersionNotSupported(errorBody(dynamicBody), Headers.plain(headers.headers))
+      case Some(507) ⇒ InsufficientStorage(errorBody(dynamicBody), Headers.plain(headers.headers))
     }
   }
 
-  def unfold(dynamicRequest: DynamicRequest): (Headers, DynamicBody) = {
+  def unfold(dynamicRequest: DynamicRequest): (TransitionalHeaders, DynamicBody) = {
     dynamicRequest match {
-      case DynamicRequest(requestHeader, dynamicBody) ⇒
-        val headers = extractRequestHeaders(requestHeader)
-        (headers, dynamicBody)
+      case DynamicRequest(uri, dynamicBody, headers) ⇒
+        (TransitionalHeaders(uri, headers, None), dynamicBody)
     }
   }
   
@@ -99,7 +102,7 @@ object RequestMapper {
     TextFrame(ByteString(ba.toByteArray))
   }
 
-  def toHttpResponse(headers: Headers, body: DynamicBody): HttpResponse = {
+  def toHttpResponse(headers: TransitionalHeaders, body: DynamicBody): HttpResponse = {
     val statusCode = StatusCode.int2StatusCode(headers.statusCode getOrElse 200)
     val httpContentType: ContentType = contentType(body.contentType)
     val jsonBody = body.content.toJson
@@ -113,41 +116,26 @@ object RequestMapper {
     HttpResponse(httpStatusCode, HttpEntity(httpContentType, jsonBody), List())
   }
 
-  def extractRequestHeaders(dynamicHeader: RequestHeader): Headers = {
-    var headers = Map[String, Seq[String]]()
-    headers += (METHOD → Seq(dynamicHeader.method))
-    dynamicHeader.contentType match {
-      case Some(contentType) ⇒ headers += (CONTENT_TYPE → Seq(contentType))
-      case None ⇒
-    }
-    headers += (MESSAGE_ID → Seq(dynamicHeader.messageId))
-    dynamicHeader.correlationId match {
-      case Some(correlationId) ⇒ headers += (CORRELATION_ID → Seq(correlationId))
-      case None ⇒
-    }
-    Headers(dynamicHeader.uri, headers, None)
+  def extractRequestHeaders(requestUri: uri.Uri, headers: Headers): TransitionalHeaders = {
+    TransitionalHeaders(requestUri, headers, None)
   }
 
-  def extractResponseHeaders(statusCode: Int, headers: Map[String, Seq[String]], messageId: String, correlationId: String): Headers = {
+  def extractResponseHeaders(statusCode: Int, headers: Map[String, Seq[String]], messageId: String, correlationId: String): TransitionalHeaders = {
     val responseHeaders = headers + (MESSAGE_ID → Seq(messageId), CORRELATION_ID → Seq(correlationId))
-    Headers(null, responseHeaders, Some(statusCode))
+    TransitionalHeaders(null, responseHeaders, Some(statusCode))
   }
 
-  def extractDynamicHeader(headers: Headers): RequestHeader = {
-    val method = headers.singleValueHeader(METHOD).getOrElse(Method.GET)
-    val contentType = headers.singleValueHeader(CONTENT_TYPE)
-    val messageId = headers.singleValueHeader(MESSAGE_ID).get
-    val correlationId = headers.singleValueHeader(CORRELATION_ID)
-    val otherHeaders = headers.headers - (METHOD, CONTENT_TYPE, MESSAGE_ID, CORRELATION_ID)
-    RequestHeader(headers.uri, method, contentType, messageId, correlationId, otherHeaders)
+  def correlationId(headers: Headers): String = {
+    val messageId = headers(Header.MESSAGE_ID)
+    headers.get(Header.CORRELATION_ID).getOrElse(messageId).head
   }
 
   def addField(fieldName: String, fieldValue: String, dynamicRequest: DynamicRequest): DynamicRequest = {
     dynamicRequest match {
-      case DynamicRequest(requestHeader, dynamicBody) ⇒
+      case DynamicRequest(uri, dynamicBody, requestHeader) ⇒
         val fieldMap = dynamicBody.content.asMap
         val updatedBody = DynamicBody(Obj(fieldMap + (fieldName → Text(fieldValue))))
-        DynamicRequest(requestHeader, updatedBody)
+        DynamicRequest(uri, updatedBody, requestHeader)
     }
   }
 
@@ -176,7 +164,7 @@ object RequestMapper {
     }
   }
 
-  private def extractHttpHeaders(headers: Headers): List[HttpHeader]= {
+  private def extractHttpHeaders(headers: TransitionalHeaders): List[HttpHeader]= {
     var httpHeaders = List[HttpHeader]()
     headers.headers.foreach {
       case (name, value) ⇒

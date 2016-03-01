@@ -1,12 +1,10 @@
 package eu.inn.facade.http
 
 import akka.actor.ActorSystem
-import eu.inn.binders.dynamic.Null
 import eu.inn.binders.json._
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.filter.model.{DynamicRequestHeaders, Headers}
+import eu.inn.facade.filter.model.{DynamicRequestHeaders, TransitionalHeaders}
 import eu.inn.facade.raml.RamlConfig
-import eu.inn.hyperbus.model.standard.{DynamicGet, EmptyBody}
 import eu.inn.hyperbus.model.{DynamicBody, Response}
 import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.{HyperBus, IdGenerator}
@@ -47,14 +45,14 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
     val resourceUriPattern = ramlConfig.resourceStateUri(uri)
     val responsePromise = Promise[HttpResponse]()
     filterIn(request, resourceUriPattern) map {
-      case (headers, body) ⇒
-        if (headers.hasStatusCode) responsePromise.complete(Success(RequestMapper.toHttpResponse(headers, body)))
+      case (filteredHeaders, filteredBody) ⇒
+        if (filteredHeaders.hasStatusCode) responsePromise.complete(Success(RequestMapper.toHttpResponse(filteredHeaders, filteredBody)))
         else {
-          val resourceUri = api.uri.Uri(resourceUriPattern)
-          val responseFuture = hyperBus <~ DynamicGet(resourceUri, DynamicBody(EmptyBody.contentType, Null)) flatMap {
+          val filteredRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
+          val responseFuture = hyperBus <~ filteredRequest flatMap {
             case response: Response[DynamicBody] ⇒ filterOut(response, resourceUriPattern, request.method.name)
           } map {
-            case (headers: Headers, body: DynamicBody) ⇒
+            case (headers: TransitionalHeaders, body: DynamicBody) ⇒
               val intStatusCode = headers.statusCode.getOrElse(200)
               val statusCode = StatusCode.int2StatusCode(intStatusCode)
               HttpResponse(statusCode, HttpEntity(`application/json`, body.content.toJson))
@@ -68,17 +66,17 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
     responsePromise.future
   }
 
-  def filterIn(request: HttpRequest, uri: String): Future[(Headers, DynamicBody)] = {
-    val dynamicRequest = RequestMapper.toDynamicRequest(request)
+  def filterIn(request: HttpRequest, uri: String): Future[(TransitionalHeaders, DynamicBody)] = {
+    val dynamicRequest = RequestMapper.toDynamicRequest(request, uri)
     val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
     val contentType = headers.singleValueHeader(DynamicRequestHeaders.CONTENT_TYPE)
     filterChainComposer.inputFilterChain(uri, request.method.name, contentType).applyFilters(headers, dynamicBody)
   }
 
-  def filterOut(response: Response[DynamicBody], uriPattern: String, method: String): Future[(Headers, DynamicBody)] = {
+  def filterOut(response: Response[DynamicBody], uriPattern: String, method: String): Future[(TransitionalHeaders, DynamicBody)] = {
     val statusCode = response.status
     val body = response.body
-    filterChainComposer.outputFilterChain(uriPattern, method).applyFilters(Headers(api.uri.Uri(uriPattern), response.headers, Some(statusCode)), body)
+    filterChainComposer.outputFilterChain(uriPattern, method).applyFilters(TransitionalHeaders(api.uri.Uri(uriPattern), response.headers, Some(statusCode)), body)
   }
 
   private def exceptionToHttpResponse(t: Throwable): HttpResponse = {

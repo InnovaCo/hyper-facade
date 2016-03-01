@@ -5,7 +5,7 @@ import eu.inn.facade.raml.{Method, DataStructure, RamlConfig}
 trait RamlAwareFilter extends Filter {
   def ramlConfig: RamlConfig
 
-  def getDataStructure(headers: Headers): Option[DataStructure] = {
+  def getDataStructure(headers: TransitionalHeaders): Option[DataStructure] = {
     val uri = headers.uri.toString
     val method = headers.singleValueHeader(DynamicRequestHeaders.METHOD).getOrElse(Method.GET)
     val contentType = headers.singleValueHeader(DynamicRequestHeaders.CONTENT_TYPE)

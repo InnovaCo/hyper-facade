@@ -11,14 +11,14 @@ import scala.concurrent.Future
 
 class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
 
-  override def apply(headers: Headers, body: DynamicBody): Future[(Headers, DynamicBody)] = {
+  override def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
     Future {
       val enrichedBody = enrichBody(headers, body)
       (headers, enrichedBody)
     }
   }
 
-  def enrichBody(headers: Headers, body: DynamicBody): DynamicBody = {
+  def enrichBody(headers: TransitionalHeaders, body: DynamicBody): DynamicBody = {
     var enrichedBody = body
     val dataStructure = getDataStructure(headers)
     dataStructure match {

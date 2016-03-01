@@ -2,13 +2,10 @@ package eu.inn.facade.events
 
 import akka.actor.{ActorRef, Props}
 import com.typesafe.config.Config
-import eu.inn.binders.dynamic.Null
-import eu.inn.facade.filter.model.{DynamicRequestHeaders, Headers}
+import eu.inn.facade.filter.model.{DynamicRequestHeaders, TransitionalHeaders}
 import eu.inn.facade.http.RequestMapper
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
-import eu.inn.hyperbus.model.standard.{DynamicGet, EmptyBody}
-import eu.inn.hyperbus.serialization.RequestHeader
 import scaldi.{Injectable, Injector}
 
 import scala.collection.mutable
@@ -28,28 +25,24 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
   var resubscriptionCount: Int = 0
   var initialRequest: Option[DynamicRequest] = None
 
-  override def process: Receive = super.process orElse {
-    // Received event from HyperBus. Should be sent to client
-    case request @ DynamicRequest(RequestHeader(_, "post", _, _, _, _), body) ⇒
-      if (!resourceStateFetched) {
-        pendingEvents += request
-      }
-      else {
-        sendEvent(request)
-      }
+  override def process(event: DynamicRequest): Unit = {
+      if (!resourceStateFetched)
+        pendingEvents += event
+      else
+        sendEvent(event)
   }
 
   override def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory) = {
     import context._
 
-    hyperBus <~ DynamicGet(resourceStateUri(request.uri), DynamicBody(EmptyBody.contentType, Null)) flatMap {
+    hyperBus <~ DynamicRequest(resourceStateUri(request.uri), request.body, request.headers) flatMap {
       case response: Response[DynamicBody] ⇒
         lastRevisionId = response.headers(DynamicRequestHeaders.REVISION).head.toLong
         filterOut(request, response)
     } recover {
       case t: Throwable ⇒ exceptionToResponse(t)
     } map {
-      case (headers: Headers, dynamicBody: DynamicBody) ⇒
+      case (headers: TransitionalHeaders, dynamicBody: DynamicBody) ⇒
         val response = RequestMapper.toDynamicResponse(headers, dynamicBody)
         websocketWorker ! response
         sendQueuedMessages()
@@ -71,7 +64,7 @@ class ReliableFeedSubscriptionActor(websocketWorker: ActorRef,
     subscriptionRequest foreach { request ⇒
       if (revisionId == lastRevisionId + 1)
         filterOut(request, event) map {
-          case (headers: Headers, body: DynamicBody) ⇒
+          case (headers: TransitionalHeaders, body: DynamicBody) ⇒
             lastRevisionId = revisionId
             RequestMapper.toDynamicRequest(headers, body)
         } pipeTo websocketWorker
