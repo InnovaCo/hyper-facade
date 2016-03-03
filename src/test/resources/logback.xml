@@ -1,12 +1,12 @@
 <configuration>
-    <root level="info">
+    <root level="trace">
         <appender class="ch.qos.logback.core.rolling.RollingFileAppender">
-            <file>test.log</file>
+            <file>hyperbus-facade.log</file>
 
             <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
                 <!-- rollover daily -->
                 <fileNamePattern>
-                    sproot-%d{yyyy-MM-dd}.%i.log
+                    hyperbus-facade-%d{yyyy-MM-dd}.%i.log
                 </fileNamePattern>
                 <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
                     <!-- or whenever the file size reaches limit -->

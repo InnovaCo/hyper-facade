@@ -1,15 +1,18 @@
 package eu.inn.facade.http
 
+import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, TimeUnit}
+
 import akka.actor.{ActorSystem, Props}
+import com.typesafe.config.Config
 import eu.inn.binders.dynamic.{Obj, Text}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.serialization.RequestHeader
-import eu.inn.hyperbus.transport.api.Subscription
 import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
 import eu.inn.hyperbus.transport.api.uri.Uri
+import eu.inn.hyperbus.transport.api.{Subscription, TransportConfigurationLoader, TransportManager}
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Seconds, Span}
@@ -21,10 +24,14 @@ import spray.http.{HttpHeaders, HttpMethods, HttpRequest}
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Promise
+import scala.concurrent.{ExecutionContext, Promise}
 import scala.io.Source
 import scala.util.Success
 
+
+/**
+  * Important: Kafka should be up and running to pass this test
+  */
 class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with Injectable {
   implicit val injector = Injectors()
   implicit val actorSystem = inject[ActorSystem]
@@ -32,13 +39,11 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
   new WsRestServiceApp("localhost", 54321) {
     start {
-      pathPrefix("status") {
-        statusMonitorFacade.restRoutes.routes
-      }
+      statusMonitorFacade.restRoutes.routes
     }
   }
   val hyperBus = inject[HyperBus] // initialize hyperbus
-  val testService = new TestService(hyperBus)
+  val testService = new TestService(testServiceHyperBus)
 
   "Facade integration" - {
     "simple http request" in {
@@ -84,7 +89,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       client ! Connect() // init websocket connection
 
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable/resource")), Map(Header.METHOD → Specific("subscribe"))),
+      val subscriptionFuture = testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable/resource")), Map(Header.METHOD → Specific("subscribe"))),
         Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))))
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
@@ -106,14 +111,14 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           resourceState should startWith( """{"response":{"status":200,"headers":{"messageId":""")
           resourceState should endWith( """body":{"content":"fullResource"}}""")
         } else fail("Full resource state wasn't sent to the client")
-
-        testService.publish(
-          UnreliableFeedTestRequest(
-            FeedTestBody("haha"),
-            Headers.plain(Map(
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId")))))
       }
+
+      testService.publish(
+        UnreliableFeedTestRequest(
+          FeedTestBody("haha"),
+          Headers.plain(Map(
+            Header.MESSAGE_ID → Seq("messageId"),
+            Header.CORRELATION_ID → Seq("correlationId")))))
 
       whenReady(publishedEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val eventMessage = clientMessageQueue.get(1)
@@ -121,17 +126,17 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           val referenceRequest = """{"request":{"uri":{"pattern":"/test-service/unreliable/feed"},"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"method":["feed:post"],"contentType":["application/vnd+test-1.json"]}},"body":{"content":"haha"}}"""
           eventMessage.get.payload.utf8String shouldBe referenceRequest
         } else fail("Event wasn't sent to the client")
-
-        client ! DynamicRequest(
-          RequestHeader(
-            Uri("/test-service/unreliable"),
-            Map(Header.METHOD → Seq("unsubscribe"),
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId"))
-          ),
-          DynamicBody(Obj(Map()))
-        )
       }
+
+      client ! DynamicRequest(
+        RequestHeader(
+          Uri("/test-service/unreliable"),
+          Map(Header.METHOD → Seq("unsubscribe"),
+            Header.MESSAGE_ID → Seq("messageId"),
+            Header.CORRELATION_ID → Seq("correlationId"))
+        ),
+        DynamicBody(Obj(Map()))
+      )
     }
 
     "websocket: reliable feed" in {
@@ -293,16 +298,16 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
     HttpHeaders.RawHeader("Sec-WebSocket-Key", "x3JJHMbDL1EzLkh9GBhXDw=="),
     HttpHeaders.RawHeader("Sec-WebSocket-Extensions", "permessage-deflate"))
 
-//  def testServiceHyperBus: HyperBus = {
-//    val config = inject[Config]
-//    val testServiceTransportMgr = new TransportManager(TransportConfigurationLoader.fromConfig(config))
-//    val hypeBusGroupKey = "hyperbus.facade.group-name"
-//    val defaultHyperBusGroup = if (config.hasPath(hypeBusGroupKey)) Some(config.getString(hypeBusGroupKey)) else None
-//    new HyperBus(testServiceTransportMgr, defaultHyperBusGroup)(ExecutionContext.fromExecutor(newPoolExecutor()))
-//  }
-//
-//  private def newPoolExecutor(): Executor = {
-//    val maximumPoolSize: Int = Runtime.getRuntime.availableProcessors() * 16
-//    new ThreadPoolExecutor(0, maximumPoolSize, 5 * 60L, TimeUnit.SECONDS, new SynchronousQueue[Runnable])
-//  }
+  def testServiceHyperBus: HyperBus = {
+    val config = inject[Config]
+    val testServiceTransportMgr = new TransportManager(TransportConfigurationLoader.fromConfig(config))
+    val hypeBusGroupKey = "hyperbus.facade.group-name"
+    val defaultHyperBusGroup = if (config.hasPath(hypeBusGroupKey)) Some(config.getString(hypeBusGroupKey)) else None
+    new HyperBus(testServiceTransportMgr, defaultHyperBusGroup)(ExecutionContext.fromExecutor(newPoolExecutor()))
+  }
+
+  private def newPoolExecutor(): Executor = {
+    val maximumPoolSize: Int = Runtime.getRuntime.availableProcessors() * 16
+    new ThreadPoolExecutor(0, maximumPoolSize, 5 * 60L, TimeUnit.SECONDS, new SynchronousQueue[Runnable])
+  }
 }

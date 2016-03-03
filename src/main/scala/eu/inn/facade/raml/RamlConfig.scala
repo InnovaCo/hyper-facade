@@ -19,7 +19,7 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig]) {
     val resourceTraits = traits(uriPattern, Method.POST)
     resourceTraits.find(resourceTrait ⇒ isFeed(resourceTrait.name)) match {
       case Some(feedTrait) ⇒ feedTrait.parameters(EVENT_FEED_URI)
-      case None ⇒ uriPattern // todo: is it correct?
+      case None ⇒ uriPattern
     }
   }
 
@@ -27,7 +27,7 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig]) {
     val resourceTraits = traits(uriPattern, Method.POST)
     resourceTraits.find(resourceTrait ⇒ hasMappedUri(resourceTrait.name)) match {
       case Some(resourceStateTrait) ⇒ resourceStateTrait.parameters(RESOURCE_STATE_URI)
-      case None ⇒ uriPattern // todo: is it correct?
+      case None ⇒ uriPattern
     }
   }
 
@@ -50,9 +50,14 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig]) {
   }
 
   private def traits(uriPattern: String, method: String): Seq[Trait] = {
-    val traits = resourcesByUri(uriPattern).traits
-    traits.methodSpecificTraits
-      .getOrElse(Method(method), traits.commonTraits)
+    resourcesByUri.get(uriPattern) match {
+      case Some(config) ⇒
+        val traits = config.traits
+        traits.methodSpecificTraits
+          .getOrElse(Method(method), traits.commonTraits)
+
+      case None ⇒ Seq()
+    }
   }
 
   private def getContentType(contentTypeName: Option[String]): Option[ContentType] = {

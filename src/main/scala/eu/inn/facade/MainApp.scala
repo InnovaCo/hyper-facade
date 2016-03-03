@@ -18,9 +18,7 @@ object MainApp extends App with Injectable {
 
   new WsRestServiceApp(config.getString("inn.facade.rest-api.host"), config.getInt("inn.facade.rest-api.port")) {
     start {
-      pathPrefix("test-service") {
-        httpWorker.restRoutes.routes
-      }
+      httpWorker.restRoutes.routes
     }
   }
   val hyperBus = inject [HyperBus]  // it's time to initialize hyperbus
