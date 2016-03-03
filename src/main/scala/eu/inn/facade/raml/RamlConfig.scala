@@ -32,20 +32,30 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig]) {
   }
 
   def requestDataStructure(uriPattern: String, method: String, contentType: Option[String]): Option[DataStructure] = {
-    resourcesByUri(uriPattern).requests.dataStructures.get(Method(method), getContentType(contentType))
+    resourcesByUri.get(uriPattern) match {
+      case Some(resourceConfig) ⇒ resourceConfig.requests.dataStructures.get(Method(method), getContentType(contentType))
+      case None => None
+    }
   }
 
   def responseDataStructure(uriPattern: String, method: String, statusCode: Int): Option[DataStructure] = {
-    resourcesByUri(uriPattern).responses.dataStructures.get((Method(method), statusCode))
+    resourcesByUri.get(uriPattern) match {
+      case Some(resourceConfig) ⇒ resourceConfig.responses.dataStructures.get(Method(method), statusCode)
+      case None => None
+    }
   }
 
   def responseDataStructures(uriPattern: String, method: String): Seq[DataStructure] = {
-    val allStructures = resourcesByUri(uriPattern).responses.dataStructures
-    allStructures.foldLeft(Seq[DataStructure]()) { (structuresByMethod, kv) ⇒
-      val (httpMethod, _) = kv._1
-      val structure = kv._2
-      if (httpMethod == Method(method)) structuresByMethod :+ structure
-      else structuresByMethod
+    resourcesByUri.get(uriPattern) match {
+      case Some(resourceConfig) ⇒
+        resourceConfig.responses.dataStructures.foldLeft(Seq.newBuilder[DataStructure]) { (structuresByMethod, kv) ⇒
+          val (httpMethod, _) = kv._1
+          val structure = kv._2
+          if (httpMethod == Method(method)) structuresByMethod += structure
+          else structuresByMethod
+        }.result()
+
+      case None ⇒ Seq()
     }
   }
 
