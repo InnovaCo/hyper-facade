@@ -11,7 +11,8 @@ import eu.inn.hyperbus.model._
 import eu.inn.hyperbus._
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api
-import eu.inn.hyperbus.transport.api.uri
+import eu.inn.hyperbus.transport.api.{NoTransportRouteException, uri}
+import org.slf4j.LoggerFactory
 import spray.can.websocket.frame.{Frame, TextFrame}
 import spray.http.HttpCharsets._
 import spray.http.HttpHeaders.RawHeader
@@ -19,6 +20,8 @@ import spray.http.MediaTypes._
 import spray.http._
 
 object RequestMapper {
+
+  val log = LoggerFactory.getLogger(RequestMapper.getClass)
 
   def toDynamicRequest(headers: TransitionalHeaders, body: DynamicBody): DynamicRequest = {
     DynamicRequest(RequestHeader(headers.uri, headers.headers), body)
@@ -86,6 +89,24 @@ object RequestMapper {
       case Some(504) ⇒ GatewayTimeout(errorBody(dynamicBody), Headers.plain(headers.headers))
       case Some(505) ⇒ HttpVersionNotSupported(errorBody(dynamicBody), Headers.plain(headers.headers))
       case Some(507) ⇒ InsufficientStorage(errorBody(dynamicBody), Headers.plain(headers.headers))
+    }
+  }
+
+  def exceptionToResponse(t: Throwable)(implicit mcf: MessagingContextFactory): Response[Body] = {
+    val errorId = IdGenerator.create()
+    log.error("Can't handle request. #" + errorId, t)
+    t match {
+      case noRoute: NoTransportRouteException ⇒ model.NotFound(ErrorBody("not_found", Some("Resource wasn't found"), errorId = errorId))
+      case t: Throwable ⇒ model.InternalServerError(ErrorBody("unhandled-exception", Some(t.getMessage + " #"+errorId), errorId = errorId))
+    }
+  }
+
+  def exceptionToHttpResponse(t: Throwable): HttpResponse = {
+    val errorId = IdGenerator.create()
+    log.error("Can't handle request. #" + errorId, t)
+    t match {
+      case noRoute: NoTransportRouteException ⇒ HttpResponse(StatusCodes.NotFound, "Resource wasn't found")
+      case t: Throwable ⇒ HttpResponse(StatusCodes.InternalServerError, t.toString + " #" + errorId)
     }
   }
 

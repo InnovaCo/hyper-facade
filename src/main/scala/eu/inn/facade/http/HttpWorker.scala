@@ -5,9 +5,9 @@ import eu.inn.binders.json._
 import eu.inn.facade.filter.chain.FilterChainFactory
 import eu.inn.facade.filter.model.{DynamicRequestHeaders, TransitionalHeaders}
 import eu.inn.facade.raml.RamlConfig
+import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model.{DynamicBody, Response}
 import eu.inn.hyperbus.transport.api
-import eu.inn.hyperbus.{HyperBus, IdGenerator}
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
 import spray.http.ContentTypes._
@@ -57,8 +57,7 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
               val statusCode = StatusCode.int2StatusCode(intStatusCode)
               HttpResponse(statusCode, HttpEntity(`application/json`, body.content.toJson))
           } recover {
-            case t: Throwable ⇒
-              exceptionToHttpResponse(t)
+            case t: Throwable ⇒ RequestMapper.exceptionToHttpResponse(t)
           }
           responsePromise.completeWith(responseFuture)
         }
@@ -78,12 +77,6 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
     val statusCode = response.status
     val body = response.body
     filterChainComposer.outputFilterChain(uriPattern, method).applyFilters(TransitionalHeaders(api.uri.Uri(uriPattern), response.headers, Some(statusCode)), body)
-  }
-
-  private def exceptionToHttpResponse(t: Throwable): HttpResponse = {
-    val errorId = IdGenerator.create()
-    log.error("Can't handle request. #" + errorId, t)
-    HttpResponse(StatusCodes.InternalServerError, t.toString + " #" + errorId)
   }
 }
 

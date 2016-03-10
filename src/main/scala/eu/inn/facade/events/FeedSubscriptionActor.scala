@@ -10,8 +10,8 @@ import eu.inn.facade.filter.chain.FilterChainFactory
 import eu.inn.facade.filter.model.{DynamicRequestHeaders, TransitionalHeaders}
 import eu.inn.facade.http.RequestMapper
 import eu.inn.facade.raml.{Method, RamlConfig}
+import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
-import eu.inn.hyperbus.{HyperBus, IdGenerator}
 import scaldi.{Injectable, Injector}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -102,10 +102,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     val feedStateSnapshot = feedState.get
     val updatedRequest = DynamicRequest(ramlConfig.resourceUri(request.uri.pattern.specific), request.body, request.headers)
     hyperBus <~ updatedRequest flatMap {
-      case response: Response[DynamicBody] ⇒
-        filterResponse(updatedRequest, response)
-    } recover {
-      case t: Throwable ⇒ exceptionToResponse(t)
+      case response: Response[DynamicBody] ⇒ filterResponse(updatedRequest, response)
     } map {
       case (headers: TransitionalHeaders, dynamicBody: DynamicBody) ⇒
         val response = RequestMapper.toDynamicResponse(headers, dynamicBody)
@@ -127,6 +124,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
             val updated = feedState.compareAndSet(feedStateSnapshot, FeedState(resourceStateFetched, reliableFeed, 0L, 0))
             if (updated) websocketWorker ! response
         }
+    } recover {
+      case t: Throwable ⇒ websocketWorker ! RequestMapper.exceptionToResponse(t)
     }
   }
 
@@ -203,12 +202,6 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
     // HTTP method and we treat all websocket requests as sent with POST method
     filterChainComposer.outputFilterChain(uriPattern, Method.POST).applyFilters(headers, body)
-  }
-
-  def exceptionToResponse(t: Throwable)(implicit mcf: MessagingContextFactory): Response[Body] = {
-    val errorId = IdGenerator.create()
-    log.error(t, "Can't handle request. #" + errorId)
-    InternalServerError(ErrorBody("unhandled-exception", Some(t.getMessage + " #"+errorId), errorId = errorId))
   }
 }
 
