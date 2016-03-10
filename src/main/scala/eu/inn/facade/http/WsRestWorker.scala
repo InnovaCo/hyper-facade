@@ -2,7 +2,7 @@ package eu.inn.facade.http
 
 import akka.actor._
 import eu.inn.binders.dynamic.Text
-import eu.inn.facade.events.{ReliableFeedSubscriptionActor, SubscriptionsManager, UnreliableFeedSubscriptionActor}
+import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChainFactory
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
@@ -110,14 +110,8 @@ class WsRestWorker(val serverConnection: ActorRef,
     val actorName = "Subscr-" + key
     context.child(actorName) match {
       case Some(actor) ⇒ actor.forward(request)
-      case None ⇒ context.actorOf(feedSubscriptionActorProps(request.uri.pattern.specific.toString), actorName) ! request
+      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperBus, subscriptionManager), actorName) ! request
     }
-  }
-
-  def feedSubscriptionActorProps(uri: String): Props = {
-    if (ramlConfig.isReliableEventFeed(uri)) ReliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
-    else if (ramlConfig.isUnreliableEventFeed(uri)) UnreliableFeedSubscriptionActor.props(self, hyperBus, subscriptionManager)
-    else throw new IllegalArgumentException("This resource doesn't contain an event feed")
   }
 
   def isPingRequest(uri: String, method: String): Boolean = {

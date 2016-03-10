@@ -12,12 +12,13 @@ import scala.collection.JavaConversions._
 class RamlConfigParser(val api: Api) {
 
   def parseRaml: RamlConfig = {
-    val resourcesByUrl = api.resources()
-      .foldLeft(Map.newBuilder[String, ResourceConfig]) { (accumulator, resource) ⇒
+    val (resourcesByUri, uris) = api.resources()
+      .foldLeft((Map.newBuilder[String, ResourceConfig], Seq.newBuilder[String])) { (accumulator, resource) ⇒
+        val (resourceMap, uris) = accumulator
         val currentRelativeUri = resource.relativeUri().value()
-        accumulator ++= parseResource(currentRelativeUri, resource)
-      }.result()
-    new RamlConfig(resourcesByUrl)
+        (resourceMap ++= parseResource(currentRelativeUri, resource), uris += currentRelativeUri)
+      }
+    new RamlConfig(resourcesByUri.result(), uris.result())
   }
 
   private def parseResource(currentUri: String, resource: Resource): Map[String, ResourceConfig] = {
@@ -139,17 +140,7 @@ class RamlConfigParser(val api: Api) {
     traits.foldLeft(Seq.newBuilder[Trait]) {
       (accumulator, traitRef) ⇒
         val traitName = traitRef.value.getRAMLValueName
-        if (Trait.hasMappedUri(traitName)) {
-          val traitInstance = traitRef.value
-          val traitClass = traitInstance.getClass
-          val resourceStateURI: String = traitClass.getDeclaredField(Trait.RESOURCE_STATE_URI).get(traitInstance).asInstanceOf[String]
-          var parameters = Map(Trait.RESOURCE_STATE_URI → resourceStateURI)
-          if (Trait.isFeed(traitName)) {
-            val eventFeedURI: String = traitClass.getDeclaredField(Trait.EVENT_FEED_URI).get(traitInstance).asInstanceOf[String]
-            parameters += Trait.EVENT_FEED_URI → eventFeedURI
-          }
-          accumulator += Trait(traitName, parameters)
-        } else accumulator += Trait(traitName)
+        accumulator += Trait(traitName)
     }.result()
   }
 }

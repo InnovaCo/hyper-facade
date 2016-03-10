@@ -1,7 +1,7 @@
 package eu.inn.facade.events
 
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
+import java.util.concurrent.atomic.AtomicLong
 
 import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.Config
@@ -10,7 +10,7 @@ import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model.{DynamicRequest, Header}
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api.Subscription
-import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, RequestMatcher, Specific}
+import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, RequestMatcher}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}

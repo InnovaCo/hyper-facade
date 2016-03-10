@@ -42,15 +42,15 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
   }
 
   def processRequest(request: HttpRequest, uri: String): Future[HttpResponse] = {
-    val resourceUriPattern = ramlConfig.resourceStateUri(uri)
+    val resourceUri = ramlConfig.resourceUri(uri)
     val responsePromise = Promise[HttpResponse]()
-    filterIn(request, resourceUriPattern) map {
+    filterIn(request, resourceUri.pattern.specific) map {
       case (filteredHeaders, filteredBody) ⇒
         if (filteredHeaders.hasStatusCode) responsePromise.complete(Success(RequestMapper.toHttpResponse(filteredHeaders, filteredBody)))
         else {
           val filteredRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
           val responseFuture = hyperBus <~ filteredRequest flatMap {
-            case response: Response[DynamicBody] ⇒ filterOut(response, resourceUriPattern, request.method.name)
+            case response: Response[DynamicBody] ⇒ filterOut(response, resourceUri.pattern.specific, request.method.name)
           } map {
             case (headers: TransitionalHeaders, body: DynamicBody) ⇒
               val intStatusCode = headers.statusCode.getOrElse(200)
@@ -64,6 +64,7 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
         }
     }
     responsePromise.future
+
   }
 
   def filterIn(request: HttpRequest, uri: String): Future[(TransitionalHeaders, DynamicBody)] = {

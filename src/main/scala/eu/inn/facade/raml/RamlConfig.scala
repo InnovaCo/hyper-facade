@@ -1,47 +1,43 @@
 package eu.inn.facade.raml
 
-class RamlConfig(val resourcesByUri: Map[String, ResourceConfig]) {
-  import Trait._
+import eu.inn.hyperbus.transport.api.uri._
+
+class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
 
   def traitNames(uriPattern: String, method: String): Seq[String] = {
     traits(uriPattern, method) map (foundTrait ⇒ foundTrait.name)
   }
 
-  def isReliableEventFeed(uriPattern: String) = {
-    traitNames(uriPattern, Method.POST).contains(STREAMED_RELIABLE)
-  }
-
-  def isUnreliableEventFeed(uriPattern: String) = {
-    traitNames(uriPattern, Method.POST).contains(Trait.STREAMED_UNRELIABLE)
-  }
-
-  def resourceFeedUri(uriPattern: String): String = {
-    val resourceTraits = traits(uriPattern, Method.POST)
-    resourceTraits.find(resourceTrait ⇒ isFeed(resourceTrait.name)) match {
-      case Some(feedTrait) ⇒ feedTrait.parameters(EVENT_FEED_URI)
-      case None ⇒ uriPattern
+  def resourceUri(requestUriString: String): Uri = {
+    val requestUri = Uri(requestUriString)
+    matchUri(requestUri) match {
+      case Some(uri) ⇒ uri
+      case None ⇒ requestUri
     }
   }
 
-  def resourceStateUri(uriPattern: String): String = {
-    val resourceTraits = traits(uriPattern, Method.POST)
-    resourceTraits.find(resourceTrait ⇒ hasMappedUri(resourceTrait.name)) match {
-      case Some(resourceStateTrait) ⇒ resourceStateTrait.parameters(RESOURCE_STATE_URI)
-      case None ⇒ uriPattern
+  def matchUri(requestUri: Uri): Option[Uri] = {
+    var foundUri: Option[Uri] = None
+    for (uri ← uris if foundUri.isEmpty) {
+      UriMatcher.matchUri(uri, requestUri) match {
+        case uri @ Some(_) ⇒ foundUri = uri
+        case None ⇒
+      }
     }
+    foundUri
   }
 
   def requestDataStructure(uriPattern: String, method: String, contentType: Option[String]): Option[DataStructure] = {
     resourcesByUri.get(uriPattern) match {
       case Some(resourceConfig) ⇒ resourceConfig.requests.dataStructures.get(Method(method), getContentType(contentType))
-      case None => None
+      case None ⇒ None
     }
   }
 
   def responseDataStructure(uriPattern: String, method: String, statusCode: Int): Option[DataStructure] = {
     resourcesByUri.get(uriPattern) match {
       case Some(resourceConfig) ⇒ resourceConfig.responses.dataStructures.get(Method(method), statusCode)
-      case None => None
+      case None ⇒ None
     }
   }
 
@@ -102,17 +98,6 @@ object Trait {
 
   def apply(name: String): Trait = {
     Trait(name, Map())
-  }
-
-  def hasMappedUri(traitName: String): Boolean = {
-    traitName == STREAMED_RELIABLE ||
-      traitName == STREAMED_UNRELIABLE ||
-      traitName == PLAIN_RESOURCE
-  }
-
-  def isFeed(traitName: String): Boolean = {
-    traitName == STREAMED_RELIABLE ||
-      traitName == STREAMED_UNRELIABLE
   }
 }
 

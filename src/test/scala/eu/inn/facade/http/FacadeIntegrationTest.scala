@@ -89,7 +89,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       client ! Connect() // init websocket connection
 
-      val subscriptionFuture = testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable/resource")), Map(Header.METHOD → Specific("subscribe"))),
+      testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific("subscribe"))),
         Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))))
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
@@ -123,7 +123,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       whenReady(publishedEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val eventMessage = clientMessageQueue.get(1)
         if (eventMessage.isDefined) {
-          val referenceRequest = """{"request":{"uri":{"pattern":"/test-service/unreliable/feed"},"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"method":["feed:post"],"contentType":["application/vnd+test-1.json"]}},"body":{"content":"haha"}}"""
+          val referenceRequest = """{"request":{"uri":{"pattern":"/test-service/unreliable"},"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"method":["feed:post"],"contentType":["application/vnd+test-1.json"]}},"body":{"content":"haha"}}"""
           eventMessage.get.payload.utf8String shouldBe referenceRequest
         } else fail("Event wasn't sent to the client")
       }
@@ -177,11 +177,11 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       val initialResourceState = Ok(
         DynamicBody(Obj(Map("content" → Text("fullResource")))),
-        Headers.plain(Map("hyperbus:revision" → Seq("1"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("1"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
 
       val updatedResourceState = Ok(
         DynamicBody(Obj(Map("content" → Text("fullResource")))),
-        Headers.plain(Map("hyperbus:revision" → Seq("4"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("4"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
 
       val subscriptionRequest = DynamicRequest(
         RequestHeader(
@@ -195,22 +195,22 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       val eventRev2 = ReliableFeedTestRequest(
         FeedTestBody("haha"),
-        Headers.plain(Map("hyperbus:revision" → Seq("2"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("2"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
 
       val eventRev3 = ReliableFeedTestRequest(
         FeedTestBody("haha"),
-        Headers.plain(Map("hyperbus:revision" → Seq("3"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("3"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
 
       val eventBadRev5 = ReliableFeedTestRequest(
         FeedTestBody("updateFromFuture"),
-        Headers.plain(Map("hyperbus:revision" → Seq("5"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("5"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
 
       val eventGoodRev5 = ReliableFeedTestRequest(
         FeedTestBody("haha"),
-        Headers.plain(Map("hyperbus:revision" → Seq("5"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("5"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
 
       var hbSubscription: Option[Subscription] = None
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable/resource")), Map(Header.METHOD → Specific("subscribe"))),
+      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific("subscribe"))),
         initialResourceState,
       // emulate latency between request for full resource state and response
         () ⇒ Thread.sleep(10000)) onSuccess {
@@ -227,7 +227,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          val referenceState = """{"response":{"status":200,"headers":{"hyperbus:revision":["1"],"messageId":["messageId"],"correlationId":["correlationId"]}},"body":{"content":"fullResource"}}"""
+          val referenceState = """{"response":{"status":200,"headers":{"revision":["1"],"messageId":["messageId"],"correlationId":["correlationId"]}},"body":{"content":"fullResource"}}"""
           resourceState shouldBe referenceState
         } else fail("Full resource state wasn't sent to the client")
       }
@@ -252,7 +252,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         } else fail("Last event wasn't sent to the client")
 
         testService.unsubscribe(hbSubscription.get)
-        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable/resource")), Map(Header.METHOD → Specific("subscribe"))),
+        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific("subscribe"))),
           updatedResourceState)
         // This event should be ignored, because it's an "event from future". Resource state retrieving should be triggered
         testService.publish(eventBadRev5)
@@ -262,7 +262,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceUpdatedStateMessage = clientMessageQueue.get(3)
         if (resourceUpdatedStateMessage.isDefined) {
           val resourceUpdatedState = resourceUpdatedStateMessage.get.payload.utf8String
-          val referenceState = """{"response":{"status":200,"headers":{"hyperbus:revision":["4"],"messageId":["messageId"],"correlationId":["correlationId"]}},"body":{"content":"fullResource"}}"""
+          val referenceState = """{"response":{"status":200,"headers":{"revision":["4"],"messageId":["messageId"],"correlationId":["correlationId"]}},"body":{"content":"fullResource"}}"""
           resourceUpdatedState shouldBe referenceState
         } else fail("Full resource state wasn't sent to the client")
 

@@ -19,11 +19,11 @@ import scala.concurrent.Future
 @body("application/vnd+test-1.json")
 case class FeedTestBody(content: String) extends Body
 
-@request(Method.FEED_POST, "/test-service/reliable/feed")
+@request(Method.FEED_POST, "/test-service/reliable")
 case class ReliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
   with DefinedResponse[Ok[DynamicBody]]
 
-@request(Method.FEED_POST, "/test-service/unreliable/feed")
+@request(Method.FEED_POST, "/test-service/unreliable")
 case class UnreliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
   with DefinedResponse[Ok[DynamicBody]]
 
@@ -53,7 +53,6 @@ class TestService(hyperBus: HyperBus) {
   }
 
   def publish(request: UnreliableFeedTestRequest): Future[PublishResult] = {
-    println(s"event published ${System.currentTimeMillis()} $request")
     hyperBus <| request
   }
 
@@ -79,7 +78,7 @@ object TestService4WebsocketPerf extends App {
   val eventsPerSecond = config.getInt("perf-test.events-per-second")
   var canStart = new AtomicBoolean(false)
   TestService.startSeedNode(config)
-  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable/resource")), Map(Header.METHOD → Specific("subscribe"))),
+  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific("subscribe"))),
     Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), () ⇒ canStart.compareAndSet(false, true))
   while (!canStart.get()) {
     Thread.sleep(1000)
@@ -104,6 +103,6 @@ object TestService4HttpPerf extends App {
   val hyperBus = new HyperBusFactory(config).hyperBus
   val testService = new TestService(hyperBus)
   TestService.startSeedNode(config)
-  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable/resource")), Map(Header.METHOD → Specific(Method.GET))),
+  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
     Ok(DynamicBody(Text("response"))))
 }
