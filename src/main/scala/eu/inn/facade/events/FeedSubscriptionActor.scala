@@ -49,7 +49,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
         // This request received from backend sevice via HyperBus. Will be sent to client
         case _ ⇒
-          process(request)
+          processEvent(request)
       }
 
     case other ⇒
@@ -61,7 +61,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     unsubscribe()
   }
 
-  def process(event: DynamicRequest): Unit = {
+  def processEvent(event: DynamicRequest): Unit = {
     val feedStateSnapshot = feedState.get
     val resourceStateFetched = feedStateSnapshot.resourceStateFetched
     event.headers.get(Header.REVISION) match {
@@ -118,7 +118,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
             val updated = feedState.compareAndSet(feedStateSnapshot, FeedState(resourceStateFetched, reliableFeed, revisionId, resubscriptionCount))
             if (updated) {
               websocketWorker ! response
-              sendQueuedMessages()
+              sendQueuedEvents()
             }
 
           case None ⇒
@@ -136,7 +136,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
   }
 
-  def sendQueuedMessages(): Unit = {
+  def sendQueuedEvents(): Unit = {
     while (!pendingEvents.isEmpty) {
       sendEvent(pendingEvents.poll())
     }
