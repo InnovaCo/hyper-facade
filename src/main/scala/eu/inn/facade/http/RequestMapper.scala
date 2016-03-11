@@ -5,10 +5,10 @@ import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
 import akka.util.ByteString
 import eu.inn.binders.dynamic.{Null, Obj, Text}
 import eu.inn.binders.json._
-import eu.inn.facade.filter.model.DynamicRequestHeaders._
+import eu.inn.facade.filter.model.Headers._
 import eu.inn.facade.filter.model.TransitionalHeaders
-import eu.inn.hyperbus.model._
 import eu.inn.hyperbus._
+import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.transport.api.{NoTransportRouteException, uri}
@@ -32,12 +32,14 @@ object RequestMapper {
   }
 
   def toDynamicRequest(httpRequest: HttpRequest, uri: String): DynamicRequest = {
-    if (httpRequest.entity.isEmpty) DynamicRequest(
-      RequestHeader(
-        api.uri.Uri(uri),
-        Headers(Header.METHOD → Seq(httpRequest.method.name.toLowerCase))),
-      DynamicBody(Obj(Map())))
-    else DynamicRequest(new ByteArrayInputStream(httpRequest.entity.data.toByteArray))
+    httpRequest.method.name.toLowerCase match {
+      case Method.GET ⇒
+        val header = RequestHeader(api.uri.Uri(uri), Headers(Header.METHOD → Seq(httpRequest.method.name.toLowerCase)))
+        val body = QueryBody.fromQueryString(httpRequest.uri.query.toMap)
+        DynamicRequest(header, body)
+
+      case _ ⇒ DynamicRequest(new ByteArrayInputStream(httpRequest.entity.data.toByteArray))
+    }
   }
 
   def toDynamicResponse(headers: TransitionalHeaders, dynamicBody: DynamicBody): Response[Body] = {
@@ -142,7 +144,7 @@ object RequestMapper {
   }
 
   def extractResponseHeaders(statusCode: Int, headers: Map[String, Seq[String]], messageId: String, correlationId: String): TransitionalHeaders = {
-    val responseHeaders = headers + (MESSAGE_ID → Seq(messageId), CORRELATION_ID → Seq(correlationId))
+    val responseHeaders = headers + (Header.MESSAGE_ID → Seq(messageId), Header.CORRELATION_ID → Seq(correlationId))
     TransitionalHeaders(null, responseHeaders, Some(statusCode))
   }
 

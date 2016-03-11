@@ -2,8 +2,8 @@ package eu.inn.facade.filter
 
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.filter.model.{Filter, TransitionalHeaders, InputFilter, OutputFilter}
-import eu.inn.hyperbus.model.DynamicBody
+import eu.inn.facade.filter.model.{Filter, InputFilter, OutputFilter, TransitionalHeaders}
+import eu.inn.hyperbus.model.{DynamicBody, QueryBody}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}

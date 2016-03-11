@@ -53,6 +53,7 @@ object Build extends sbt.Build {
           "com.typesafe.akka"              %% "akka-cluster"                % "2.4.1",
           "com.typesafe.akka"              %% "akka-testkit"                % "2.4.1"     % "test",
           "com.wandoulabs.akka"            %% "spray-websocket"             % "0.1.4",
+          "eu.inn"                         %% "binders-core"                % "0.11.77",
           "eu.inn"                         %% "hyperbus"                    % "0.1.SNAPSHOT",
           "eu.inn"                         %% "hyperbus-model"              % "0.1.SNAPSHOT",
           "eu.inn"                         %% "hyperbus-transport"          % "0.1.SNAPSHOT",

@@ -7,7 +7,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.pipe
 import com.typesafe.config.Config
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.filter.model.{DynamicRequestHeaders, TransitionalHeaders}
+import eu.inn.facade.filter.model.TransitionalHeaders
 import eu.inn.facade.http.RequestMapper
 import eu.inn.facade.raml.{Method, RamlConfig}
 import eu.inn.hyperbus.HyperBus
@@ -64,7 +64,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def process(event: DynamicRequest): Unit = {
     val feedStateSnapshot = feedState.get
     val resourceStateFetched = feedStateSnapshot.resourceStateFetched
-    event.headers.get(DynamicRequestHeaders.REVISION) match {
+    event.headers.get(Header.REVISION) match {
       case Some(revision) ⇒
         if (!resourceStateFetched || !pendingEvents.isEmpty) pendingEvents.add(event)
         else sendEvent(event)
@@ -93,12 +93,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           feedState.set(FeedState())
           subscribe(filteredRequest)
           implicit val mvx = MessagingContextFactory.withCorrelationId(serverCorrelationId(filteredRequest))
-          fetchAndReplyWithResource(filteredRequest)
+          fetchResource(filteredRequest)
         }
     }
   }
 
-  def fetchAndReplyWithResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit = {
+  def fetchResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit = {
     val feedStateSnapshot = feedState.get
     val updatedRequest = DynamicRequest(ramlConfig.resourceUri(request.uri.pattern.specific), request.body, request.headers)
     hyperBus <~ updatedRequest flatMap {
@@ -106,7 +106,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     } map {
       case (headers: TransitionalHeaders, dynamicBody: DynamicBody) ⇒
         val response = RequestMapper.toDynamicResponse(headers, dynamicBody)
-        headers.singleValueHeader(DynamicRequestHeaders.REVISION) match {
+        headers.headerOption(Header.REVISION) match {
           case Some(revisionIdStr) ⇒
             val revisionId = revisionIdStr.toLong
             val resourceStateFetched = true
@@ -137,7 +137,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
   private def sendEvent(event: DynamicRequest): Unit = {
     val feedStateSnapshot = feedState.get
-    val revisionId = event.headers(DynamicRequestHeaders.REVISION).head.toLong
+    val revisionId = event.headers(Header.REVISION).head.toLong
     subscriptionRequest foreach { request ⇒
       if (revisionId == feedStateSnapshot.lastRevisionId + 1)
         filterEvent(request, event) map {
@@ -180,7 +180,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def filterRequest(dynamicRequest: DynamicRequest): Future[(TransitionalHeaders, DynamicBody)] = {
     val uriPattern = dynamicRequest.uri.pattern.specific.toString
     val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-    val contentType = headers.singleValueHeader(DynamicRequestHeaders.CONTENT_TYPE)
+    val contentType = headers.headerOption(Header.CONTENT_TYPE)
     // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
     // HTTP method and we treat all websocket requests as sent with POST method
     filterChainComposer.inputFilterChain(uriPattern, Method.POST, contentType).applyFilters(headers, dynamicBody)

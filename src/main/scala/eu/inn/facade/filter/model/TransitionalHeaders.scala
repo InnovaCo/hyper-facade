@@ -8,7 +8,7 @@ case class TransitionalHeaders(uri: Uri, headers: Map[String, Seq[String]], stat
     TransitionalHeaders(uri, headers, newResponseCode)
   }
 
-  def singleValueHeader(name: String): Option[String] = {
+  def headerOption(name: String): Option[String] = {
     headers.get(name) match {
       case Some(values) ⇒ Some(values.head)
       case None ⇒ None
