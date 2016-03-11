@@ -4,7 +4,7 @@ import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, Tim
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.Config
-import eu.inn.binders.dynamic.{Obj, Text}
+import eu.inn.binders.dynamic.{Null, Obj, Text}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
 import eu.inn.hyperbus.HyperBus
@@ -45,17 +45,29 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
   val hyperBus = inject[HyperBus] // initialize hyperbus
   val testService = new TestService(testServiceHyperBus)
 
+  // Unfortunately WsRestServiceApp doesn't provide a Future or any other way to ensure that listener is
+  // bound to socket, so we need this stupid timeout to initialize the listener
+  Thread.sleep(1000)
+
   "Facade integration" - {
-    "simple http request" in {
-
+    "http. Resource configured in RAML" in {
       testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
-        Ok(DynamicBody(Text("response"))))
+        Ok(DynamicBody(Text("response"))), { request ⇒
+          request.uri shouldBe Uri("/status/test-service")
+          request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
+        }
+      )
+      Source.fromURL("http://localhost:54321/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
+    }
 
-      // Unfortunately WsRestServiceApp doesn't provide a Future or any other way to ensure that listener is
-      // bound to socket, so we need this stupid timeout to initialize the listener
-      Thread.sleep(1000)
-
-      Source.fromURL("http://localhost:54321/status/test-service", "UTF-8").mkString shouldBe """"response""""
+    "http. Resource is not configured in RAML" in {
+      testService.onCommand(RequestMatcher(Some(Uri("/someSecretResource")), Map(Header.METHOD → Specific(Method.GET))),
+        Ok(DynamicBody(Text("response"))), { request ⇒
+          request.uri shouldBe Uri("/someSecretResource")
+          request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
+        }
+      )
+      Source.fromURL("http://localhost:54321/someSecretResource?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
     }
 
     "websocket: unreliable feed" in {
@@ -139,6 +151,60 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       )
     }
 
+    "websocker: handle error response" in {
+      val host = "localhost"
+      val port = 54321
+      val url = "/status/test-service"
+
+      val connect = Http.Connect(host, port)
+      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
+
+      val onClientUpgradePromise = Promise[Boolean]()
+      val resourceStatePromise = Promise[Boolean]()
+      val publishedEventPromise = Promise[Boolean]()
+
+      var clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
+      val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
+        override def onMessage(frame: TextFrame): Unit = {
+          clientMessageQueue += frame
+          clientMessageQueue.size match {
+            case 1 ⇒ resourceStatePromise.complete(Success(true))
+            case 2 ⇒ fail("there should not be incoming events after error response")
+          }
+        }
+
+        override def onUpgrade(): Unit = {
+          onClientUpgradePromise.complete(Success(true))
+        }
+      }), "error-feed-client")
+
+      client ! Connect() // init websocket connection
+
+      testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific("subscribe"))),
+        eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled_exception", Some("Internal server error"), errorId = "123")))
+
+      whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
+        client ! DynamicRequest(
+          RequestHeader(
+            Uri("/test-service/unreliable"),
+            Map(Header.METHOD → Seq("subscribe"),
+              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+              Header.MESSAGE_ID → Seq("messageId"),
+              Header.CORRELATION_ID → Seq("correlationId"))
+          ),
+          DynamicBody(Obj(Map("content" → Text("haha")))))
+      }
+
+      whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
+        val resourceStateMessage = clientMessageQueue.get(0)
+        if (resourceStateMessage.isDefined) {
+          val resourceState = resourceStateMessage.get.payload.utf8String
+          resourceState should startWith( """{"response":{"status":500,"headers":{"messageId":""")
+          resourceState should endWith( """"body":{"code":"unhandled_exception","description":"Internal server error","errorId":"123"}}""")
+        } else fail("Full resource state wasn't sent to the client")
+      }
+    }
+
     "websocket: reliable feed" in {
 
       val host = "localhost"
@@ -213,7 +279,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific("subscribe"))),
         initialResourceState,
       // emulate latency between request for full resource state and response
-        () ⇒ Thread.sleep(10000)) onSuccess {
+        _ ⇒ Thread.sleep(10000)) onSuccess {
         case subscription: Subscription ⇒ hbSubscription = Some(subscription)
       }
 

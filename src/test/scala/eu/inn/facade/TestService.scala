@@ -56,10 +56,10 @@ class TestService(hyperBus: HyperBus) {
     hyperBus <| request
   }
 
-  def onCommand(matcher: RequestMatcher, response: Response[Body], optionalTestCallback: (() ⇒ Unit) = () ⇒ ()) = {
+  def onCommand(matcher: RequestMatcher, response: Response[Body], optionalTestCallback: (DynamicRequest ⇒ Unit) = _ ⇒ ()) = {
     hyperBus.onCommand(matcher) { request: DynamicRequest ⇒
       Future {
-        optionalTestCallback()
+        optionalTestCallback(request)
         response
       }
     }
@@ -79,7 +79,7 @@ object TestService4WebsocketPerf extends App {
   var canStart = new AtomicBoolean(false)
   TestService.startSeedNode(config)
   testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific("subscribe"))),
-    Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), () ⇒ canStart.compareAndSet(false, true))
+    Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), _ ⇒ canStart.compareAndSet(false, true))
   while (!canStart.get()) {
     Thread.sleep(1000)
   }

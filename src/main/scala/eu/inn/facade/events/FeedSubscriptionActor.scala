@@ -32,8 +32,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   val maxResubscriptionsCount = inject[Config].getInt("inn.facade.maxResubscriptionsCount")
   val feedState = new AtomicReference[FeedState](FeedState())
 
-  var subscriptionId: Option[String] = None
-  var subscriptionRequest: Option[DynamicRequest] = None
+  var subscriptionId = new AtomicReference[Option[String]](None)
+  var subscriptionRequest = new AtomicReference[Option[DynamicRequest]](None)
 
   override def receive: Receive = {
 
@@ -41,7 +41,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       request.headers.get(Header.METHOD) match {
 
         case Some(Seq("subscribe")) ⇒
-          subscriptionRequest = Some(request)
+          subscriptionRequest.set(Some(request))
           filterAndSubscribe(request)
 
         case Some(Seq("unsubscribe")) ⇒
@@ -66,17 +66,20 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     val resourceStateFetched = feedStateSnapshot.resourceStateFetched
     event.headers.get(Header.REVISION) match {
       case Some(revision) ⇒
-        if (!resourceStateFetched || !pendingEvents.isEmpty) pendingEvents.add(event)
+        if (!resourceStateFetched || !pendingEvents.isEmpty) {
+          pendingEvents.add(event)
+          log.info(s"event $event is enqueued because resource state is not fetched yet")
+        }
         else sendEvent(event)
 
       case None ⇒
         if (resourceStateFetched) {
-          subscriptionRequest foreach { request ⇒
+          subscriptionRequest.get foreach { request ⇒
             filterEvent(request, event) map {
               case (headers: TransitionalHeaders, body: DynamicBody) ⇒ RequestMapper.toDynamicRequest(headers, body)
             } pipeTo websocketWorker
           }
-        }
+        } else log.warning(s"event $event will be dropped because resource state is not fetched yet")
     }
   }
 
@@ -125,7 +128,11 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
             if (updated) websocketWorker ! response
         }
     } recover {
-      case t: Throwable ⇒ websocketWorker ! RequestMapper.exceptionToResponse(t)
+      case t: Throwable ⇒
+        val response = RequestMapper.exceptionToResponse(t)
+        websocketWorker ! response
+        log.error(s"Service answered with error #${response.body.asInstanceOf[ErrorBody].errorId}. Stopping actor")
+        context.stop(self)
     }
   }
 
@@ -138,14 +145,14 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   private def sendEvent(event: DynamicRequest): Unit = {
     val feedStateSnapshot = feedState.get
     val revisionId = event.headers(Header.REVISION).head.toLong
-    subscriptionRequest foreach { request ⇒
+    subscriptionRequest.get foreach { request ⇒
       if (revisionId == feedStateSnapshot.lastRevisionId + 1)
         filterEvent(request, event) map {
           case (headers: TransitionalHeaders, body: DynamicBody) ⇒
             val lastRevisionId = revisionId
             val resubscriptionCount = feedStateSnapshot.resubscriptionCount
-            feedState.compareAndSet(feedStateSnapshot, FeedState(true, true, lastRevisionId, resubscriptionCount))
-            websocketWorker ! RequestMapper.toDynamicRequest(headers, body)
+            val updated = feedState.compareAndSet(feedStateSnapshot, FeedState(true, true, lastRevisionId, resubscriptionCount))
+            if (updated) websocketWorker ! RequestMapper.toDynamicRequest(headers, body)
         }
       else if (revisionId > feedStateSnapshot.lastRevisionId + 1) resubscribe(request)
       // if revisionId <= lastRevisionId -- just ignore this event
@@ -163,13 +170,13 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def unsubscribe(): Unit = {
-    subscriptionId.foreach(subscriptionManager.off)
-    subscriptionId = None
+    subscriptionId.get.foreach(subscriptionManager.off)
+    subscriptionId.set(None)
   }
 
   def subscribe(request: DynamicRequest): Unit = {
     val finalCorrelationId = RequestMapper.correlationId(request.headers)
-    subscriptionId = Some(subscriptionManager.subscribe(request.uri, self, finalCorrelationId))
+    subscriptionId.set(Some(subscriptionManager.subscribe(request.uri, self, finalCorrelationId)))
   }
 
   def serverCorrelationId(request: DynamicRequest): String = {
