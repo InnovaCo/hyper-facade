@@ -7,8 +7,9 @@ import eu.inn.facade.filter.model.TransitionalHeaders
 import eu.inn.facade.filter.model.Headers._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
-import eu.inn.hyperbus.model.{DynamicBody, Response}
+import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.Header._
+import eu.inn.hyperbus.serialization.StringDeserializer
 import eu.inn.hyperbus.transport.api
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
@@ -30,29 +31,24 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
   implicit val executionContext = inject[ExecutionContext]
 
   val restRoutes = new RestRoutes {
-    val anyMethod = get | put | post | head | patch | delete | options
     val request = extract(_.request)
-
-    val routes: Route =
-      anyMethod {
-        (request & requestUri) { (request, uri) ⇒
-          onSuccess(processRequest(request, uri.path.toString)) { response ⇒
-            complete(response)
-          }
+    val routes: Route = request { (request) ⇒
+        onSuccess(processRequest(request)) { response ⇒
+          complete(response)
         }
       }
   }
 
-  def processRequest(request: HttpRequest, uri: String): Future[HttpResponse] = {
-    val resourceUri = ramlConfig.resourceUri(uri)
+  def processRequest(request: HttpRequest): Future[HttpResponse] = {
+    val resourceUri = ramlConfig.resourceUri(request.uri.path.toString)
     val responsePromise = Promise[HttpResponse]()
-    filterIn(request, resourceUri.pattern.specific) map {
+    filterIn(request, resourceUri) map {
       case (filteredHeaders, filteredBody) ⇒
         if (filteredHeaders.hasStatusCode) responsePromise.complete(Success(RequestMapper.toHttpResponse(filteredHeaders, filteredBody)))
         else {
           val filteredRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
           val responseFuture = hyperBus <~ filteredRequest flatMap {
-            case response: Response[DynamicBody] ⇒ filterOut(response, resourceUri.pattern.specific, request.method.name)
+            case response: Response[DynamicBody] ⇒ filterOut(response, resourceUri, request.method.name)
           } map {
             case (headers: TransitionalHeaders, body: DynamicBody) ⇒
               val intStatusCode = headers.statusCode.getOrElse(200)
@@ -68,21 +64,29 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
 
   }
 
-  def filterIn(request: HttpRequest, uri: String): Future[(TransitionalHeaders, DynamicBody)] = {
-    val dynamicRequest = RequestMapper.toDynamicRequest(request, uri)
-    val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-    val updatedHeaders = request.method.name match {
-      case method if (Seq("post", "put", "patch").contains(method)) ⇒ updateRequestContentType(headers)
-      case _ ⇒ headers
+  def filterIn(request: HttpRequest, uri: api.uri.Uri): Future[(TransitionalHeaders, DynamicBody)] = {
+    val (body, headers) = request.method match {
+      case HttpMethods.GET ⇒
+        (QueryBody.fromQueryString(request.uri.query.toMap),
+          TransitionalHeaders(uri, Headers(Header.METHOD → Seq(Method.GET)), None))
+      case HttpMethods.DELETE ⇒
+        (EmptyBody,
+          TransitionalHeaders(uri, Headers(Header.METHOD → Seq(Method.DELETE)), None))
+      case _ ⇒
+        (StringDeserializer.dynamicBody(Some(request.entity.asString)),
+          updateRequestContentType(
+            TransitionalHeaders(uri, Headers(Header.METHOD → Seq(request.method.toString.toLowerCase)), None)
+          ))
     }
-    val contentType = updatedHeaders.headerOption(CONTENT_TYPE)
-    filterChainComposer.inputFilterChain(uri, request.method.name, contentType).applyFilters(updatedHeaders, dynamicBody)
+
+    val contentType = headers.headerOption(CONTENT_TYPE)
+    filterChainComposer.inputFilterChain(uri, request.method.name, contentType).applyFilters(headers, body)
   }
 
-  def filterOut(response: Response[DynamicBody], uriPattern: String, method: String): Future[(TransitionalHeaders, DynamicBody)] = {
+  def filterOut(response: Response[DynamicBody], uri: api.uri.Uri, method: String): Future[(TransitionalHeaders, DynamicBody)] = {
     val body = response.body
-    val headers = updateResponseContentType(response, uriPattern)
-    filterChainComposer.outputFilterChain(uriPattern, method).applyFilters(headers, body)
+    val headers = updateResponseContentType(response, uri)
+    filterChainComposer.outputFilterChain(uri, method).applyFilters(headers, body)
   }
 
   def updateRequestContentType(headers: TransitionalHeaders): TransitionalHeaders = {
@@ -101,13 +105,13 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
     TransitionalHeaders(headers.uri, headersMap, headers.statusCode)
   }
 
-  def updateResponseContentType(response: Response[DynamicBody], uriPattern: String): TransitionalHeaders = {
+  def updateResponseContentType(response: Response[DynamicBody], uri: api.uri.Uri): TransitionalHeaders = {
     val newContentType = response.headerOption(CONTENT_TYPE) match {
       case Some(contentType) ⇒ CERTAIN_CONTENT_TYPE_START + contentType + CERTAIN_CONTENT_TYPE_END
       case None ⇒ COMMON_CONTENT_TYPE
     }
     val headers = response.headers + (CONTENT_TYPE → Seq(newContentType))
-    TransitionalHeaders(api.uri.Uri(uriPattern), headers, Some(response.status))
+    TransitionalHeaders(uri, headers, Some(response.status))
   }
 }
 

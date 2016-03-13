@@ -185,30 +185,27 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def filterRequest(dynamicRequest: DynamicRequest): Future[(TransitionalHeaders, DynamicBody)] = {
-    val uriPattern = dynamicRequest.uri.pattern.specific.toString
     val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
     val contentType = headers.headerOption(Header.CONTENT_TYPE)
     // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
     // HTTP method and we treat all websocket requests as sent with POST method
-    filterChainComposer.inputFilterChain(uriPattern, Method.POST, contentType).applyFilters(headers, dynamicBody)
+    filterChainComposer.inputFilterChain(dynamicRequest.uri, Method.POST, contentType).applyFilters(headers, dynamicBody)
   }
 
   def filterEvent(dynamicRequest: DynamicRequest, responseEvent: DynamicRequest): Future[(TransitionalHeaders, DynamicBody)] = {
-    val uriPattern = dynamicRequest.uri.pattern.specific.toString
     val (headers, dynamicBody) = RequestMapper.unfold(responseEvent)
     // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
     // HTTP method and we treat all websocket requests as sent with POST method
-    filterChainComposer.outputFilterChain(uriPattern, Method.POST).applyFilters(headers, dynamicBody)
+    filterChainComposer.outputFilterChain(dynamicRequest.uri, Method.POST).applyFilters(headers, dynamicBody)
   }
 
   def filterResponse(request: DynamicRequest, response: Response[DynamicBody]): Future[(TransitionalHeaders, DynamicBody)] = {
     val statusCode = response.status
-    val uriPattern = request.uri.pattern.specific.toString
     val body = response.body
     val headers = RequestMapper.extractResponseHeaders(statusCode, response.headers, response.messageId, response.correlationId)
     // Method is POST, because it's not an HTTP request but DynamicRequest via websocket, so there is no
     // HTTP method and we treat all websocket requests as sent with POST method
-    filterChainComposer.outputFilterChain(uriPattern, Method.POST).applyFilters(headers, body)
+    filterChainComposer.outputFilterChain(request.uri, Method.POST).applyFilters(headers, body)
   }
 }
 

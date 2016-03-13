@@ -1,11 +1,11 @@
 package eu.inn.facade.filter
 
-import com.typesafe.config.Config
 import eu.inn.facade.filter.chain.FilterChainFactory
 import eu.inn.facade.filter.model.Filter
 import eu.inn.facade.modules.{ConfigModule, FiltersModule}
+import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
-import scaldi.{Module, Injectable}
+import scaldi.{Injectable, Module}
 
 class FilterChainRamlFactoryTest extends FreeSpec with Matchers with Injectable {
 
@@ -18,20 +18,20 @@ class FilterChainRamlFactoryTest extends FreeSpec with Matchers with Injectable 
 
   "FilterChainRamlFactory " - {
     "trait based filter chain" in {
-      val chain = filterChainFactory.inputFilterChain("/private", "get", None)
+      val chain = filterChainFactory.inputFilterChain(Uri("/private"), "get", None)
 
       chain.filters shouldBe inject [Seq[Filter]]("privateResource")
     }
 
     "annotation based filter chain" in {
-      val chain = filterChainFactory.inputFilterChain("/status/test-service", "get", None)
+      val chain = filterChainFactory.inputFilterChain(Uri("/status/test-service"), "get", None)
 
       val inputEnrichmentFilter = inject [Seq[Filter]]("x-client-ip").filter(_.isInputFilter)
       chain.filters shouldBe inputEnrichmentFilter
     }
 
     "trait and annotation based filter chain" in {
-      val chain = filterChainFactory.outputFilterChain("/users", "get")
+      val chain = filterChainFactory.outputFilterChain(Uri("/users"), "get")
 
       val outputPrivateFieldFilter = inject [Seq[Filter]]("privateField").filter(_.isOutputFilter)
       val pagedOutputFilter = inject [Seq[Filter]]("paged")

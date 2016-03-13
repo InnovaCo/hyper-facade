@@ -1,6 +1,6 @@
 package eu.inn.facade.http
 
-import java.io.{ByteArrayInputStream, ByteArrayOutputStream}
+import java.io.ByteArrayOutputStream
 
 import akka.util.ByteString
 import eu.inn.binders.dynamic.{Null, Obj, Text}
@@ -10,7 +10,6 @@ import eu.inn.facade.filter.model.TransitionalHeaders
 import eu.inn.hyperbus._
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.serialization.RequestHeader
-import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.transport.api.{NoTransportRouteException, uri}
 import org.slf4j.LoggerFactory
 import spray.can.websocket.frame.{Frame, TextFrame}
@@ -30,17 +29,19 @@ object RequestMapper {
   def toDynamicRequest(frame: Frame): DynamicRequest = {
     DynamicRequest(frame.payload.iterator.asInputStream)
   }
-
-  def toDynamicRequest(httpRequest: HttpRequest, uri: String): DynamicRequest = {
+/*
+  def toDynamicRequest(httpRequest: HttpRequest, uri: api.uri.Uri): DynamicRequest = {
     httpRequest.method.name.toLowerCase match {
       case Method.GET ⇒
-        val header = RequestHeader(api.uri.Uri(uri), Headers(Header.METHOD → Seq(httpRequest.method.name.toLowerCase)))
+        val header = RequestHeader(uri, Headers(Header.METHOD → Seq(httpRequest.method.name.toLowerCase)))
         val body = QueryBody.fromQueryString(httpRequest.uri.query.toMap)
         DynamicRequest(header, body)
 
+        // todo: нельзя так сериализовать?
       case _ ⇒ DynamicRequest(new ByteArrayInputStream(httpRequest.entity.data.toByteArray))
     }
   }
+*/
 
   def toDynamicResponse(headers: TransitionalHeaders, dynamicBody: DynamicBody): Response[Body] = {
     headers.statusCode match {
