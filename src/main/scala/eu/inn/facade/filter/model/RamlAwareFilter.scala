@@ -1,15 +1,16 @@
 package eu.inn.facade.filter.model
 
-import eu.inn.facade.raml.{DataStructure, RamlConfig}
+import eu.inn.facade.raml.{DataStructure, Method, RamlConfig}
+import eu.inn.hyperbus.model.Header
 
 trait RamlAwareFilter extends Filter {
   def ramlConfig: RamlConfig
 
-  def getDataStructure(headers: Headers): Option[DataStructure] = {
-    val url = headers.headers(DynamicRequestHeaders.URL)
-    val method = headers.headers(DynamicRequestHeaders.METHOD)
-    val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
-    if (isInputFilter) ramlConfig.requestDataStructure(url, method, contentType)
-    else ramlConfig.responseDataStructure(url, method, headers.statusCode.getOrElse(200))
+  def getDataStructure(headers: TransitionalHeaders): Option[DataStructure] = {
+    val uri = headers.uri.toString
+    val method = headers.headerOption(Header.METHOD).getOrElse(Method.GET)
+    val contentType = headers.headerOption(Header.CONTENT_TYPE)
+    if (isInputFilter) ramlConfig.requestDataStructure(uri, method, contentType)
+    else ramlConfig.responseDataStructure(uri, method, headers.statusCode.getOrElse(200))
   }
 }

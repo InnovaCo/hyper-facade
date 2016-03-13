@@ -7,10 +7,11 @@ import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.Config
 import eu.inn.facade.HyperBusFactory
 import eu.inn.hyperbus.HyperBus
-import eu.inn.hyperbus.model.DynamicRequest
-import eu.inn.hyperbus.model.standard.Method
+import eu.inn.hyperbus.model.{DynamicRequest, Header}
 import eu.inn.hyperbus.serialization.RequestHeader
-import eu.inn.hyperbus.transport.api.Topic
+import eu.inn.hyperbus.transport.api.Subscription
+import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, RequestMatcher}
+import eu.inn.hyperbus.transport.api.uri.Uri
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
 
@@ -24,38 +25,39 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
   implicit val actorSystem = inject[ActorSystem]
   implicit val executionContext = inject[ExecutionContext]
 
-  def subscribe(topicFilter: Topic, clientActor: ActorRef, correlationId: String): String =
-    subscriptionManager.subscribe(topicFilter, clientActor, correlationId)
+  def subscribe(uri: Uri, clientActor: ActorRef, correlationId: String): String =
+    subscriptionManager.subscribe(uri, clientActor, correlationId)
   def off(subscriptionId: String) = subscriptionManager.off(subscriptionId)
   private val subscriptionManager = new Manager
 
   class Manager {
     val groupName = HyperBusFactory.defaultHyperBusGroup(inject[Config])
     val idCounter = new AtomicLong(0)
-    val groupSubscriptions = scala.collection.mutable.Map[Topic,GroupSubscription]()
-    val groupSubscriptionById = TrieMap[String, Topic]()
+    val groupSubscriptions = scala.collection.mutable.Map[Uri,GroupSubscription]()
+    val groupSubscriptionById = TrieMap[String, Uri]()
 
-    case class ClientSubscriptionData(subscriptionId: String, topicFilter: Topic, clientActor: ActorRef, correlationId: String)
+    case class ClientSubscriptionData(subscriptionId: String, uri: Uri, clientActor: ActorRef, correlationId: String)
 
-    class GroupSubscription(groupTopic: Topic, initialSubscription: ClientSubscriptionData) {
+    class GroupSubscription(groupUri: Uri, initialSubscription: ClientSubscriptionData) {
       val clientSubscriptions = new ConcurrentLinkedQueue[ClientSubscriptionData]()
+      var hyperBusSubscription: Option[Subscription] = None
       addClient(initialSubscription)
 
-      val hyperBusSubscriptionId = hyperBus.onEvent(groupTopic, Method.POST, None, groupName) { eventRequest: DynamicRequest ⇒
+      val methodFilter = Map(Header.METHOD → RegexMatcher("feed:.*"))
+      hyperBus.onEvent(RequestMatcher(Some(groupUri), methodFilter), groupName) { eventRequest: DynamicRequest ⇒
         Future{
           log.debug(s"Event received ($groupName): $eventRequest")
           import scala.collection.JavaConversions._
           for (consumer: ClientSubscriptionData ← clientSubscriptions) {
             try {
-              val matched = consumer.topicFilter.matchTopic(eventRequest.topic)
+              val matched = consumer.uri.matchUri(eventRequest.uri)
               log.debug(s"Event #(${eventRequest.messageId}) ${if (matched) "forwarded" else "NOT matched"} to ${consumer.clientActor}/${consumer.correlationId}")
               if (matched) {
                 val request = DynamicRequest(
-                  RequestHeader(eventRequest.topic.url.specific,
-                    eventRequest.method,
-                    eventRequest.body.contentType,
-                    eventRequest.messageId,
-                    Some(consumer.correlationId)),
+                  RequestHeader(
+                    eventRequest.uri,
+                    eventRequest.headers + (Header.CORRELATION_ID → Seq(consumer.correlationId))
+                  ),
                   eventRequest.body
                 )
                 consumer.clientActor ! request
@@ -67,6 +69,8 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
             }
           }
         }
+      } onSuccess {
+        case subscription: Subscription ⇒ hyperBusSubscription = Some(subscription)
       }
 
       def addClient(subscription: ClientSubscriptionData) = clientSubscriptions.add(subscription)
@@ -80,34 +84,37 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       }
 
       def off() = {
-        hyperBus.off(hyperBusSubscriptionId)
+        hyperBusSubscription match {
+          case Some(subscription) ⇒ hyperBus.off(subscription)
+          case None ⇒ log.warn("You cannot unsubscribe because you are not subscribed yet!")
+        }
       }
     }
 
-    def subscribe(topicFilter: Topic, clientActor: ActorRef, correlationId: String): String = {
+    def subscribe(uri: Uri, clientActor: ActorRef, correlationId: String): String = {
       val subscriptionId = idCounter.incrementAndGet().toHexString
-      val subscriptionData = ClientSubscriptionData(subscriptionId, topicFilter, clientActor, correlationId)
-      val groupTopic = topicFilter
-      groupSubscriptionById += subscriptionId → groupTopic
+      val subscriptionData = ClientSubscriptionData(subscriptionId, uri, clientActor, correlationId)
+      val groupUri = uri
+      groupSubscriptionById += subscriptionId → groupUri
       groupSubscriptions.synchronized {
-        groupSubscriptions.get(groupTopic).map { list ⇒
+        groupSubscriptions.get(groupUri).map { list ⇒
           list.addClient(subscriptionData)
         } getOrElse {
-          val groupSubscription = new GroupSubscription(groupTopic, subscriptionData)
-          groupSubscriptions += groupTopic → groupSubscription
+          val groupSubscription = new GroupSubscription(groupUri, subscriptionData)
+          groupSubscriptions += groupUri → groupSubscription
         }
       }
       subscriptionId
     }
 
     def off(subscriptionId: String) = {
-      groupSubscriptionById.get(subscriptionId).foreach { groupTopic ⇒
+      groupSubscriptionById.get(subscriptionId).foreach { groupUri ⇒
         groupSubscriptionById -= subscriptionId
         groupSubscriptions.synchronized {
-          groupSubscriptions.get(groupTopic).foreach { groupSubscription ⇒
+          groupSubscriptions.get(groupUri).foreach { groupSubscription ⇒
             if (groupSubscription.removeClient(subscriptionId)) {
               groupSubscription.off()
-              groupSubscriptions -= groupTopic
+              groupSubscriptions -= groupUri
             }
           }
         }

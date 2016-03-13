@@ -1,15 +1,18 @@
 package eu.inn.facade.filter.model
 
-case class Headers(headers: Map[String, String], statusCode: Option[Int]) {
+import eu.inn.hyperbus.model.Header._
 
-  def withStatusCode(newResponseCode: Option[Int]) = {
-    Headers(headers, newResponseCode)
-  }
+import scala.collection.Set
 
-  def hasStatusCode: Boolean = {
-    statusCode match {
-      case Some(_) ⇒ true
-      case None ⇒ false
-    }
+object Headers {
+
+  val CERTAIN_CONTENT_TYPE_START = "application/vnd."
+  val CERTAIN_CONTENT_TYPE_END = "+json"
+  val COMMON_CONTENT_TYPE = "application/json"
+
+  val headerNames = Set(METHOD, CONTENT_TYPE, MESSAGE_ID, CORRELATION_ID)
+
+  def isDynamicHeader(headerName: String): Boolean = {
+    headerNames.contains(headerName)
   }
 }

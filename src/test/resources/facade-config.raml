@@ -62,17 +62,6 @@ annotationTypes:
   privateField:
 
 traits:
-  streamed-unreliable:
-    queryParameters:
-      <<resourceStateUri>>:
-      <<eventFeedUri>>:
-  streamed-reliable:
-    queryParameters:
-      <<resourceStateUri>>:
-      <<eventFeedUri>>:
-  plain-resource:
-    queryParameters:
-      <<resourceStateUri>>:
   secured:
   paged:
   rateLimited:
@@ -116,8 +105,7 @@ traits:
 /private:
   is: [ privateResource ]
 
-/unreliable-feed:
-  is: [ streamed-unreliable: { "resourceStateUri": "/unreliable-feed/resource", "eventFeedUri": "/unreliable-feed/{content}/events" } ]
+/unreliable-feed/{content}:
   post:
     body:
       application/vnd+app-server-status.json:
@@ -125,8 +113,7 @@ traits:
       application/vnd+app-server-status-update.json:
         type: ResourceUpdate
 
-/reliable-feed:
-  is: [ streamed-reliable: { "resourceStateUri": "/reliable-feed/resource", "eventFeedUri": "/reliable-feed/{content}/events" } ]
+/reliable-feed/{content:*}:
   post:
     body:
       none:
@@ -138,12 +125,9 @@ traits:
 
 /test-service/reliable:
   post:
-    is: [ streamed-reliable: { "resourceStateUri": "/test-service/reliable/resource", "eventFeedUri": "/test-service/reliable/{content}/events" } ]
 
 /test-service/unreliable:
   post:
-    is: [ streamed-unreliable: { "resourceStateUri": "/test-service/unreliable/resource", "eventFeedUri": "/test-service/unreliable/{content}/events" } ]
 
 /perf-test-service/ws:
   post:
-    is: [ streamed-unreliable: { "resourceStateUri": "/test-service/unreliable/resource", "eventFeedUri": "/test-service/unreliable/{content}/events" } ]

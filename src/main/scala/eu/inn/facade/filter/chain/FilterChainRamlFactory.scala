@@ -2,6 +2,7 @@ package eu.inn.facade.filter.chain
 
 import eu.inn.facade.filter.model.Filter
 import eu.inn.facade.raml.{DataStructure, RamlConfig}
+import eu.inn.hyperbus.transport.api.uri.Uri
 import scaldi.{Injectable, Injector}
 
 import scala.util.{Failure, Success, Try}
@@ -10,24 +11,24 @@ class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory 
 
   val ramlConfig = inject[RamlConfig]
 
-  override def inputFilterChain(url: String, method: String, contentType: Option[String]): FilterChain = {
-    val dataStructure = ramlConfig.requestDataStructure(url, method, contentType)
+  override def inputFilterChain(uri: Uri, method: String, contentType: Option[String]): FilterChain = {
+    val dataStructure = ramlConfig.requestDataStructure(uri.pattern.specific, method, contentType)
     val dataStructures: Seq[DataStructure] = dataStructure match {
       case Some(structure) ⇒ Seq(structure)
       case None ⇒ Seq()
     }
-    val inputFilters = filters(url, method, dataStructures).filter(_.isInputFilter)
+    val inputFilters = filters(uri, method, dataStructures).filter(_.isInputFilter)
     FilterChain(inputFilters)
   }
 
-  override def outputFilterChain(url: String, method: String): FilterChain = {
-    val dataStructures: Seq[DataStructure] = ramlConfig.responseDataStructures(url, method)
-    val outputFilters = filters(url, method, dataStructures).filter(_.isOutputFilter)
+  override def outputFilterChain(uri: Uri, method: String): FilterChain = {
+    val dataStructures: Seq[DataStructure] = ramlConfig.responseDataStructures(uri, method)
+    val outputFilters = filters(uri, method, dataStructures).filter(_.isOutputFilter)
     FilterChain(outputFilters)
   }
 
-  private def filters(url: String, method: String, dataStructures: Seq[DataStructure]): Seq[Filter] = {
-    val filterNames = ramlConfig.traitNames(url, method)
+  private def filters(uri: Uri, method: String, dataStructures: Seq[DataStructure]): Seq[Filter] = {
+    val filterNames = ramlConfig.traitNames(uri.pattern.specific, method)
     val filters = filterNames.foldLeft(Seq[Filter]()) { (filters, filterName) ⇒
       Try(inject[Seq[Filter]](filterName)) match {
         case Success(traitBasedFilters) ⇒

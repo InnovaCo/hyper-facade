@@ -9,24 +9,32 @@ import eu.inn.binders.dynamic.{Obj, Text}
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.annotations.{body, request}
-import eu.inn.hyperbus.model.standard._
 import eu.inn.hyperbus.transport.api._
+import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
+import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 @body("application/vnd+test-1.json")
-case class FeedTestBody(content: String, revisionId: Long = 0) extends Body
+case class FeedTestBody(content: String) extends Body
 
-@request("/test-service/reliable/{content}/events")
-case class ReliableFeedTestRequest(body: FeedTestBody, messageId: String, correlationId: String) extends StaticPost(body)
-with DefinedResponse[Ok[DynamicBody]]
+@request(Method.FEED_POST, "/test-service/reliable")
+case class ReliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
+  with DefinedResponse[Ok[DynamicBody]]
 
-@request("/test-service/unreliable/{content}/events")
-case class UnreliableFeedTestRequest(body: FeedTestBody, messageId: String, correlationId: String) extends StaticPost(body)
-with DefinedResponse[Ok[DynamicBody]]
+@request(Method.FEED_POST, "/test-service/unreliable")
+case class UnreliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
+  with DefinedResponse[Ok[DynamicBody]]
 
 object TestService extends App {
+  val config = new ConfigsFactory().config
+  val hyperBus = new HyperBusFactory(config).hyperBus
+  val testService = new TestService(hyperBus)
+  startSeedNode(config)
+  testService.onCommand(RequestMatcher(Some(Uri("/aaa")), Map(Header.METHOD → Specific(Method.GET))),
+    Ok(DynamicBody(Text("response"))))
+
   def startSeedNode(config: Config): Unit = {
     val serviceConfig = config.getConfig("seed-node-service")
     val system = ActorSystem("eu-inn", serviceConfig)
@@ -36,29 +44,29 @@ object TestService extends App {
 }
 
 /**
- * NOT THREAD SAFE
- * This class is just a test stuff for publishing events to HyperBus.
- */
+  * NOT THREAD SAFE
+  * This class is just a test stuff for publishing events to HyperBus.
+  */
 class TestService(hyperBus: HyperBus) {
-  def publish (request: ReliableFeedTestRequest): Future[PublishResult] = {
+  def publish(request: ReliableFeedTestRequest): Future[PublishResult] = {
     hyperBus <| request
   }
 
-  def publish (request: UnreliableFeedTestRequest): Future[PublishResult] = {
+  def publish(request: UnreliableFeedTestRequest): Future[PublishResult] = {
     hyperBus <| request
   }
 
-  def onCommand(topic: Topic, response: Response[Body], optionalTestCallback: (() ⇒ Unit) = () ⇒ ()) = {
-    hyperBus.onCommand(topic, Method.GET, None) { request: DynamicRequest ⇒
+  def onCommand(matcher: RequestMatcher, response: Response[Body], optionalTestCallback: (DynamicRequest ⇒ Unit) = _ ⇒ ()) = {
+    hyperBus.onCommand(matcher) { request: DynamicRequest ⇒
       Future {
-        optionalTestCallback()
+        optionalTestCallback(request)
         response
       }
     }
   }
 
-  def unsubscribe(subscriptionId: String) = {
-    hyperBus.off(subscriptionId)
+  def unsubscribe(subscription: Subscription) = {
+    hyperBus.off(subscription)
   }
 }
 
@@ -70,9 +78,9 @@ object TestService4WebsocketPerf extends App {
   val eventsPerSecond = config.getInt("perf-test.events-per-second")
   var canStart = new AtomicBoolean(false)
   TestService.startSeedNode(config)
-  testService.onCommand(Topic("/test-service/unreliable/resource"),
-    Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), () ⇒ canStart.compareAndSet(false, true))
-  while(!canStart.get()) {
+  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific("subscribe"))),
+    Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), _ ⇒ canStart.compareAndSet(false, true))
+  while (!canStart.get()) {
     Thread.sleep(1000)
   }
   startLoad()
@@ -81,8 +89,8 @@ object TestService4WebsocketPerf extends App {
     println("start load")
     while (true) {
       val startTime = System.currentTimeMillis()
-      for ( i ← 1 to eventsPerSecond) {
-        testService.publish(UnreliableFeedTestRequest(FeedTestBody("perfEvent"), "messageId", "correlationId"))
+      for (i ← 1 to eventsPerSecond) {
+        testService.publish(UnreliableFeedTestRequest(FeedTestBody("perfEvent"), Headers()))
       }
       val remainingTime = 1000 - (startTime - System.currentTimeMillis())
       if (remainingTime > 0) Thread.sleep(remainingTime)
@@ -95,5 +103,6 @@ object TestService4HttpPerf extends App {
   val hyperBus = new HyperBusFactory(config).hyperBus
   val testService = new TestService(hyperBus)
   TestService.startSeedNode(config)
-  testService.onCommand(Topic("/status/test-service"), Ok(DynamicBody(Text("response"))))
+  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
+    Ok(DynamicBody(Text("response"))))
 }

@@ -1,58 +1,70 @@
 package eu.inn.facade.raml
 
-class RamlConfig(val resourcesByUrl: Map[String, ResourceConfig]) {
-  import Trait._
+import eu.inn.hyperbus.transport.api
+import eu.inn.hyperbus.transport.api.uri._
 
-  def traitNames(url: String, method: String): Seq[String] = {
-    traits(url, method) map (foundTrait ⇒ foundTrait.name)
+class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
+
+  def traitNames(uriPattern: String, method: String): Seq[String] = {
+    traits(uriPattern, method) map (foundTrait ⇒ foundTrait.name)
   }
 
-  def isReliableEventFeed(url: String) = {
-    traitNames(url, Method.POST).contains(STREAMED_RELIABLE)
-  }
-
-  def isUnreliableEventFeed(url: String) = {
-    traitNames(url, Method.POST).contains(Trait.STREAMED_UNRELIABLE)
-  }
-
-  def resourceFeedUri(url: String): String = {
-    val resourceTraits = traits(url, Method.POST)
-    resourceTraits.find(resourceTrait ⇒ isFeed(resourceTrait.name)) match {
-      case Some(feedTrait) ⇒ feedTrait.parameters(EVENT_FEED_URI)
-      case None ⇒ url // todo: is it correct?
+  def resourceUri(requestUriString: String): Uri = {
+    val requestUri = Uri(requestUriString)
+    matchUri(requestUri) match {
+      case Some(uri) ⇒ uri
+      case None ⇒ requestUri
     }
   }
 
-  def resourceStateUri(url: String): String = {
-    val resourceTraits = traits(url, Method.POST)
-    resourceTraits.find(resourceTrait ⇒ hasMappedUri(resourceTrait.name)) match {
-      case Some(resourceStateTrait) ⇒ resourceStateTrait.parameters(RESOURCE_STATE_URI)
-      case None ⇒ url // todo: is it correct?
+  def matchUri(requestUri: Uri): Option[Uri] = {
+    var foundUri: Option[Uri] = None
+    for (uri ← uris if foundUri.isEmpty) {
+      UriMatcher.matchUri(uri, requestUri) match {
+        case uri @ Some(_) ⇒ foundUri = uri
+        case None ⇒
+      }
+    }
+    foundUri
+  }
+
+  def requestDataStructure(uriPattern: String, method: String, contentType: Option[String]): Option[DataStructure] = {
+    resourcesByUri.get(uriPattern) match {
+      case Some(resourceConfig) ⇒ resourceConfig.requests.dataStructures.get(Method(method), getContentType(contentType))
+      case None ⇒ None
     }
   }
 
-  def requestDataStructure(url: String, method: String, contentType: Option[String]): Option[DataStructure] = {
-    resourcesByUrl(url).requests.dataStructures.get(Method(method), getContentType(contentType))
-  }
-
-  def responseDataStructure(url: String, method: String, statusCode: Int): Option[DataStructure] = {
-    resourcesByUrl(url).responses.dataStructures.get((Method(method), statusCode))
-  }
-
-  def responseDataStructures(url: String, method: String): Seq[DataStructure] = {
-    val allStructures = resourcesByUrl(url).responses.dataStructures
-    allStructures.foldLeft(Seq[DataStructure]()) { (structuresByMethod, kv) ⇒
-      val (httpMethod, _) = kv._1
-      val structure = kv._2
-      if (httpMethod == Method(method)) structuresByMethod :+ structure
-      else structuresByMethod
+  def responseDataStructure(uriPattern: String, method: String, statusCode: Int): Option[DataStructure] = {
+    resourcesByUri.get(uriPattern) match {
+      case Some(resourceConfig) ⇒ resourceConfig.responses.dataStructures.get(Method(method), statusCode)
+      case None ⇒ None
     }
   }
 
-  private def traits(url: String, method: String): Seq[Trait] = {
-    val traits = resourcesByUrl(url).traits
-    traits.methodSpecificTraits
-      .getOrElse(Method(method), traits.commonTraits)
+  def responseDataStructures(uri: api.uri.Uri, method: String): Seq[DataStructure] = {
+    resourcesByUri.get(uri.pattern.specific) match {
+      case Some(resourceConfig) ⇒
+        resourceConfig.responses.dataStructures.foldLeft(Seq.newBuilder[DataStructure]) { (structuresByMethod, kv) ⇒
+          val (httpMethod, _) = kv._1
+          val structure = kv._2
+          if (httpMethod == Method(method)) structuresByMethod += structure
+          else structuresByMethod
+        }.result()
+
+      case None ⇒ Seq()
+    }
+  }
+
+  private def traits(uriPattern: String, method: String): Seq[Trait] = {
+    resourcesByUri.get(uriPattern) match {
+      case Some(config) ⇒
+        val traits = config.traits
+        traits.methodSpecificTraits
+          .getOrElse(Method(method), traits.commonTraits)
+
+      case None ⇒ Seq()
+    }
   }
 
   private def getContentType(contentTypeName: Option[String]): Option[ContentType] = {
@@ -87,17 +99,6 @@ object Trait {
 
   def apply(name: String): Trait = {
     Trait(name, Map())
-  }
-
-  def hasMappedUri(traitName: String): Boolean = {
-    traitName == STREAMED_RELIABLE ||
-      traitName == STREAMED_UNRELIABLE ||
-      traitName == PLAIN_RESOURCE
-  }
-
-  def isFeed(traitName: String): Boolean = {
-    traitName == STREAMED_RELIABLE ||
-      traitName == STREAMED_UNRELIABLE
   }
 }
 

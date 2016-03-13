@@ -8,6 +8,7 @@ import org.scalatest.{FreeSpec, Matchers}
 import eu.inn.facade.raml.Annotation._
 import eu.inn.facade.raml.DataType._
 import eu.inn.facade.raml.Method._
+import eu.inn.hyperbus.transport.api.uri.Uri
 
 class RamlConfigParserTest extends FreeSpec with Matchers {
   val ramlConfig = readConfig
@@ -91,23 +92,20 @@ class RamlConfigParserTest extends FreeSpec with Matchers {
       val resourceStateContentType = Some("application/vnd+app-server-status.json")
       val resourceUpdateContentType = Some("application/vnd+app-server-status-update.json")
 
-      ramlConfig.requestDataStructure("/reliable-feed", POST, resourceStateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceStateBody)))
-      ramlConfig.requestDataStructure("/reliable-feed", POST, resourceUpdateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceUpdateBody)))
-      ramlConfig.requestDataStructure("/reliable-feed", POST, None) shouldBe Some(DataStructure(feedHeaders, Some(testRequestBody)))
+      ramlConfig.requestDataStructure("/reliable-feed/{content:*}", POST, resourceStateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceStateBody)))
+      ramlConfig.requestDataStructure("/reliable-feed/{content:*}", POST, resourceUpdateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceUpdateBody)))
+      ramlConfig.requestDataStructure("/reliable-feed/{content:*}", POST, None) shouldBe Some(DataStructure(feedHeaders, Some(testRequestBody)))
     }
 
     "request URI substitution" in {
-      val unreliableResourceUriGeneral = ramlConfig.resourceStateUri("/unreliable-feed")
-      unreliableResourceUriGeneral shouldBe "/unreliable-feed/resource"
+      val unreliableResourceUriGeneral = ramlConfig.resourceUri("/unreliable-feed/someContent")
+      unreliableResourceUriGeneral shouldBe Uri("/unreliable-feed/{content}", Map("content" → "someContent"))
 
-      val unreliableFeedUri = ramlConfig.resourceFeedUri("/unreliable-feed")
-      unreliableFeedUri shouldBe "/unreliable-feed/{content}/events"
+      val unreliableResourceUriGeneral1 = ramlConfig.resourceUri("/unreliable-feed/someContent/someDetails")
+      unreliableResourceUriGeneral1 shouldBe Uri("/unreliable-feed/someContent/someDetails")
 
-      val reliableResourceUriGeneral = ramlConfig.resourceStateUri("/reliable-feed")
-      reliableResourceUriGeneral shouldBe "/reliable-feed/resource"
-
-      val reliableFeedUri = ramlConfig.resourceFeedUri("/reliable-feed")
-      reliableFeedUri shouldBe "/reliable-feed/{content}/events"
+      val reliableResourceUriGeneral = ramlConfig.resourceUri("/reliable-feed/someContent/someDetails")
+      reliableResourceUriGeneral shouldBe Uri("/reliable-feed/{content:*}", Map("content" → "someContent/someDetails"))
     }
   }
 }

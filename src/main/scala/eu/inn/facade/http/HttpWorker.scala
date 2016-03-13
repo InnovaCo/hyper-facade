@@ -1,14 +1,16 @@
 package eu.inn.facade.http
 
 import akka.actor.ActorSystem
-import eu.inn.binders.dynamic.Null
 import eu.inn.binders.json._
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.filter.model.{DynamicRequestHeaders, Headers}
+import eu.inn.facade.filter.model.TransitionalHeaders
+import eu.inn.facade.filter.model.Headers._
 import eu.inn.facade.raml.RamlConfig
-import eu.inn.hyperbus.model.standard.{DynamicGet, EmptyBody}
-import eu.inn.hyperbus.model.{DynamicBody, Response}
-import eu.inn.hyperbus.{HyperBus, IdGenerator}
+import eu.inn.hyperbus.HyperBus
+import eu.inn.hyperbus.model._
+import eu.inn.hyperbus.model.Header._
+import eu.inn.hyperbus.serialization.StringDeserializer
+import eu.inn.hyperbus.transport.api
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
 import spray.http.ContentTypes._
@@ -29,60 +31,87 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
   implicit val executionContext = inject[ExecutionContext]
 
   val restRoutes = new RestRoutes {
-    val anyMethod = get | put | post | head | patch | delete | options
     val request = extract(_.request)
-
-    val routes: Route =
-      anyMethod {
-        (request & requestUri) { (request, uri) ⇒
-          onSuccess(processRequest(request, uri)) { response ⇒
-            complete(response)
-          }
+    val routes: Route = request { (request) ⇒
+        onSuccess(processRequest(request)) { response ⇒
+          complete(response)
         }
       }
   }
 
-  def processRequest(request: HttpRequest, uri: Uri): Future[HttpResponse] = {
-    val resourceUri = ramlConfig.resourceStateUri(uri.path.toString())
+  def processRequest(request: HttpRequest): Future[HttpResponse] = {
+    val resourceUri = ramlConfig.resourceUri(request.uri.path.toString)
     val responsePromise = Promise[HttpResponse]()
     filterIn(request, resourceUri) map {
-      case (headers, body) ⇒
-        if (headers.hasStatusCode) responsePromise.complete(Success(RequestMapper.toHttpResponse(headers, body)))
+      case (filteredHeaders, filteredBody) ⇒
+        if (filteredHeaders.hasStatusCode) responsePromise.complete(Success(RequestMapper.toHttpResponse(filteredHeaders, filteredBody)))
         else {
-          val responseFuture = hyperBus <~ DynamicGet(resourceUri, DynamicBody(EmptyBody.contentType, Null)) flatMap {
+          val filteredRequest = RequestMapper.toDynamicRequest(filteredHeaders, filteredBody)
+          val responseFuture = hyperBus <~ filteredRequest flatMap {
             case response: Response[DynamicBody] ⇒ filterOut(response, resourceUri, request.method.name)
           } map {
-            case (headers: Headers, body: DynamicBody) ⇒
+            case (headers: TransitionalHeaders, body: DynamicBody) ⇒
               val intStatusCode = headers.statusCode.getOrElse(200)
               val statusCode = StatusCode.int2StatusCode(intStatusCode)
               HttpResponse(statusCode, HttpEntity(`application/json`, body.content.toJson))
           } recover {
-            case t: Throwable ⇒
-              exceptionToHttpResponse(t)
+            case t: Throwable ⇒ RequestMapper.exceptionToHttpResponse(t)
           }
           responsePromise.completeWith(responseFuture)
         }
     }
     responsePromise.future
+
   }
 
-  def filterIn(request: HttpRequest, uri: String): Future[(Headers, DynamicBody)] = {
-    val dynamicRequest = RequestMapper.toDynamicRequest(request)
-    val (headers, dynamicBody) = RequestMapper.unfold(dynamicRequest)
-    val contentType = headers.headers.get(DynamicRequestHeaders.CONTENT_TYPE)
-    filterChainComposer.inputFilterChain(uri, request.method.name, contentType).applyFilters(headers, dynamicBody)
+  def filterIn(request: HttpRequest, uri: api.uri.Uri): Future[(TransitionalHeaders, DynamicBody)] = {
+    val (body, headers) = request.method match {
+      case HttpMethods.GET ⇒
+        (QueryBody.fromQueryString(request.uri.query.toMap),
+          TransitionalHeaders(uri, Headers(Header.METHOD → Seq(Method.GET)), None))
+      case HttpMethods.DELETE ⇒
+        (EmptyBody,
+          TransitionalHeaders(uri, Headers(Header.METHOD → Seq(Method.DELETE)), None))
+      case _ ⇒
+        (StringDeserializer.dynamicBody(Some(request.entity.asString)),
+          updateRequestContentType(
+            TransitionalHeaders(uri, Headers(Header.METHOD → Seq(request.method.toString.toLowerCase)), None)
+          ))
+    }
+
+    val contentType = headers.headerOption(CONTENT_TYPE)
+    filterChainComposer.inputFilterChain(uri, request.method.name, contentType).applyFilters(headers, body)
   }
 
-  def filterOut(response: Response[DynamicBody], uri: String, method: String): Future[(Headers, DynamicBody)] = {
-    val statusCode = response.status
+  def filterOut(response: Response[DynamicBody], uri: api.uri.Uri, method: String): Future[(TransitionalHeaders, DynamicBody)] = {
     val body = response.body
-    filterChainComposer.outputFilterChain(uri, method).applyFilters(Headers(Map(), Some(statusCode)), body)
+    val headers = updateResponseContentType(response, uri)
+    filterChainComposer.outputFilterChain(uri, method).applyFilters(headers, body)
   }
 
-  private def exceptionToHttpResponse(t: Throwable): HttpResponse = {
-    val errorId = IdGenerator.create()
-    log.error("Can't handle request. #" + errorId, t)
-    HttpResponse(StatusCodes.InternalServerError, t.toString + " #" + errorId)
+  def updateRequestContentType(headers: TransitionalHeaders): TransitionalHeaders = {
+    val newContentType = headers.headerOption(CONTENT_TYPE) match {
+      case contentType @ (Some(COMMON_CONTENT_TYPE) | None) ⇒ None
+      case contentType @ Some(value) if (value.startsWith(CERTAIN_CONTENT_TYPE_START) && value.endsWith(CERTAIN_CONTENT_TYPE_END)) ⇒
+        val beginIndex = CERTAIN_CONTENT_TYPE_START.size
+        val endIndex = value.size - CERTAIN_CONTENT_TYPE_END.size
+        Some(value.substring(beginIndex, endIndex))
+      case _ ⇒ None
+    }
+    val headersMap = newContentType match {
+      case Some(contentType) ⇒ headers.headers + (CONTENT_TYPE → Seq(contentType))
+      case None ⇒ headers.headers - CONTENT_TYPE
+    }
+    TransitionalHeaders(headers.uri, headersMap, headers.statusCode)
+  }
+
+  def updateResponseContentType(response: Response[DynamicBody], uri: api.uri.Uri): TransitionalHeaders = {
+    val newContentType = response.headerOption(CONTENT_TYPE) match {
+      case Some(contentType) ⇒ CERTAIN_CONTENT_TYPE_START + contentType + CERTAIN_CONTENT_TYPE_END
+      case None ⇒ COMMON_CONTENT_TYPE
+    }
+    val headers = response.headers + (CONTENT_TYPE → Seq(newContentType))
+    TransitionalHeaders(uri, headers, Some(response.status))
   }
 }
 

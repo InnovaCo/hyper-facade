@@ -12,12 +12,13 @@ import scala.collection.JavaConversions._
 class RamlConfigParser(val api: Api) {
 
   def parseRaml: RamlConfig = {
-    val resourcesByUrl = api.resources()
-      .foldLeft(Map[String, ResourceConfig]()) { (accumulator, resource) ⇒
+    val (resourcesByUri, uris) = api.resources()
+      .foldLeft((Map.newBuilder[String, ResourceConfig], Seq.newBuilder[String])) { (accumulator, resource) ⇒
+        val (resourceMap, uris) = accumulator
         val currentRelativeUri = resource.relativeUri().value()
-        accumulator ++ parseResource(currentRelativeUri, resource)
+        (resourceMap ++= parseResource(currentRelativeUri, resource), uris += currentRelativeUri)
       }
-    new RamlConfig(resourcesByUrl)
+    new RamlConfig(resourcesByUri.result(), uris.result())
   }
 
   private def parseResource(currentUri: String, resource: Resource): Map[String, ResourceConfig] = {
@@ -26,27 +27,29 @@ class RamlConfigParser(val api: Api) {
     val responses = extractResourceResponses(resource)
     val resourceConfig = ResourceConfig(traits, requests, responses)
 
-    resource.resources().foldLeft(Map(currentUri → resourceConfig)) { (configuration, resource) ⇒
+    val configuration = Map.newBuilder[String, ResourceConfig]
+    configuration += (currentUri → resourceConfig)
+    resource.resources().foldLeft(configuration) { (configuration, resource) ⇒
       val childResourceRelativeUri = resource.relativeUri().value()
-      configuration ++ parseResource(currentUri + childResourceRelativeUri, resource)
-    }
+      configuration ++= parseResource(currentUri + childResourceRelativeUri, resource)
+    }.result()
   }
 
   private def extractResourceRequests(resource: Resource): Requests = {
-    val acc = Map[(Method, Option[ContentType]), DataStructure]()
+    val acc = Map.newBuilder[(Method, Option[ContentType]), DataStructure]
     val requestsByMethodAndType = resource.methods.foldLeft(acc) { (requestMap, ramlMethod) ⇒
       val method = Method(ramlMethod.method())
       val dataTypes: Map[Option[ContentType], DataStructure] = extractTypeDefinitions(RamlRequestResponseWrapper(ramlMethod))
       dataTypes.foldLeft(requestMap) { (requestMap, mapEntry) ⇒
         val (contentType, dataStructure) = mapEntry
-        requestMap + ((method, contentType) → dataStructure)
+        requestMap += ((method, contentType) → dataStructure)
       }
-    }
+    }.result()
     Requests(requestsByMethodAndType)
   }
 
   private def extractResourceResponses(resource: Resource): Responses = {
-    val acc = Map[(Method, Int), DataStructure]()
+    val acc = Map.newBuilder[(Method, Int), DataStructure]
     val responsesByMethod = resource.methods.foldLeft(acc) { (responseMap, ramlMethod) ⇒
       val method = Method(ramlMethod.method())
       ramlMethod.responses.foldLeft(responseMap) { (responseMap, ramlResponse) ⇒
@@ -54,19 +57,19 @@ class RamlConfigParser(val api: Api) {
         val dataTypesMap: Map[Option[ContentType], DataStructure] = extractTypeDefinitions(RamlRequestResponseWrapper(ramlResponse))
         dataTypesMap.foldLeft(responseMap) { (responseMap, mapEntry) ⇒
           val dataStructure = mapEntry._2
-          responseMap + ((method, statusCode) → dataStructure)
+          responseMap += ((method, statusCode) → dataStructure)
         }
       }
-    }
+    }.result()
     Responses(responsesByMethod)
   }
 
   private def extractTypeDefinitions(ramlReqRspWrapper: RamlRequestResponseWrapper): Map[Option[ContentType], DataStructure] = {
-    val headers = ramlReqRspWrapper.headers.foldLeft(Seq[Header]()) { (headerList, ramlHeader) ⇒
-      headerList :+ Header(ramlHeader.name())
-    }
+    val headers = ramlReqRspWrapper.headers.foldLeft(Seq.newBuilder[Header]) { (headerList, ramlHeader) ⇒
+      headerList += Header(ramlHeader.name())
+    }.result()
     val typeNames: Map[Option[String], Option[String]] = getTypeNamesByContentType(ramlReqRspWrapper)
-    typeNames.foldLeft(Map[Option[ContentType], DataStructure]()) { (typeDefinitions, typeDefinition) ⇒
+    typeNames.foldLeft(Map.newBuilder[Option[ContentType], DataStructure]) { (typeDefinitions, typeDefinition) ⇒
       val (contentTypeName, typeName) = typeDefinition
       val contentType: Option[ContentType] = contentTypeName match {
         case Some(name) ⇒ Some(ContentType(name))
@@ -75,13 +78,12 @@ class RamlConfigParser(val api: Api) {
       val dataStructure = typeName match {
         case Some(name) ⇒ getTypeDefinition(name) match {
           case Some(typeDefinition) ⇒
-            val fields = typeDefinition.asInstanceOf[ObjectFieldImpl].properties().foldLeft(Seq[Field] ()) {
-              (fieldList, ramlField) ⇒
+            val fields = typeDefinition.asInstanceOf[ObjectFieldImpl].properties().foldLeft(Seq.newBuilder[Field]) { (fieldList, ramlField) ⇒
                 val fieldName = ramlField.name
                 val fieldType = ramlField.`type`.get(0)
                 val field = Field(fieldName, DataType(fieldType, Seq(), extractAnnotations(ramlField)))
-                fieldList :+ field
-            }
+                fieldList += field
+            }.result()
             val body = Body(DataType(name, fields, Seq()))
             val dataType = DataStructure(headers, Some(body))
             dataType
@@ -90,8 +92,8 @@ class RamlConfigParser(val api: Api) {
 
         case None ⇒ DataStructure(headers, Some(Body(DataType())))
       }
-      typeDefinitions + (contentType → dataStructure)
-    }
+      typeDefinitions += (contentType → dataStructure)
+    }.result()
   }
 
   private def getTypeNamesByContentType(ramlReqRspWrapper: RamlRequestResponseWrapper): Map[Option[String], Option[String]] = {
@@ -99,12 +101,12 @@ class RamlConfigParser(val api: Api) {
       || ramlReqRspWrapper.body.get(0).`type`.isEmpty)
       Map(None → None)
     else {
-      ramlReqRspWrapper.body.foldLeft(Map[Option[String], Option[String]]()) { (typeNames, body) ⇒
+      ramlReqRspWrapper.body.foldLeft(Map.newBuilder[Option[String], Option[String]]) { (typeNames, body) ⇒
         val contentType = if (body.name == null || body.name == "body" || body.name.equalsIgnoreCase("none")) None else Some(body.name)
         val typeName = body.`type`.get(0)
-        typeNames + (contentType → Option(typeName))
+        typeNames += (contentType → Option(typeName))
       }
-    }
+    }.result()
   }
 
   private def getTypeDefinition(typeName: String): Option[DataElement] = {
@@ -119,37 +121,27 @@ class RamlConfigParser(val api: Api) {
   }
 
   private def extractAnnotations(ramlField: DataElement): Seq[Annotation] = {
-    ramlField.annotations.foldLeft(Seq[Annotation]()) { (annotations, annotation) ⇒
-      annotations :+ Annotation(annotation.value.getRAMLValueName)
-    }
+    ramlField.annotations.foldLeft(Seq.newBuilder[Annotation]) { (annotations, annotation) ⇒
+      annotations += Annotation(annotation.value.getRAMLValueName)
+    }.result()
   }
 
   private def extractResourceTraits(resource: Resource): Traits = {
     val commonResourceTraits = extractTraits(resource.is())
-    val methodSpecificTraits = resource.methods().foldLeft(Map[Method, Seq[Trait]]()) { (specificTraits, ramlMethod) ⇒
+    val methodSpecificTraits = resource.methods().foldLeft(Map.newBuilder[Method, Seq[Trait]]) { (specificTraits, ramlMethod) ⇒
       val method = Method(ramlMethod.method)
       val methodTraits = extractTraits(ramlMethod.is())
-      specificTraits + (method → (methodTraits ++ commonResourceTraits))
-    }
+      specificTraits += (method → (methodTraits ++ commonResourceTraits))
+    }.result()
     Traits(commonResourceTraits, methodSpecificTraits)
   }
 
   private def extractTraits(traits: java.util.List[TraitRef]): Seq[Trait] = {
-    traits.foldLeft(Seq[Trait]()) {
+    traits.foldLeft(Seq.newBuilder[Trait]) {
       (accumulator, traitRef) ⇒
         val traitName = traitRef.value.getRAMLValueName
-        if (Trait.hasMappedUri(traitName)) {
-          val traitInstance = traitRef.value
-          val traitClass = traitInstance.getClass
-          val resourceStateURI: String = traitClass.getDeclaredField(Trait.RESOURCE_STATE_URI).get(traitInstance).asInstanceOf[String]
-          var parameters = Map(Trait.RESOURCE_STATE_URI → resourceStateURI)
-          if (Trait.isFeed(traitName)) {
-            val eventFeedURI: String = traitClass.getDeclaredField(Trait.EVENT_FEED_URI).get(traitInstance).asInstanceOf[String]
-            parameters += Trait.EVENT_FEED_URI → eventFeedURI
-          }
-          accumulator :+ Trait(traitName, parameters)
-        } else accumulator :+ Trait(traitName)
-    }
+        accumulator += Trait(traitName)
+    }.result()
   }
 }
 
