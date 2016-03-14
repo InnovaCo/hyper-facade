@@ -1,11 +1,13 @@
 package eu.inn.facade.filter.chain
 
+import eu.inn.hyperbus.transport.api.uri.Uri
+
 class FilterChainStubFactory extends FilterChainFactory {
-  override def inputFilterChain(url: String, method: String, contentType: Option[String]): FilterChain = {
+  override def inputFilterChain(uri: Uri, method: String, contentType: Option[String]): FilterChain = {
     FilterChain(Seq())
   }
 
-  override def outputFilterChain(url: String, method: String): FilterChain = {
+  override def outputFilterChain(uri: Uri, method: String): FilterChain = {
     FilterChain(Seq())
   }
 }

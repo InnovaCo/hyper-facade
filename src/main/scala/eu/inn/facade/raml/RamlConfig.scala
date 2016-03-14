@@ -1,5 +1,6 @@
 package eu.inn.facade.raml
 
+import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.transport.api.uri._
 
 class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
@@ -41,8 +42,8 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
     }
   }
 
-  def responseDataStructures(uriPattern: String, method: String): Seq[DataStructure] = {
-    resourcesByUri.get(uriPattern) match {
+  def responseDataStructures(uri: api.uri.Uri, method: String): Seq[DataStructure] = {
+    resourcesByUri.get(uri.pattern.specific) match {
       case Some(resourceConfig) ⇒
         resourceConfig.responses.dataStructures.foldLeft(Seq.newBuilder[DataStructure]) { (structuresByMethod, kv) ⇒
           val (httpMethod, _) = kv._1
