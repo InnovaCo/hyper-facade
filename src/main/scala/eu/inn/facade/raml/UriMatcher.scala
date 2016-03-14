@@ -8,8 +8,8 @@ object UriMatcher {
 
   /**
     * Matches URI pattern from RAML configuration with request URI
-    * @param pattern
-    * @param uri
+    * @param pattern - URI pattern from RAML configuration
+    * @param uri - request URI
     * @return if request URI matches pattern then Some of constructed URI with parameters will be returned, None otherwise
     */
   def matchUri(pattern: String, uri: Uri): Option[Uri] = {
@@ -32,9 +32,10 @@ object UriMatcher {
             matchesCorrectly = patternTokenIter.hasNext == reqUriTokenIter.hasNext
         }
 
-        case patternToken @ ParameterToken(paramName, PathMatchType) ⇒ reqUriToken match {
-          case requestUriToken @ TextToken(value) ⇒ args += paramName → foldUriTail(value, reqUriTokenIter)
-        }
+        case patternToken @ ParameterToken(paramName, PathMatchType) ⇒
+          reqUriToken match {
+            case requestUriToken @ TextToken(value) ⇒ args += paramName → foldUriTail(value, reqUriTokenIter)
+          }
       }
     }
     if (!matchesCorrectly) None
@@ -43,8 +44,8 @@ object UriMatcher {
 
   /**
     * It's like toString for iterator of URI tokens
-    * @param uriTail
-    * @param tokenIter
+    * @param uriTail - string of merged URI tokens
+    * @param tokenIter - remaining tokens
     * @return
     */
   @tailrec private def foldUriTail(uriTail: String, tokenIter: Iterator[Token]): String = {

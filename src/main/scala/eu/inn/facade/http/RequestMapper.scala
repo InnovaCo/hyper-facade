@@ -100,8 +100,8 @@ object RequestMapper {
     log.error("Can't handle request. #" + errorId, t)
     t match {
       case noRoute: NoTransportRouteException ⇒ model.NotFound(ErrorBody("not_found", Some("Resource wasn't found"), errorId = errorId))
-      case hbEx: HyperBusServerException[ErrorBody] ⇒ hbEx
-      case t: Throwable ⇒ model.InternalServerError(ErrorBody("unhandled_exception", Some(t.getMessage + " #"+errorId), errorId = errorId))
+      case hbEx: HyperBusException[ErrorBody] ⇒ hbEx
+      case t: Throwable ⇒ model.InternalServerError(ErrorBody("internal_server_error", Some(s"Unhandled error #$errorId"), errorId = errorId))
     }
   }
 
@@ -109,9 +109,9 @@ object RequestMapper {
     val errorId = IdGenerator.create()
     log.error("Can't handle request. #" + errorId, t)
     t match {
-      case noRoute: NoTransportRouteException ⇒ HttpResponse(StatusCodes.NotFound, "Resource wasn't found")
-      case hbEx: HyperBusServerException[ErrorBody] ⇒ HttpResponse(StatusCodes.getForKey(hbEx.status).get, hbEx.body.content.asString)
-      case t: Throwable ⇒ HttpResponse(StatusCodes.InternalServerError, t.toString + " #" + errorId)
+      case noRoute: NoTransportRouteException ⇒ HttpResponse(StatusCodes.NotFound, "Resource not found")
+      case hbEx: HyperBusException[ErrorBody] ⇒ HttpResponse(StatusCodes.getForKey(hbEx.status).get, hbEx.body.content.asString)
+      case t: Throwable ⇒ HttpResponse(StatusCodes.InternalServerError, s"Unhandled error #$errorId")
     }
   }
 

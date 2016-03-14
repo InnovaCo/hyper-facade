@@ -101,8 +101,11 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       client ! Connect() // init websocket connection
 
+      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific("subscribe"))),
-        Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))))
+        Ok(DynamicBody(Obj(Map("content" → Text("fullResource")))))) onSuccess {
+        case subscr ⇒ onCommandSubscription = Some(subscr)
+      }
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
         client ! DynamicRequest(
@@ -122,6 +125,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           val resourceState = resourceStateMessage.get.payload.utf8String
           resourceState should startWith( """{"response":{"status":200,"headers":{"messageId":""")
           resourceState should endWith( """body":{"content":"fullResource"}}""")
+          onCommandSubscription foreach testService.unsubscribe
         } else fail("Full resource state wasn't sent to the client")
       }
 

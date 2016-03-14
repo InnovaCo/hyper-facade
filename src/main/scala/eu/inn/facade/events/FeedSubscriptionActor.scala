@@ -103,7 +103,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
   def fetchResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit = {
     val feedStateSnapshot = feedState.get
-    val updatedRequest = DynamicRequest(ramlConfig.resourceUri(request.uri.pattern.specific), request.body, request.headers)
+    val updatedRequest = DynamicRequest(request.uri, request.body, request.headers)
     hyperBus <~ updatedRequest flatMap {
       case response: Response[DynamicBody] ⇒ filterResponse(updatedRequest, response)
     } map {
