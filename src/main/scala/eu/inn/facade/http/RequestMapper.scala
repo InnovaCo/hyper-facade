@@ -5,7 +5,7 @@ import java.io.ByteArrayOutputStream
 import akka.util.ByteString
 import eu.inn.binders.dynamic.{Null, Obj, Text}
 import eu.inn.binders.json._
-import eu.inn.facade.filter.model.Headers._
+import eu.inn.facade.filter.model.FacadeHeaders._
 import eu.inn.facade.filter.model.TransitionalHeaders
 import eu.inn.hyperbus._
 import eu.inn.hyperbus.model._

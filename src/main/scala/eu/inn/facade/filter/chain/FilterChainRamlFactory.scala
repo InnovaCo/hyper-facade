@@ -23,8 +23,12 @@ class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory 
 
   override def outputFilterChain(uri: Uri, method: String): FilterChain = {
     val dataStructures: Seq[DataStructure] = ramlConfig.responseDataStructures(uri, method)
-    val outputFilters = filters(uri, method, dataStructures).filter(_.isOutputFilter)
+    val outputFilters = filters(uri, method, dataStructures).filter(_.isOutputFilter) ++ defaultOutputFilters
     FilterChain(outputFilters)
+  }
+
+  def defaultOutputFilters: Seq[Filter] = {
+    inject[Seq[Filter]]("revisionHeaders")
   }
 
   private def filters(uri: Uri, method: String, dataStructures: Seq[DataStructure]): Seq[Filter] = {

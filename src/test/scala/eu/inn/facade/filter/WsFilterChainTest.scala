@@ -7,7 +7,7 @@ import akka.io.IO
 import akka.pattern.ask
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.filter.model.Headers._
+import eu.inn.facade.filter.model.FacadeHeaders._
 import eu.inn.facade.filter.model.{InputFilter, OutputFilter, TransitionalHeaders}
 import eu.inn.facade.http.RequestMapper._
 import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}

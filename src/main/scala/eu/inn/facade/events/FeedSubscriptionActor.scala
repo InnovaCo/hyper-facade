@@ -7,6 +7,7 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.pipe
 import com.typesafe.config.Config
 import eu.inn.facade.filter.chain.FilterChainFactory
+import eu.inn.facade.filter.model
 import eu.inn.facade.filter.model.TransitionalHeaders
 import eu.inn.facade.http.RequestMapper
 import eu.inn.facade.raml.{Method, RamlConfig}
@@ -109,7 +110,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     } map {
       case (headers: TransitionalHeaders, dynamicBody: DynamicBody) ⇒
         val response = RequestMapper.toDynamicResponse(headers, dynamicBody)
-        headers.headerOption(Header.REVISION) match {
+        headers.headerOption(model.FacadeHeaders.CLIENT_REVISION_ID) match {
           case Some(revisionIdStr) ⇒
             val revisionId = revisionIdStr.toLong
             val resourceStateFetched = true

@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import eu.inn.binders.json._
 import eu.inn.facade.filter.chain.FilterChainFactory
 import eu.inn.facade.filter.model.TransitionalHeaders
-import eu.inn.facade.filter.model.Headers._
+import eu.inn.facade.filter.model.FacadeHeaders._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._

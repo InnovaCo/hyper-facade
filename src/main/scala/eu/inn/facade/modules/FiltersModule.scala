@@ -1,12 +1,11 @@
 package eu.inn.facade.modules
 
-import com.typesafe.config.Config
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.filter._
 import eu.inn.facade.filter.chain.{FilterChainFactory, FilterChainRamlFactory}
 import eu.inn.facade.filter.model.{Filter, InputFilter, OutputFilter}
 import eu.inn.facade.raml.RamlConfig
-import scaldi.{OpenInjectable, Module}
+import scaldi.Module
 
 import scala.collection.JavaConversions._
 
@@ -17,6 +16,7 @@ class FiltersModule extends Module {
                                                                                        new PrivateFieldsFilter(inject [RamlConfig] ) with OutputFilter)
   bind [Seq[Filter]]        identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilter(inject [RamlConfig] ) with InputFilter,
                                                                                        new EnrichmentFilter(inject [RamlConfig] ) with OutputFilter)
+  bind [Seq[Filter]]        identifiedBy "revisionHeaders"                      to Seq(new RevisionHeadersFilter)
   bind [FilterChainFactory] identifiedBy 'ramlFilterChain                       to new FilterChainRamlFactory
   initOuterBindings()
 

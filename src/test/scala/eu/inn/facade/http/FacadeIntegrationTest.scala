@@ -5,6 +5,8 @@ import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, Tim
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.Config
 import eu.inn.binders.dynamic.{Null, Obj, Text}
+import eu.inn.facade.filter.model
+import eu.inn.facade.filter.model.FacadeHeaders
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
 import eu.inn.hyperbus.HyperBus
@@ -297,7 +299,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          val referenceState = """{"response":{"status":200,"headers":{"revision":["1"],"messageId":["messageId"],"correlationId":["correlationId"]}},"body":{"content":"fullResource"}}"""
+          val referenceState = """{"response":{"status":200,"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"hyperbus-revision":["1"]}},"body":{"content":"fullResource"}}"""
           resourceState shouldBe referenceState
         } else fail("Full resource state wasn't sent to the client")
       }
@@ -305,9 +307,15 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       whenReady(queuedEventPromise.future, Timeout(Span(15, Seconds))) { b ⇒
         val queuedEventMessage = clientMessageQueue.get(1)
         if (queuedEventMessage.isDefined) {
-          val dynEvent = RequestMapper.toDynamicRequest(queuedEventMessage.get)
-          val queuedEvent = ReliableFeedTestRequest(FeedTestBody(dynEvent.body.content.content[String]), Headers.plain(eventRev2.headers))
-          queuedEvent shouldBe eventRev2
+          val receivedEvent = RequestMapper.toDynamicRequest(queuedEventMessage.get)
+          val queuedEvent = DynamicRequest(Uri("/test-service/reliable"),
+            DynamicBody(Obj(Map("content" → Text("haha")))),
+            Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
+              FacadeHeaders.CLIENT_REVISION_ID → Seq("2"),
+              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+              Header.MESSAGE_ID → Seq("messageId"),
+              Header.CORRELATION_ID → Seq("correlationId"))))
+          receivedEvent.toString shouldBe queuedEvent.toString
         } else fail("Queued event wasn't sent to the client")
 
         testService.publish(eventRev3)
@@ -316,9 +324,15 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       whenReady(publishedEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val directEventMessage = clientMessageQueue.get(2)
         if (directEventMessage.isDefined) {
-          val dynEvent = RequestMapper.toDynamicRequest(directEventMessage.get)
-          val directEvent = ReliableFeedTestRequest(FeedTestBody(dynEvent.body.content.content[String]), Headers.plain(eventRev3.headers))
-          directEvent shouldBe eventRev3
+          val receivedEvent = RequestMapper.toDynamicRequest(directEventMessage.get)
+          val directEvent = DynamicRequest(Uri("/test-service/reliable"),
+            DynamicBody(Obj(Map("content" → Text("haha")))),
+            Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
+              FacadeHeaders.CLIENT_REVISION_ID → Seq("3"),
+              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+              Header.MESSAGE_ID → Seq("messageId"),
+              Header.CORRELATION_ID → Seq("correlationId"))))
+          receivedEvent.toString shouldBe directEvent.toString
         } else fail("Last event wasn't sent to the client")
 
         testService.unsubscribe(hbSubscription.get)
@@ -332,7 +346,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceUpdatedStateMessage = clientMessageQueue.get(3)
         if (resourceUpdatedStateMessage.isDefined) {
           val resourceUpdatedState = resourceUpdatedStateMessage.get.payload.utf8String
-          val referenceState = """{"response":{"status":200,"headers":{"revision":["4"],"messageId":["messageId"],"correlationId":["correlationId"]}},"body":{"content":"fullResource"}}"""
+          val referenceState = """{"response":{"status":200,"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"hyperbus-revision":["4"]}},"body":{"content":"fullResource"}}"""
           resourceUpdatedState shouldBe referenceState
         } else fail("Full resource state wasn't sent to the client")
 
@@ -342,9 +356,15 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       whenReady(afterResubscriptionEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val directEventMessage = clientMessageQueue.get(4)
         if (directEventMessage.isDefined) {
-          val dynEvent = RequestMapper.toDynamicRequest(directEventMessage.get)
-          val directEvent = ReliableFeedTestRequest(FeedTestBody(dynEvent.body.content.content[String]), Headers.plain(eventGoodRev5.headers))
-          directEvent shouldBe eventGoodRev5
+          val receivedEvent = RequestMapper.toDynamicRequest(directEventMessage.get)
+          val directEvent = DynamicRequest(Uri("/test-service/reliable"),
+            DynamicBody(Obj(Map("content" → Text("haha")))),
+            Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
+              FacadeHeaders.CLIENT_REVISION_ID → Seq("5"),
+              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+              Header.MESSAGE_ID → Seq("messageId"),
+              Header.CORRELATION_ID → Seq("correlationId"))))
+          receivedEvent.toString shouldBe directEvent.toString
         } else fail("Last event wasn't sent to the client")
 
         client ! DynamicRequest(

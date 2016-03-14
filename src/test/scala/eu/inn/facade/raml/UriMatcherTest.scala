@@ -7,14 +7,14 @@ class UriMatcherTest extends FreeSpec with Matchers {
 
   "URI matcher" - {
     "match URI with pattern from RAML" in {
-      val unreliableResourceUri = UriMatcher.matchUri("/unreliable-feed/{content}", Uri("/unreliable-feed/someContent"))
-      unreliableResourceUri shouldBe Some(Uri("/unreliable-feed/{content}", Map("content" → "someContent")))
+      val parameterRegularMatch = UriMatcher.matchUri("/unreliable-feed/{content}", Uri("/unreliable-feed/someContent"))
+      parameterRegularMatch shouldBe Some(Uri("/unreliable-feed/{content}", Map("content" → "someContent")))
 
-      val reliableResourceUri = UriMatcher.matchUri("/reliable-feed/{content:*}", Uri("/reliable-feed/someContent/someDetails"))
-      reliableResourceUri shouldBe Some(Uri("/reliable-feed/{content:*}", Map("content" → "someContent/someDetails")))
+      val parameterLongPathMatch = UriMatcher.matchUri("/reliable-feed/{content:*}", Uri("/reliable-feed/someContent/someDetails"))
+      parameterLongPathMatch shouldBe Some(Uri("/reliable-feed/{content:*}", Map("content" → "someContent/someDetails")))
 
-      val revaultUri = UriMatcher.matchUri("/revault/content/{path:*}", Uri("/revault/content/abc"))
-      revaultUri shouldBe Some(Uri("/revault/content/{path:*}", Map("path" → "abc")))
+      val parameterShortPathMatch = UriMatcher.matchUri("/revault/content/{path:*}", Uri("/revault/content/abc"))
+      parameterShortPathMatch shouldBe Some(Uri("/revault/content/{path:*}", Map("path" → "abc")))
     }
   }
 }
