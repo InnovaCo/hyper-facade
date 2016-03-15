@@ -1,7 +1,7 @@
 package eu.inn.facade.http
 
 import akka.actor.ActorRef
-import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.filter.chain.{InputFilterChain, OutputFilterChain, InputFilterChain$}
 import eu.inn.facade.http.RequestMapper._
 import eu.inn.hyperbus.model.DynamicRequest
 import spray.can.websocket.frame.TextFrame
@@ -11,7 +11,7 @@ import spray.routing.HttpServiceActor
 
 import scala.util.Success
 
-abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker {
+abstract class WsTestWorker(val inputFilterChain: InputFilterChain, val outputFilterChain: OutputFilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 

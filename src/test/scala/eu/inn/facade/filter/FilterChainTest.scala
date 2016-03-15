@@ -1,7 +1,7 @@
 package eu.inn.facade.filter
 
 import eu.inn.binders.dynamic.Text
-import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.filter.chain.{OutputFilterChain, InputFilterChain, InputFilterChain$}
 import eu.inn.facade.model.{Filter, InputFilter, OutputFilter, TransitionalHeaders}
 import eu.inn.hyperbus.model.{DynamicBody, QueryBody}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -13,8 +13,8 @@ import scala.concurrent.Future
 import scala.util.{Failure, Success}
 
 class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
-  val inputFilterChain: FilterChain = new FilterChain(Seq(new TestInputFilter))
-  val outputFilterChain: FilterChain = new FilterChain(Seq(new TestOutputFilter))
+  val inputFilterChain: InputFilterChain = new InputFilterChain(Seq(new TestInputFilter))
+  val outputFilterChain: OutputFilterChain = new OutputFilterChain(Seq(new TestOutputFilter))
 
   class TestInputFilter extends InputFilter {
     override def apply(requestHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
@@ -23,14 +23,16 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     }
   }
 
-  class TestFailedFilter extends Filter {
+  class TestFailedInputFilter extends InputFilter {
     override def apply(requestHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
       throw new FilterNotPassedException(403, "Forbidden")
     }
+  }
 
-    override def isInputFilter: Boolean = true
-
-    override def isOutputFilter: Boolean = true
+  class TestFailedOutputFilter extends OutputFilter {
+    override def apply(requestHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
+      throw new FilterNotPassedException(403, "Forbidden")
+    }
   }
 
   class TestOutputFilter extends OutputFilter {
@@ -71,7 +73,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       val body = DynamicBody(Text("test body"))
       val requestHeaders = TransitionalHeaders(Uri("testUri"), Map[String, Seq[String]](), None)
 
-      val failedInputFilterChain = new FilterChain(Seq(new TestFailedFilter, new TestInputFilter))
+      val failedInputFilterChain = new InputFilterChain(Seq(new TestFailedInputFilter, new TestInputFilter))
       val filteringResult = failedInputFilterChain.applyFilters(requestHeaders, body)
       whenReady(filteringResult.failed) {
         case FilterNotPassedException(responseCode, message) ⇒
@@ -120,7 +122,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     val body = DynamicBody(Text("test body"))
     val requestHeaders = TransitionalHeaders(Uri("testUri"), Map[String, Seq[String]](), None)
 
-    val failedOutputFilterChain = new FilterChain(Seq(new TestFailedFilter, new TestOutputFilter))
+    val failedOutputFilterChain = new OutputFilterChain(Seq(new TestFailedOutputFilter, new TestOutputFilter))
     val filteringResult = failedOutputFilterChain.applyFilters(requestHeaders, body)
     whenReady(filteringResult.failed) {
       case FilterNotPassedException(responseCode, message) ⇒

@@ -1,6 +1,9 @@
 package eu.inn.facade.model
 
-trait InputFilter extends Filter {
+import eu.inn.hyperbus.model.DynamicBody
 
-  override def isInputFilter: Boolean = true
+import scala.concurrent.Future
+
+trait InputFilter extends Filter {
+  def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)]
 }

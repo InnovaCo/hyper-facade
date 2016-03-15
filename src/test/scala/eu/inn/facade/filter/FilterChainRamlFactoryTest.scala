@@ -26,16 +26,16 @@ class FilterChainRamlFactoryTest extends FreeSpec with Matchers with Injectable 
     "annotation based filter chain" in {
       val chain = filterChainFactory.inputFilterChain(Uri("/status/test-service"), "get", None)
 
-      val inputEnrichmentFilter = inject [Seq[Filter]]("x-client-ip").filter(_.isInputFilter)
+      val inputEnrichmentFilter = inject [Seq[Filter]]("x-client-ip")
       chain.filters shouldBe inputEnrichmentFilter
     }
 
     "trait and annotation based filter chain" in {
       val chain = filterChainFactory.outputFilterChain(Uri("/users"), "get")
 
-      val outputPrivateFieldFilter = inject [Seq[Filter]]("privateField").filter(_.isOutputFilter)
+      val outputPrivateFieldFilter = inject [Seq[Filter]]("privateField")
       val pagedOutputFilter = inject [Seq[Filter]]("paged")
-      val defaultOutputFilters = inject [Seq[Filter]]("revisionHeaders")
+      val defaultOutputFilters = inject [Seq[Filter]]("defaultOutputFilters")
       chain.filters shouldBe pagedOutputFilter ++ outputPrivateFieldFilter ++ defaultOutputFilters
     }
   }

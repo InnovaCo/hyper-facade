@@ -3,7 +3,7 @@ package eu.inn.facade.modules
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.filter._
 import eu.inn.facade.filter.chain.{FilterChainFactory, FilterChainRamlFactory}
-import eu.inn.facade.model.{Filter, InputFilter, OutputFilter}
+import eu.inn.facade.model.{OutputFilter, Filter}
 import eu.inn.facade.raml.RamlConfig
 import scaldi.Module
 
@@ -12,13 +12,10 @@ import scala.collection.JavaConversions._
 class FiltersModule extends Module {
 
   bind [Seq[Filter]]        identifiedBy "privateResource"                      to Seq(new PrivateResourceFilter)
-  bind [Seq[Filter]]        identifiedBy "privateField"                         to Seq(new PrivateFieldsFilter(inject [RamlConfig] ) with InputFilter,
-                                                                                       new PrivateFieldsFilter(inject [RamlConfig] ) with OutputFilter)
-  bind [Seq[Filter]]        identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilter(inject [RamlConfig] ) with InputFilter,
-                                                                                       new EnrichmentFilter(inject [RamlConfig] ) with OutputFilter)
-  bind [Seq[Filter]]        identifiedBy "revisionHeaders"                      to Seq(new RevisionHeadersFilter)
-  bind [Seq[Filter]]        identifiedBy "forward"                              to Seq(new ForwardFilter(inject [RamlConfig] ) with InputFilter,
-                                                                                       new ForwardFilter(inject [RamlConfig] ) with OutputFilter)
+  bind [Seq[Filter]]        identifiedBy "privateField"                         to Seq(new PrivateFieldsFilter(inject [RamlConfig]))
+  bind [Seq[Filter]]        identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilter(inject [RamlConfig] ))
+  bind [Seq[Filter]]        identifiedBy "forward"                              to Seq(new ForwardFilter(inject [RamlConfig] ))
+  bind [Seq[OutputFilter]]  identifiedBy "defaultOutputFilters"                 to Seq(new RevisionHeadersFilter)
   bind [FilterChainFactory] identifiedBy 'ramlFilterChain                       to new FilterChainRamlFactory
   initOuterBindings()
 

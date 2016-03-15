@@ -9,7 +9,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 import scala.concurrent.Future
 
-class PrivateFieldsFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
+class PrivateFieldsFilter(val ramlConfig: RamlConfig) extends RamlAwareOutputFilter {
 
   override def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
     Future {

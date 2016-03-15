@@ -9,7 +9,7 @@ import eu.inn.hyperbus.model.DynamicBody
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
+class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareInputFilter {
 
   override def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
     Future {

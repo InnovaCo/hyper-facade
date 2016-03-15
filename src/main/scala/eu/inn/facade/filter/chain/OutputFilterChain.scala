@@ -1,14 +1,13 @@
 package eu.inn.facade.filter.chain
 
-import eu.inn.facade.model.{Filter, TransitionalHeaders}
+import eu.inn.facade.model.{OutputFilter, TransitionalHeaders}
 import eu.inn.hyperbus.model.DynamicBody
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Future, Promise}
 import scala.language.postfixOps
 
-class FilterChain(val filters: Seq[Filter]) {
-
+class OutputFilterChain(val filters: Seq[OutputFilter]) {
   def applyFilters(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
     val accumulator: Future[(TransitionalHeaders, DynamicBody)] = Future {
       (headers, body)
@@ -28,12 +27,12 @@ class FilterChain(val filters: Seq[Filter]) {
   }
 }
 
-object FilterChain {
-  def apply(filters: Seq[Filter]) = {
-    new FilterChain(filters)
+object OutputFilterChain {
+  def apply(filters: Seq[OutputFilter]): OutputFilterChain = {
+    new OutputFilterChain(filters)
   }
 
-  def apply() = {
-    new FilterChain(Seq())
+  def apply(): OutputFilterChain = {
+    new OutputFilterChain(Seq.empty)
   }
 }
