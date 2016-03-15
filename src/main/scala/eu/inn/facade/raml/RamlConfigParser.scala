@@ -6,6 +6,7 @@ import com.mulesoft.raml1.java.parser.model.bodies.Response
 import com.mulesoft.raml1.java.parser.model.datamodel.DataElement
 import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
+import eu.inn.facade.raml.annotations.RamlAnnotation
 
 import scala.collection.JavaConversions._
 
@@ -122,7 +123,11 @@ class RamlConfigParser(val api: Api) {
 
   private def extractAnnotations(ramlField: DataElement): Seq[Annotation] = {
     ramlField.annotations.foldLeft(Seq.newBuilder[Annotation]) { (annotations, annotation) ⇒
-      annotations += Annotation(annotation.value.getRAMLValueName)
+      val value = annotation.value() match {
+        case x: RamlAnnotation ⇒ Some(x)
+        case _ ⇒ None
+      }
+      annotations += Annotation(annotation.value.getRAMLValueName, value)
     }.result()
   }
 

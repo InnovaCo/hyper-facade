@@ -26,7 +26,7 @@ class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
         structure.body match {
           case Some(httpBody) ⇒
             val fields = httpBody.dataType.fields
-            fields.filter(_.dataType.annotations.contains(Annotation(CLIENT_LANGUAGE)))
+            fields.filter(_.dataType.annotations.exists(_.name == CLIENT_LANGUAGE))
               .foreach { field ⇒
                 val clientLanguage = headers.headerOption("Accept-Language")
                 enrichedBody = clientLanguage match {
@@ -37,7 +37,7 @@ class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
                   case None ⇒ body
                 }
               }
-            fields.filter(_.dataType.annotations.contains(Annotation(CLIENT_IP)))
+            fields.filter(_.dataType.annotations.exists(_.name == CLIENT_IP))
               .foreach { field ⇒
                 val clientIp = headers.headerOption("http_x_forwarded_for")
                 enrichedBody = clientIp match {

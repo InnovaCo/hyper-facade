@@ -136,3 +136,13 @@ traits:
 /revault/content/{path:*}:
   uriParameters:
     path:*: string
+
+/test-rewrite/some-service
+  (forward):
+    uri: /revault/content/some-service
+
+/test-rewrite-method/some-service
+  get:
+  put:
+    (forward):
+      uri: /revault/content/some-service

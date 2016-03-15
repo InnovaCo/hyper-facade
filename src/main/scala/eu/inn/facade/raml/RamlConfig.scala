@@ -1,5 +1,6 @@
 package eu.inn.facade.raml
 
+import eu.inn.facade.raml.annotations.RamlAnnotation
 import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.transport.api.uri._
 
@@ -60,9 +61,7 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
     resourcesByUri.get(uriPattern) match {
       case Some(config) ⇒
         val traits = config.traits
-        traits.methodSpecificTraits
-          .getOrElse(Method(method), traits.commonTraits)
-
+        traits.methodSpecificTraits.getOrElse(Method(method), Seq.empty) ++ traits.commonTraits
       case None ⇒ Seq()
     }
   }
@@ -125,12 +124,15 @@ object DataType {
 case class Body(dataType: DataType)
 
 case class Field(name: String, dataType: DataType) {
-  def isPrivate: Boolean = dataType.annotations.contains(Annotation(Annotation.PRIVATE))
+  def isPrivate: Boolean = dataType.annotations.exists(_.name == Annotation.PRIVATE)
 }
 
-case class Annotation(name: String)
+case class Annotation(name: String, value: Option[RamlAnnotation])
+
 object Annotation {
   val PRIVATE = "privateField"
   val CLIENT_LANGUAGE = "x-client-language"
   val CLIENT_IP = "x-client-ip"
+
+  def apply(name: String): Annotation = Annotation(name, None)
 }

@@ -17,6 +17,8 @@ class FiltersModule extends Module {
   bind [Seq[Filter]]        identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilter(inject [RamlConfig] ) with InputFilter,
                                                                                        new EnrichmentFilter(inject [RamlConfig] ) with OutputFilter)
   bind [Seq[Filter]]        identifiedBy "revisionHeaders"                      to Seq(new RevisionHeadersFilter)
+  bind [Seq[Filter]]        identifiedBy "forward"                              to Seq(new ForwardFilter(inject [RamlConfig] ) with InputFilter,
+                                                                                       new ForwardFilter(inject [RamlConfig] ) with OutputFilter)
   bind [FilterChainFactory] identifiedBy 'ramlFilterChain                       to new FilterChainRamlFactory
   initOuterBindings()
 

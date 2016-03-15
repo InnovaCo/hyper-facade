@@ -11,6 +11,10 @@ types:
       properties:
         transactionId: string
         path: string
+traits:
+  forward:
+    queryParameters:
+      uri: string
 /revault/content/{path:*}:
   uriParameters:
     path:*: string
@@ -54,3 +58,11 @@ types:
         body:
           application/json:
             type: Transaction
+
+/test-rewrite/some-service:
+  is: [forward: {uri: /revault/content/some-service}]
+
+/test-rewrite-method/some-service:
+  get:
+  put:
+    is: [forward: {uri: /revault/content/some-service}]
