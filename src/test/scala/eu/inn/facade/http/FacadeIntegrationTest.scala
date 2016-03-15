@@ -86,6 +86,31 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       onCommandSubscription foreach testService.unsubscribe
     }
 
+    "http get. Error response" in {
+      var onCommandSubscription: Option[Subscription] = None
+      testService.onCommand(RequestMatcher(Some(Uri("/failedResource")), Map(Header.METHOD → Specific(Method.GET))),
+        ServiceUnavailable(ErrorBody("Service is unavailable", Some("No connection to DB")))) onSuccess {
+        case subscr ⇒ onCommandSubscription = Some(subscr)
+      }
+
+      val clientActorSystem = ActorSystem()
+      val pipeline: HttpRequest => Future[HttpResponse] = sendReceive(clientActorSystem, ExecutionContext.fromExecutor(newPoolExecutor()))
+      val uri404 = "http://localhost:54321/test-service/reliable"
+      val responseFuture404 = pipeline(Get(http.Uri(uri404)))
+      whenReady(responseFuture404, Timeout(Span(5, Seconds))) { response ⇒
+        response.entity.asString shouldBe """Resource not found"""
+      }
+
+      val uri503 = "http://localhost:54321/failedResource"
+      val responseFuture503 = pipeline(Get(http.Uri(uri503)))
+      whenReady(responseFuture503, Timeout(Span(5, Seconds))) { response ⇒
+        response.entity.asString should startWith ("""{"code":"Service is unavailable","description":"No connection to DB","errorId":""")
+
+        onCommandSubscription foreach testService.unsubscribe
+        Await.result(clientActorSystem.terminate(), Duration.Inf)
+      }
+    }
+
     "http get reliable resource. Check hyperbus-revision" in {
       var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
@@ -94,7 +119,6 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       }
 
       val clientActorSystem = ActorSystem()
-      println(clientActorSystem == actorSystem)
       val pipeline: HttpRequest => Future[HttpResponse] = sendReceive(clientActorSystem, ExecutionContext.fromExecutor(newPoolExecutor()))
       val uri = "http://localhost:54321/test-service/reliable"
       val responseFuture = pipeline(Get(http.Uri(uri)))
@@ -164,8 +188,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState should startWith( """{"response":{"status":200,"headers":{"messageId":""")
-          resourceState should endWith( """body":{"content":"fullResource"}}""")
+          resourceState should startWith ("""{"response":{"status":200,"headers":{"messageId":""")
+          resourceState should endWith ("""body":{"content":"fullResource"}}""")
           onCommandSubscription foreach testService.unsubscribe
         } else fail("Full resource state wasn't sent to the client")
       }
@@ -243,8 +267,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState should startWith( """{"response":{"status":500,"headers":{"messageId":""")
-          resourceState should endWith( """"body":{"code":"unhandled_exception","description":"Internal server error","errorId":"123"}}""")
+          resourceState should startWith ("""{"response":{"status":500,"headers":{"messageId":""")
+          resourceState should endWith (""""body":{"code":"unhandled_exception","description":"Internal server error","errorId":"123"}}""")
         } else fail("Full resource state wasn't sent to the client")
       }
     }

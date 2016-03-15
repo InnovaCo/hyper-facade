@@ -103,7 +103,7 @@ object RequestMapper {
     log.error("Can't handle request. #" + errorId, t)
     t match {
       case noRoute: NoTransportRouteException ⇒ HttpResponse(StatusCodes.NotFound, "Resource not found")
-      case hbEx: HyperBusException[ErrorBody] ⇒ HttpResponse(StatusCodes.getForKey(hbEx.status).get, hbEx.body.content.asString)
+      case hbEx: HyperBusException[ErrorBody] ⇒ HttpResponse(StatusCodes.getForKey(hbEx.status).get, hbEx.body.toJson)
       case t: Throwable ⇒ HttpResponse(StatusCodes.InternalServerError, s"Unhandled error #$errorId")
     }
   }
