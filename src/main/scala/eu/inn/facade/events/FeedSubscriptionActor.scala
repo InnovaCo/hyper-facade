@@ -33,8 +33,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   val maxResubscriptionsCount = inject[Config].getInt("inn.facade.maxResubscriptionsCount")
   val feedState = new AtomicReference[FeedState](FeedState())
 
-  var subscriptionId = new AtomicReference[Option[String]](None)
-  var initialClientRequest = new AtomicReference[Option[DynamicRequest]](None)
+  val subscriptionId = new AtomicReference[Option[String]](None)
+  val initialClientRequest = new AtomicReference[Option[DynamicRequest]](None)
 
   override def receive: Receive = {
 

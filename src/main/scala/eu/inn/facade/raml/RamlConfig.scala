@@ -7,7 +7,7 @@ import eu.inn.hyperbus.transport.api.uri._
 class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
 
   def traitNames(uriPattern: String, method: String): Seq[String] = {
-    traits(uriPattern, method) map (foundTrait ⇒ foundTrait.name)
+    traits(uriPattern, method).map(foundTrait ⇒ foundTrait.name).distinct
   }
 
   def resourceUri(requestUriString: String): Uri = {

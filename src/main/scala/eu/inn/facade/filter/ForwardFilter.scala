@@ -1,13 +1,9 @@
 package eu.inn.facade.filter
 
-import java.io.ByteArrayOutputStream
-
-import eu.inn.binders.dynamic.Text
-import eu.inn.facade.model.{RamlAwareFilter, InputFilter, TransitionalHeaders}
+import eu.inn.facade.model.{RamlAwareFilter, TransitionalHeaders}
 import eu.inn.facade.raml.RamlConfig
-import eu.inn.hyperbus.model.{DynamicBody, ErrorBody}
+import eu.inn.hyperbus.model.DynamicBody
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class ForwardFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {

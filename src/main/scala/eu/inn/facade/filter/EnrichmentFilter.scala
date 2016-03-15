@@ -3,7 +3,7 @@ package eu.inn.facade.filter
 import eu.inn.binders.dynamic.{Obj, Text}
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Annotation._
-import eu.inn.facade.raml.{Annotation, RamlConfig}
+import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.model.DynamicBody
 
 import scala.concurrent.ExecutionContext.Implicits.global
