@@ -1,7 +1,7 @@
 package eu.inn.facade.filter
 
 import eu.inn.binders.dynamic.Obj
-import eu.inn.facade.filter.model._
+import eu.inn.facade.model._
 import eu.inn.facade.raml.{DataStructure, RamlConfig}
 import eu.inn.hyperbus.model.DynamicBody
 

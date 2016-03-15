@@ -5,8 +5,8 @@ import java.io.ByteArrayOutputStream
 import akka.util.ByteString
 import eu.inn.binders.dynamic.{Null, Obj, Text}
 import eu.inn.binders.json._
-import eu.inn.facade.filter.model.FacadeHeaders._
-import eu.inn.facade.filter.model.TransitionalHeaders
+import eu.inn.facade.model.FacadeHeaders._
+import eu.inn.facade.model.TransitionalHeaders
 import eu.inn.hyperbus._
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.serialization.RequestHeader
@@ -29,19 +29,12 @@ object RequestMapper {
   def toDynamicRequest(frame: Frame): DynamicRequest = {
     DynamicRequest(frame.payload.iterator.asInputStream)
   }
-/*
-  def toDynamicRequest(httpRequest: HttpRequest, uri: api.uri.Uri): DynamicRequest = {
-    httpRequest.method.name.toLowerCase match {
-      case Method.GET ⇒
-        val header = RequestHeader(uri, Headers(Header.METHOD → Seq(httpRequest.method.name.toLowerCase)))
-        val body = QueryBody.fromQueryString(httpRequest.uri.query.toMap)
-        DynamicRequest(header, body)
 
-        // todo: нельзя так сериализовать?
-      case _ ⇒ DynamicRequest(new ByteArrayInputStream(httpRequest.entity.data.toByteArray))
-    }
+  def toDynamicGet(request: DynamicRequest): DynamicRequest = {
+    val headers = request.headers
+    val updatedHeaders = Headers(headers + (Header.METHOD → Seq(Method.GET)))
+    DynamicRequest(request.uri, request.body, updatedHeaders)
   }
-*/
 
   def toDynamicResponse(headers: TransitionalHeaders, dynamicBody: DynamicBody): Response[Body] = {
     headers.statusCode match {
@@ -130,7 +123,7 @@ object RequestMapper {
 
   def toHttpResponse(headers: TransitionalHeaders, body: DynamicBody): HttpResponse = {
     val statusCode = StatusCode.int2StatusCode(headers.statusCode getOrElse 200)
-    val httpContentType: ContentType = contentType(body.contentType)
+    val httpContentType: ContentType = contentType(headers.headerOption(Header.CONTENT_TYPE))
     val jsonBody = body.content.toJson
     HttpResponse(statusCode, HttpEntity(httpContentType, jsonBody), extractHttpHeaders(headers))
   }
@@ -185,8 +178,17 @@ object RequestMapper {
     contentType match {
       case None ⇒ `application/json`
       case Some(dynamicContentType) ⇒
-        val mediaType = MediaTypes.register(MediaType.custom(dynamicContentType, null, true, false, Seq("json")))
-        spray.http.ContentType(mediaType, Some(`UTF-8`))
+        val indexOfSlash = dynamicContentType.indexOf('/')
+        val (mainType, subType) = indexOfSlash match {
+          case -1 ⇒
+            (dynamicContentType, "")
+          case index ⇒
+            val mainType = dynamicContentType.substring(0, indexOfSlash)
+            val subType = dynamicContentType.substring(indexOfSlash + 1)
+            (mainType, subType)
+        }
+        val mediaType = MediaTypes.register(MediaType.custom(mainType, subType, true, false))
+        spray.http.ContentType(mediaType, `UTF-8`)
     }
   }
 

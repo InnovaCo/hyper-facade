@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.chain
 
-import eu.inn.facade.filter.model.Filter
+import eu.inn.facade.model.Filter
 import eu.inn.facade.raml.{DataStructure, RamlConfig}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import scaldi.{Injectable, Injector}

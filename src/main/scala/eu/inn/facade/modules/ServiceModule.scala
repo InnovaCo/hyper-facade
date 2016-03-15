@@ -17,6 +17,6 @@ class ServiceModule extends Module {
   bind [ActorSystem]            identifiedBy 'actorSystem          to ActorSystem("Inn", inject [Config])
   bind [ExecutionContext]       identifiedBy 'executionContext     to inject [ActorSystem].dispatcher
   bind [HandleErrorsDirectives] identifiedBy 'errorsDirectives     to new HandleErrorsDirectives
-  bind [HttpWorker]    identifiedBy 'statusMonitorFacade  to new HttpWorker
+  bind [HttpWorker]             identifiedBy 'httpWorker           to new HttpWorker
   bind [SubscriptionsManager]   identifiedBy 'subscriptionsManager to new SubscriptionsManager
 }

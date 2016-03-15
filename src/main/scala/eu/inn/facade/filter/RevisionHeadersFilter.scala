@@ -1,6 +1,6 @@
 package eu.inn.facade.filter
 
-import eu.inn.facade.filter.model.{FacadeHeaders, OutputFilter, TransitionalHeaders}
+import eu.inn.facade.model.{FacadeHeaders, OutputFilter, TransitionalHeaders}
 import eu.inn.hyperbus.model.{DynamicBody, Header}
 
 import scala.concurrent.ExecutionContext.Implicits.global

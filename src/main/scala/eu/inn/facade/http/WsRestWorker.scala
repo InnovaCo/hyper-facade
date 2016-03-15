@@ -4,6 +4,7 @@ import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChainFactory
+import eu.inn.facade.model.ClientRequest
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
@@ -108,9 +109,10 @@ class WsRestWorker(val serverConnection: ActorRef,
   def processRequest(request: DynamicRequest) = {
     val key = RequestMapper.correlationId(request.headers)
     val actorName = "Subscr-" + key
+    val clientRequest = ClientRequest(request)
     context.child(actorName) match {
-      case Some(actor) ⇒ actor.forward(request)
-      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperBus, subscriptionManager), actorName) ! request
+      case Some(actor) ⇒ actor.forward(clientRequest)
+      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperBus, subscriptionManager), actorName) ! clientRequest
     }
   }
 

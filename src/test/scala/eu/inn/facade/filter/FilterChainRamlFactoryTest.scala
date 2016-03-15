@@ -1,7 +1,7 @@
 package eu.inn.facade.filter
 
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.filter.model.Filter
+import eu.inn.facade.model.Filter
 import eu.inn.facade.modules.{ConfigModule, FiltersModule}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}

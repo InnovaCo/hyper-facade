@@ -1,4 +1,4 @@
-package eu.inn.facade.filter.model
+package eu.inn.facade.model
 
 trait InputFilter extends Filter {
 

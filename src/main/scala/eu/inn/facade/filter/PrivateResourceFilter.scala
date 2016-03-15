@@ -3,7 +3,7 @@ package eu.inn.facade.filter
 import java.io.ByteArrayOutputStream
 
 import eu.inn.binders.dynamic.Text
-import eu.inn.facade.filter.model.{InputFilter, TransitionalHeaders}
+import eu.inn.facade.model.{InputFilter, TransitionalHeaders}
 import eu.inn.hyperbus.model.{DynamicBody, ErrorBody}
 
 import scala.concurrent.ExecutionContext.Implicits.global

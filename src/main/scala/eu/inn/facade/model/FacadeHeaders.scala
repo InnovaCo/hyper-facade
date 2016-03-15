@@ -1,4 +1,4 @@
-package eu.inn.facade.filter.model
+package eu.inn.facade.model
 
 import eu.inn.hyperbus.model.Header._
 
@@ -11,7 +11,7 @@ object FacadeHeaders {
   val COMMON_CONTENT_TYPE = "application/json"
   val CLIENT_REVISION_ID = "hyperbus-revision"
 
-  val headerNames = Set(METHOD, CONTENT_TYPE, MESSAGE_ID, CORRELATION_ID, REVISION)
+  val headerNames = Set(METHOD, CONTENT_TYPE, MESSAGE_ID, CORRELATION_ID)
 
   def isDynamicHeader(headerName: String): Boolean = {
     headerNames.contains(headerName)

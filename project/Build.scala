@@ -64,7 +64,7 @@ object Build extends sbt.Build {
           "jline"                          % "jline"                        % "2.12.1",
           "io.spray"                       %% "spray-can"                   % "1.3.3",
           "io.spray"                       %% "spray-routing-shapeless2"    % "1.3.3",
-          "io.spray"                       %% "spray-testkit"               % "1.3.3"     % "test",
+          "io.spray"                       %% "spray-client"                % "1.3.3"     % "test",
           "org.scaldi"                     %% "scaldi"                      % "0.5.7",
           "org.scalatest"                  %% "scalatest"                   % "2.2.1"     % "test",
           "org.pegdown"                    % "pegdown"                      % "1.4.2"     % "test"

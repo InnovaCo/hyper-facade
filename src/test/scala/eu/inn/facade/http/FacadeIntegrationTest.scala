@@ -5,8 +5,7 @@ import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, Tim
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.Config
 import eu.inn.binders.dynamic.{Null, Obj, Text}
-import eu.inn.facade.filter.model
-import eu.inn.facade.filter.model.FacadeHeaders
+import eu.inn.facade.model.FacadeHeaders
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
 import eu.inn.hyperbus.HyperBus
@@ -22,11 +21,16 @@ import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 import spray.can.Http
 import spray.can.websocket.frame.TextFrame
-import spray.http.{HttpHeaders, HttpMethods, HttpRequest}
+import spray.client.pipelining._
+import spray.http
+import spray.http.HttpCharsets._
+import spray.http.HttpHeaders.{RawHeader, `Content-Type`}
+import spray.http._
 
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{ExecutionContext, Promise}
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.io.Source
 import scala.util.Success
 
@@ -52,24 +56,59 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
   Thread.sleep(1000)
 
   "Facade integration" - {
-    "http. Resource configured in RAML" in {
+    "http get. Resource configured in RAML" in {
+      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(DynamicBody(Text("response"))), { request ⇒
           request.uri shouldBe Uri("/status/test-service")
           request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
         }
-      )
+      ) onSuccess {
+        case subscr ⇒ onCommandSubscription = Some(subscr)
+      }
+
       Source.fromURL("http://localhost:54321/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
+      onCommandSubscription foreach testService.unsubscribe
     }
 
-    "http. Resource is not configured in RAML" in {
+    "http get. Resource is not configured in RAML" in {
+      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/someSecretResource")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(DynamicBody(Text("response"))), { request ⇒
           request.uri shouldBe Uri("/someSecretResource")
           request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
         }
-      )
+      ) onSuccess {
+        case subscr ⇒ onCommandSubscription = Some(subscr)
+      }
+
       Source.fromURL("http://localhost:54321/someSecretResource?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
+      onCommandSubscription foreach testService.unsubscribe
+    }
+
+    "http get reliable resource. Check hyperbus-revision" in {
+      var onCommandSubscription: Option[Subscription] = None
+      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
+        Ok(DynamicBody(Text("response")), Headers(Map(Header.REVISION → Seq("1"), Header.CONTENT_TYPE → Seq("user-profile"))))) onSuccess {
+        case subscr ⇒ onCommandSubscription = Some(subscr)
+      }
+
+      val clientActorSystem = ActorSystem()
+      println(clientActorSystem == actorSystem)
+      val pipeline: HttpRequest => Future[HttpResponse] = sendReceive(clientActorSystem, ExecutionContext.fromExecutor(newPoolExecutor()))
+      val uri = "http://localhost:54321/test-service/reliable"
+      val responseFuture = pipeline(Get(http.Uri(uri)))
+      whenReady(responseFuture, Timeout(Span(5, Seconds))) { response ⇒
+        response.entity.asString shouldBe """"response""""
+        response.headers should contain (RawHeader(FacadeHeaders.CLIENT_REVISION_ID, "1"))
+
+        val mediaType = MediaTypes.register(MediaType.custom("application", "vnd.user-profile+json", true, false))
+        val contentType = ContentType(mediaType, `UTF-8`)
+        response.headers should contain (`Content-Type`(contentType))
+
+        onCommandSubscription foreach testService.unsubscribe
+        Await.result(clientActorSystem.terminate(), Duration.Inf)
+      }
     }
 
     "websocket: unreliable feed" in {
@@ -104,7 +143,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       client ! Connect() // init websocket connection
 
       var onCommandSubscription: Option[Subscription] = None
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific("subscribe"))),
+      testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(DynamicBody(Obj(Map("content" → Text("fullResource")))))) onSuccess {
         case subscr ⇒ onCommandSubscription = Some(subscr)
       }
@@ -157,7 +196,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       )
     }
 
-    "websocker: handle error response" in {
+    "websocket: handle error response" in {
       val host = "localhost"
       val port = 54321
       val url = "/status/test-service"
@@ -167,7 +206,6 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       val onClientUpgradePromise = Promise[Boolean]()
       val resourceStatePromise = Promise[Boolean]()
-      val publishedEventPromise = Promise[Boolean]()
 
       var clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
       val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
@@ -186,7 +224,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       client ! Connect() // init websocket connection
 
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific("subscribe"))),
+      testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
         eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled_exception", Some("Internal server error"), errorId = "123")))
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
@@ -281,12 +319,12 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         FeedTestBody("haha"),
         Headers.plain(Map("revision" → Seq("5"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
 
-      var hbSubscription: Option[Subscription] = None
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific("subscribe"))),
+      var onCommandSubscription: Option[Subscription] = None
+      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
         initialResourceState,
       // emulate latency between request for full resource state and response
         _ ⇒ Thread.sleep(10000)) onSuccess {
-        case subscription: Subscription ⇒ hbSubscription = Some(subscription)
+        case subscription: Subscription ⇒ onCommandSubscription = Some(subscription)
       }
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
@@ -335,9 +373,11 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           receivedEvent.toString shouldBe directEvent.toString
         } else fail("Last event wasn't sent to the client")
 
-        testService.unsubscribe(hbSubscription.get)
-        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific("subscribe"))),
-          updatedResourceState)
+        onCommandSubscription foreach testService.unsubscribe
+        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
+          updatedResourceState) onSuccess {
+          case subscription: Subscription ⇒ onCommandSubscription = Some(subscription)
+        }
         // This event should be ignored, because it's an "event from future". Resource state retrieving should be triggered
         testService.publish(eventBadRev5)
       }
@@ -350,6 +390,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           resourceUpdatedState shouldBe referenceState
         } else fail("Full resource state wasn't sent to the client")
 
+        onCommandSubscription foreach testService.unsubscribe
         testService.publish(eventGoodRev5)
       }
 
@@ -376,6 +417,122 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           ),
           DynamicBody(Obj(Map()))
         )
+      }
+    }
+
+    "websocket: get request" in {
+      val host = "localhost"
+      val port = 54321
+      val url = "/status/test-service"
+
+      val connect = Http.Connect(host, port)
+      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
+
+      val onClientUpgradePromise = Promise[Boolean]()
+      val resourceStatePromise = Promise[Boolean]()
+
+      var clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
+      val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
+        override def onMessage(frame: TextFrame): Unit = {
+          clientMessageQueue += frame
+          clientMessageQueue.size match {
+            case 1 ⇒ resourceStatePromise.complete(Success(true))
+            case 2 ⇒ fail("there should not be incoming events after response")
+          }
+        }
+
+        override def onUpgrade(): Unit = {
+          onClientUpgradePromise.complete(Success(true))
+        }
+      }), "get-client")
+
+      client ! Connect() // init websocket connection
+
+      var onCommandSubscription: Option[Subscription] = None
+      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
+        Ok(
+          DynamicBody(Obj(Map("content" → Text("fullResource")))),
+          Headers.plain(Map("revision" → Seq("1"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))) onSuccess {
+        case subscr ⇒ onCommandSubscription = Some(subscr)
+      }
+
+      whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
+        client ! DynamicRequest(
+          RequestHeader(
+            Uri("/test-service/reliable"),
+            Map(Header.METHOD → Seq(Method.GET),
+              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+              Header.MESSAGE_ID → Seq("messageId"),
+              Header.CORRELATION_ID → Seq("correlationId"))
+          ),
+          DynamicBody(Null))
+      }
+
+      whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
+        val resourceStateMessage = clientMessageQueue.get(0)
+        if (resourceStateMessage.isDefined) {
+          val resourceState = resourceStateMessage.get.payload.utf8String
+          resourceState shouldBe """{"response":{"status":200,"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"hyperbus-revision":["1"]}},"body":{"content":"fullResource"}}"""
+        } else fail("Full resource state wasn't sent to the client")
+        onCommandSubscription foreach testService.unsubscribe
+      }
+    }
+
+    "websocket: post request" in {
+      val host = "localhost"
+      val port = 54321
+      val url = "/status/test-service"
+
+      val connect = Http.Connect(host, port)
+      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
+
+      val onClientUpgradePromise = Promise[Boolean]()
+      val resourceStatePromise = Promise[Boolean]()
+
+      var clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
+      val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
+        override def onMessage(frame: TextFrame): Unit = {
+          clientMessageQueue += frame
+          clientMessageQueue.size match {
+            case 1 ⇒ resourceStatePromise.complete(Success(true))
+            case 2 ⇒ fail("there should not be incoming events after response")
+          }
+        }
+
+        override def onUpgrade(): Unit = {
+          onClientUpgradePromise.complete(Success(true))
+        }
+      }), "post-client")
+
+      client ! Connect() // init websocket connection
+
+      var onCommandSubscription: Option[Subscription] = None
+      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.POST))),
+        Ok(
+          DynamicBody(Text("got it")),
+          Headers.plain(Map(Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))) onSuccess {
+        case subscr ⇒ onCommandSubscription = Some(subscr)
+      }
+
+      whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
+        client ! DynamicRequest(
+          RequestHeader(
+            Uri("/test-service/reliable"),
+            Map(Header.METHOD → Seq(Method.POST),
+              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+              Header.MESSAGE_ID → Seq("messageId"),
+              Header.CORRELATION_ID → Seq("correlationId"))
+          ),
+          DynamicBody(Map("post request" → Text("some request body"))))
+      }
+
+      whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
+        val resourceStateMessage = clientMessageQueue.get(0)
+        if (resourceStateMessage.isDefined) {
+          val resourceState = resourceStateMessage.get.payload.utf8String
+          resourceState shouldBe """{"response":{"status":200,"headers":{"messageId":["messageId"],"correlationId":["correlationId"]}},"body":"got it"}"""
+        } else fail("Full resource state wasn't sent to the client")
+        onCommandSubscription foreach testService.unsubscribe
       }
     }
   }

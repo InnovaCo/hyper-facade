@@ -1,4 +1,4 @@
-package eu.inn.facade.filter.model
+package eu.inn.facade.model
 
 import eu.inn.hyperbus.model.DynamicBody
 

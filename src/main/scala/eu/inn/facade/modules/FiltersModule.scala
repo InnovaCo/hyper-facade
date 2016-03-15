@@ -3,7 +3,7 @@ package eu.inn.facade.modules
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.filter._
 import eu.inn.facade.filter.chain.{FilterChainFactory, FilterChainRamlFactory}
-import eu.inn.facade.filter.model.{Filter, InputFilter, OutputFilter}
+import eu.inn.facade.model.{Filter, InputFilter, OutputFilter}
 import eu.inn.facade.raml.RamlConfig
 import scaldi.Module
 

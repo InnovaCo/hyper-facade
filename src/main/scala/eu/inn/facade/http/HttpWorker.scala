@@ -3,8 +3,8 @@ package eu.inn.facade.http
 import akka.actor.ActorSystem
 import eu.inn.binders.json._
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.filter.model.TransitionalHeaders
-import eu.inn.facade.filter.model.FacadeHeaders._
+import eu.inn.facade.model.TransitionalHeaders
+import eu.inn.facade.model.FacadeHeaders._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
@@ -51,9 +51,7 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
             case response: Response[DynamicBody] ⇒ filterOut(response, resourceUri, request.method.name)
           } map {
             case (headers: TransitionalHeaders, body: DynamicBody) ⇒
-              val intStatusCode = headers.statusCode.getOrElse(200)
-              val statusCode = StatusCode.int2StatusCode(intStatusCode)
-              HttpResponse(statusCode, HttpEntity(`application/json`, body.content.toJson))
+              RequestMapper.toHttpResponse(headers, body)
           } recover {
             case t: Throwable ⇒ RequestMapper.exceptionToHttpResponse(t)
           }

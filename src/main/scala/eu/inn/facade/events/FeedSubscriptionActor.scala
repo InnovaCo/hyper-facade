@@ -7,9 +7,9 @@ import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.pattern.pipe
 import com.typesafe.config.Config
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.filter.model
-import eu.inn.facade.filter.model.TransitionalHeaders
 import eu.inn.facade.http.RequestMapper
+import eu.inn.facade.model
+import eu.inn.facade.model.{ClientRequest, ClientSpecificMethod, TransitionalHeaders}
 import eu.inn.facade.raml.{Method, RamlConfig}
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
@@ -34,24 +34,23 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   val feedState = new AtomicReference[FeedState](FeedState())
 
   var subscriptionId = new AtomicReference[Option[String]](None)
-  var subscriptionRequest = new AtomicReference[Option[DynamicRequest]](None)
+  var initialClientRequest = new AtomicReference[Option[DynamicRequest]](None)
 
   override def receive: Receive = {
 
-    case request : DynamicRequest ⇒
+    case clientRequest: ClientRequest ⇒
+      val request = clientRequest.underlyingRequest
       request.headers.get(Header.METHOD) match {
-
-        case Some(Seq("subscribe")) ⇒
-          subscriptionRequest.set(Some(request))
+        case Some(Seq(_)) ⇒
+          initialClientRequest.set(Some(request))
           filterAndSubscribe(request)
 
-        case Some(Seq("unsubscribe")) ⇒
+        case Some(Seq(ClientSpecificMethod.UNSUBSCRIBE)) ⇒
           context.stop(self)
-
-        // This request received from backend sevice via HyperBus. Will be sent to client
-        case _ ⇒
-          processEvent(request)
       }
+
+    case request: DynamicRequest ⇒
+      processEvent(request)
 
     case other ⇒
       log.error(s"Invalid request received on $self: $other")
@@ -75,7 +74,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
       case None ⇒
         if (resourceStateFetched) {
-          subscriptionRequest.get foreach { request ⇒
+          initialClientRequest.get foreach { request ⇒
             filterEvent(request, event) map {
               case (headers: TransitionalHeaders, body: DynamicBody) ⇒ RequestMapper.toDynamicRequest(headers, body)
             } pipeTo websocketWorker
@@ -95,7 +94,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         } else {
           val filteredRequest = RequestMapper.toDynamicRequest(headers, body)
           feedState.set(FeedState())
-          subscribe(filteredRequest)
+          if (preparedRequest.header(Header.METHOD) == ClientSpecificMethod.SUBSCRIBE)
+            subscribe(filteredRequest)
           implicit val mvx = MessagingContextFactory.withCorrelationId(serverCorrelationId(filteredRequest))
           fetchResource(filteredRequest)
         }
@@ -104,9 +104,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
   def fetchResource(request: DynamicRequest)(implicit mvx: MessagingContextFactory): Unit = {
     val feedStateSnapshot = feedState.get
-    val updatedRequest = DynamicRequest(request.uri, request.body, request.headers)
-    hyperBus <~ updatedRequest flatMap {
-      case response: Response[DynamicBody] ⇒ filterResponse(updatedRequest, response)
+    val getRequest = request.headers(Header.METHOD) match {
+      case Seq(ClientSpecificMethod.SUBSCRIBE) ⇒ RequestMapper.toDynamicGet(request)
+      case _ ⇒ request
+    }
+    hyperBus <~ getRequest flatMap {
+      case response: Response[DynamicBody] ⇒ filterResponse(getRequest, response)
     } map {
       case (headers: TransitionalHeaders, dynamicBody: DynamicBody) ⇒
         val response = RequestMapper.toDynamicResponse(headers, dynamicBody)
@@ -146,7 +149,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   private def sendEvent(event: DynamicRequest): Unit = {
     val feedStateSnapshot = feedState.get
     val revisionId = event.headers(Header.REVISION).head.toLong
-    subscriptionRequest.get foreach { request ⇒
+    initialClientRequest.get foreach { request ⇒
       if (revisionId == feedStateSnapshot.lastRevisionId + 1)
         filterEvent(request, event) map {
           case (headers: TransitionalHeaders, body: DynamicBody) ⇒
