@@ -4,7 +4,6 @@ import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.model.ClientRequest
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._

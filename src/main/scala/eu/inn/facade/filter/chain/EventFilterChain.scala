@@ -9,7 +9,7 @@ import scala.language.postfixOps
 case class EventFilterChain(filters: Seq[EventFilter]) {
   def applyFilters(input: FacadeRequest, output: FacadeRequest)
                   (implicit ec: ExecutionContext): Future[FacadeRequest] = {
-    FutureUtils.chain(output, filters.map(f ⇒ f.apply(input, _)))
+    FutureUtils.chain(output, filters.map(f ⇒ f.apply(input, _ : FacadeRequest)))
   }
 }
 

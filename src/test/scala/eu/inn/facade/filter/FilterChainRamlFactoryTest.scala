@@ -35,8 +35,8 @@ class FilterChainRamlFactoryTest extends FreeSpec with Matchers with Injectable 
 
       val outputPrivateFieldFilter = inject [Seq[Filter]]("privateField")
       val pagedOutputFilter = inject [Seq[Filter]]("paged")
-      val defaultOutputFilters = inject [Seq[Filter]]("defaultOutputFilters")
-      chain.filters shouldBe pagedOutputFilter ++ outputPrivateFieldFilter ++ defaultOutputFilters
+      val defaultResponseFilters = inject [Seq[Filter]]("defaultResponseFilters")
+      chain.filters shouldBe pagedOutputFilter ++ outputPrivateFieldFilter ++ defaultResponseFilters
     }
   }
 }

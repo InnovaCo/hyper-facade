@@ -11,15 +11,11 @@ import scala.collection.JavaConversions._
 
 class FiltersModule extends Module {
 
-  bind [Seq[Filter]]        identifiedBy "privateResource"                      to Seq(new PrivateResourceFilter)
-  bind [Seq[Filter]]        identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilter(inject [RamlConfig] ))
-  bind [Seq[Filter]]        identifiedBy "forward"                              to Seq(new ForwardFilter(inject [RamlConfig] ))
-  bind [Seq[ResponseFilter]]  identifiedBy "defaultOutputFilters"                 to Seq(new RevisionHeadersFilter)
+  bind [Seq[RamlFilterFactory]]   identifiedBy "privateResource"                          to Seq(new PrivateResourceFilterFactory)
+  bind [Seq[RamlFilterFactory]]   identifiedBy "x-client-ip" and "x-client-language"      to Seq(new EnrichmentFilterFactory)
+  bind [Seq[RamlFilterFactory]]   identifiedBy  "privateField"                            to Seq(new PrivateFieldsFilterFactory)
 
-
-  bind [Seq[RamlFilterFactory]]   identifiedBy  "privateField"                  to Seq(new PrivateFieldsFilterFactory)
-
-
+  bind [Seq[ResponseFilter]]  identifiedBy "defaultResponseFilters"               to Seq(new RevisionHeadersFilter)
   bind [FilterChainFactory] identifiedBy 'ramlFilterChain                       to new FilterChainRamlFactory
   initOuterBindings()
 

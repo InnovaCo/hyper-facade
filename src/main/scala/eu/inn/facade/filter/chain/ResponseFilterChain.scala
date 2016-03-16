@@ -10,7 +10,7 @@ import scala.language.postfixOps
 case class ResponseFilterChain(filters: Seq[ResponseFilter]) {
   def applyFilters(input: FacadeRequest, output: FacadeResponse)
                   (implicit ec: ExecutionContext): Future[FacadeResponse] = {
-    FutureUtils.chain(output, filters.map(f ⇒ f.apply(input, _)))
+    FutureUtils.chain(output, filters.map(f ⇒ f.apply(input, _ : FacadeResponse)))
   }
 }
 

@@ -5,7 +5,7 @@ trait Filter
 trait RamlFilterFactory {
   def createRequestFilter(target: RamlTarget): Option[RequestFilter]
   def createResponseFilter(target: RamlTarget): Option[ResponseFilter]
-  def createEventFilter(target: RamlTarget): Option[ResponseFilter]
+  def createEventFilter(target: RamlTarget): Option[EventFilter]
 }
 
 sealed trait RamlTarget

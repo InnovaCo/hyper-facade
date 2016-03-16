@@ -7,17 +7,22 @@ import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.model.DynamicBody
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareInputFilter {
-
-  override def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
-    Future {
-      val enrichedBody = enrichBody(headers, body)
-      (headers, enrichedBody)
+class EnrichmentFilterFactory extends RamlFilterFactory {
+  override def createRequestFilter(target: RamlTarget): Option[RequestFilter] = {
+    target match {
+      case TargetTypeDeclaration(typeName, fields) ⇒ Some(new EnrichRequestFilter(fields))
+      case _ ⇒ None // log warning
     }
   }
+  override def createResponseFilter(target: RamlTarget): Option[ResponseFilter] = None
+  override def createEventFilter(target: RamlTarget): Option[EventFilter] = None
+}
 
+class EnrichRequestFilter(val privateFields: Seq[String]) extends RequestFilter {
+
+  /*
   def enrichBody(headers: TransitionalHeaders, body: DynamicBody): DynamicBody = {
     var enrichedBody = body
     val dataStructure = getDataStructure(headers)
@@ -54,5 +59,13 @@ class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareInputFilter 
     }
 
     enrichedBody
+  }
+*/
+
+  override def apply(input: FacadeRequest)
+                    (implicit ec: ExecutionContext): Future[FacadeRequest] = {
+    Future {
+      input
+    }
   }
 }

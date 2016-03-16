@@ -1,13 +1,9 @@
 package eu.inn.facade.filter.chain
 
-import eu.inn.hyperbus.transport.api.uri.Uri
+import eu.inn.facade.model.{FacadeResponse, FacadeRequest}
 
 class FilterChainStubFactory extends FilterChainFactory {
-  override def requestFilterChain(uri: Uri, method: String, contentType: Option[String]): RequestFilterChain = {
-    RequestFilterChain(Seq.empty)
-  }
-
-  override def outputFilterChain(uri: Uri, method: String): FilterChains = {
-    FilterChain(Seq.empty)
-  }
+  override def requestFilterChain(input: FacadeRequest): RequestFilterChain = RequestFilterChain.empty
+  override def eventFilterChain(input: FacadeRequest, output: FacadeRequest): EventFilterChain = EventFilterChain.empty
+  override def responseFilterChain(input: FacadeRequest, output: FacadeResponse): ResponseFilterChain = ResponseFilterChain.empty
 }

@@ -2,8 +2,8 @@ package eu.inn.facade.http
 
 import akka.actor.ActorSystem
 import eu.inn.binders.json._
-import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.model.TransitionalHeaders
+import eu.inn.facade.filter.chain.{FilterChains, FilterChainFactory}
+import eu.inn.facade.model.{FilterInterruptException, FacadeResponse, FacadeRequest, TransitionalHeaders}
 import eu.inn.facade.model.FacadeHeaders._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
@@ -20,12 +20,13 @@ import spray.routing._
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Success
+import scala.util.control.NonFatal
 
 class HttpWorker(implicit inj: Injector) extends Injectable {
 
   val hyperBus = inject[HyperBus]
   val ramlConfig = inject[RamlConfig]
-  val filterChainComposer = inject[FilterChainFactory]
+  val filterChains = inject[FilterChains]
   val log = LoggerFactory.getLogger(HttpWorker.this.getClass.getName)
   implicit val actorSystem = inject[ActorSystem]
   implicit val executionContext = inject[ExecutionContext]
@@ -41,6 +42,42 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
 
   def processRequest(request: HttpRequest): Future[HttpResponse] = {
     val resourceUri = ramlConfig.resourceUri(request.uri.path.toString)
+    val facadeRequest = FacadeRequest(resourceUri, request)
+
+    filterChains.filterRequest(facadeRequest) flatMap { filteredRequest ⇒
+      hyperBus <~ filteredRequest.toDynamicRequest flatMap { response ⇒
+        filterChains.filterResponse(facadeRequest, FacadeResponse(response))
+      }
+    } recover {
+      case e: FilterInterruptException ⇒
+        if (e.getCause != null) {
+          log.error(s"Request execution interrupted: $request", e)
+        }
+        e.response
+
+      case NonFatal(e) ⇒
+        val response = RequestMapper.exceptionToResponse(e)
+        log.error(s"Service answered with error #${response.body.asInstanceOf[ErrorBody].errorId}. Stopping actor")
+        FacadeResponse(response)
+    } map { response ⇒
+      response.toHttpResponse
+    }
+  }
+
+/*
+    val body = request.method match {
+      case HttpMethods.GET ⇒
+        QueryBody.fromQueryString(request.uri.query.toMap)
+      case HttpMethods.DELETE ⇒
+        EmptyBody
+      case _ ⇒
+        (StringDeserializer.dynamicBody(Some(request.entity.asString)),
+          updateRequestContentType(
+            TransitionalHeaders(uri, Headers(Header.METHOD → Seq(request.method.toString.toLowerCase)), None)
+          ))
+    }
+
+
     val responsePromise = Promise[HttpResponse]()
     filterIn(request, resourceUri) map {
       case (filteredHeaders, filteredBody) ⇒
@@ -111,5 +148,6 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
     val headers = response.headers + (CONTENT_TYPE → Seq(newContentType))
     TransitionalHeaders(uri, headers, Some(response.status))
   }
+  */
 }
 
