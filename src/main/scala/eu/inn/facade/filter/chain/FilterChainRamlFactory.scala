@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.chain
 
-import eu.inn.facade.model.{Filter, InputFilter, OutputFilter}
+import eu.inn.facade.model.{Filter, RequestFilter, ResponseFilter}
 import eu.inn.facade.raml.{DataStructure, RamlConfig}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import scaldi.{Injectable, Injector}
@@ -10,28 +10,29 @@ class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory 
 
   val ramlConfig = inject[RamlConfig]
 
-  override def inputFilterChain(uri: Uri, method: String, contentType: Option[String]): InputFilterChain = {
+  override def requestFilterChain(uri: Uri, method: String, contentType: Option[String]): RequestFilterChain = {
     val dataStructure = ramlConfig.requestDataStructure(uri.pattern.specific, method, contentType)
     val dataStructures: Seq[DataStructure] = dataStructure match {
       case Some(structure) ⇒ Seq(structure)
       case None ⇒ Seq()
     }
     val inputFilters = filters(uri, method, dataStructures).collect {
-      case i : InputFilter ⇒ i
+      case i : RequestFilter ⇒ i
     }
-    InputFilterChain(inputFilters)
+    RequestFilterChain(inputFilters)
   }
 
-  override def outputFilterChain(uri: Uri, method: String): OutputFilterChain = {
+  // todo: + contentType
+  override def outputFilterChain(uri: Uri, method: String): FilterChains = {
     val dataStructures: Seq[DataStructure] = ramlConfig.responseDataStructures(uri, method)
     val outputFilters = filters(uri, method, dataStructures).collect {
-      case o : OutputFilter ⇒ o
+      case o : ResponseFilter ⇒ o
     } ++ defaultOutputFilters
-    OutputFilterChain(outputFilters)
+    FilterChain(outputFilters)
   }
 
-  def defaultOutputFilters: Seq[OutputFilter] = {
-    inject[Seq[OutputFilter]]("defaultOutputFilters")
+  def defaultOutputFilters: Seq[ResponseFilter] = {
+    inject[Seq[ResponseFilter]]("defaultOutputFilters")
   }
 
   private def filters(uri: Uri, method: String, dataStructures: Seq[DataStructure]): Seq[Filter] = {

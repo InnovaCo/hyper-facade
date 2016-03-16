@@ -3,7 +3,7 @@ package eu.inn.facade.modules
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.filter._
 import eu.inn.facade.filter.chain.{FilterChainFactory, FilterChainRamlFactory}
-import eu.inn.facade.model.{OutputFilter, Filter}
+import eu.inn.facade.model.{RamlFilterFactory, ResponseFilter, Filter}
 import eu.inn.facade.raml.RamlConfig
 import scaldi.Module
 
@@ -12,10 +12,14 @@ import scala.collection.JavaConversions._
 class FiltersModule extends Module {
 
   bind [Seq[Filter]]        identifiedBy "privateResource"                      to Seq(new PrivateResourceFilter)
-  bind [Seq[Filter]]        identifiedBy "privateField"                         to Seq(new PrivateFieldsFilter(inject [RamlConfig]))
   bind [Seq[Filter]]        identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilter(inject [RamlConfig] ))
   bind [Seq[Filter]]        identifiedBy "forward"                              to Seq(new ForwardFilter(inject [RamlConfig] ))
-  bind [Seq[OutputFilter]]  identifiedBy "defaultOutputFilters"                 to Seq(new RevisionHeadersFilter)
+  bind [Seq[ResponseFilter]]  identifiedBy "defaultOutputFilters"                 to Seq(new RevisionHeadersFilter)
+
+
+  bind [Seq[RamlFilterFactory]]   identifiedBy  "privateField"                  to Seq(new PrivateFieldsFilterFactory)
+
+
   bind [FilterChainFactory] identifiedBy 'ramlFilterChain                       to new FilterChainRamlFactory
   initOuterBindings()
 

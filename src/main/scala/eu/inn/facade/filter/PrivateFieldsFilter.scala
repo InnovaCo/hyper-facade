@@ -1,40 +1,44 @@
 package eu.inn.facade.filter
 
-import eu.inn.binders.dynamic.Obj
+import eu.inn.binders.dynamic.{Obj, Value}
 import eu.inn.facade.model._
-import eu.inn.facade.raml.{DataStructure, RamlConfig}
-import eu.inn.hyperbus.model.DynamicBody
 
-import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.{ExecutionContext, Future}
 
-import scala.concurrent.Future
+class PrivateFieldsFilterFactory extends RamlFilterFactory {
+  override def createRequestFilter(target: RamlTarget): Option[RequestFilter] = None
+  override def createResponseFilter(target: RamlTarget): Option[ResponseFilter] = {
+    target match {
+      case TargetTypeDeclaration(typeName, fields) ⇒ Some(new PrivateFieldsFilter(fields))
+      case _ ⇒ None // log warning
+    }
+  }
+}
 
-class PrivateFieldsFilter(val ramlConfig: RamlConfig) extends RamlAwareOutputFilter {
-
-  override def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
+class PrivateFieldsFilter(privateFields: Seq[String]) extends ResponseFilter {
+  override def apply(input: FacadeRequest, output: FacadeResponse)
+                    (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
-      getDataStructure(headers) match {
-        case Some(structure) ⇒
-          val filteredBody = filterBody(body, structure)
-          (headers, filteredBody)
-        case None ⇒ (headers, body)
-      }
+      output.copy(
+        body = filterBody(input.body)
+      )
     }
   }
 
-  def filterBody(dynamicBody: DynamicBody, dataStructure: DataStructure): DynamicBody = {
-    dataStructure.body match {
-      case Some(body) ⇒
-        val privateFieldNames = body.dataType.fields.foldLeft(Seq[String]()) { (privateFields, field) ⇒
-          if (field.isPrivate) privateFields :+ field.name
-          else privateFields
-        }
-        var bodyFields = dynamicBody.content.asMap
-        privateFieldNames.foreach { fieldName ⇒
-          bodyFields -= fieldName
-        }
-        DynamicBody(Obj(bodyFields))
-      case None ⇒ dynamicBody
+  override def apply(input: FacadeRequest, output: FacadeRequest)
+                    (implicit ec: ExecutionContext): Future[FacadeRequest] = {
+    Future {
+      output.copy(
+        body = filterBody(input.body)
+      )
     }
+  }
+
+  def filterBody(body: Value): Value = {
+    var bodyFields = body.asMap
+    privateFields.foreach { fieldName ⇒
+      bodyFields -= fieldName
+    }
+    Obj(bodyFields)
   }
 }

@@ -3,13 +3,13 @@ package eu.inn.facade.filter
 import java.io.ByteArrayOutputStream
 
 import eu.inn.binders.dynamic.Text
-import eu.inn.facade.model.{InputFilter, TransitionalHeaders}
+import eu.inn.facade.model.{RequestFilter, TransitionalHeaders}
 import eu.inn.hyperbus.model.{DynamicBody, ErrorBody}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-class PrivateResourceFilter extends InputFilter {
+class PrivateResourceFilter extends RequestFilter {
 
   override def apply(requestHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
     val error = new ByteArrayOutputStream()

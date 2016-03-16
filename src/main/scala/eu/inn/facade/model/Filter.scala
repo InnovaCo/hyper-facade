@@ -2,8 +2,17 @@ package eu.inn.facade.model
 
 trait Filter
 
-/*trait Filter {
-  def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)]
-  def isInputFilter: Boolean = false
-  def isOutputFilter: Boolean = false
-}*/
+trait RamlFilterFactory {
+  def createRequestFilter(target: RamlTarget): Option[RequestFilter]
+  def createResponseFilter(target: RamlTarget): Option[ResponseFilter]
+  def createEventFilter(target: RamlTarget): Option[ResponseFilter]
+}
+
+sealed trait RamlTarget
+case class TargetResource(uri: String) extends RamlTarget
+case class TargetMethod(uri: String, method: String) extends RamlTarget
+case class TargetResponse(uri: String, code: Int) extends RamlTarget
+//RequestBody
+//ResponseBody
+// todo: inner fields!
+case class TargetTypeDeclaration(typeName: String, fields: Seq[String]) extends RamlTarget

@@ -1,26 +1,26 @@
 package eu.inn.facade.filter
 
-import eu.inn.facade.model.{FacadeHeaders, OutputFilter, TransitionalHeaders}
-import eu.inn.hyperbus.model.{DynamicBody, Header}
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import eu.inn.facade.model.{FacadeRequest, FacadeHeaders, FacadeResponse, ResponseFilter}
+import eu.inn.hyperbus.model.Header
+import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * This filter renames header "revision" to "hyperbus-revision"
   */
-class RevisionHeadersFilter extends OutputFilter {
+class RevisionHeadersFilter extends ResponseFilter {
 
-  override def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
+  override def apply(request: FacadeRequest, response: FacadeResponse)
+                    (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
-      val updatedHeaders = headers.headerOption(Header.REVISION) match {
+      response.headers.get(Header.REVISION) match {
         case Some(revision) ⇒
-          val revision = headers.headers(Header.REVISION)
-          (headers.headers - Header.REVISION) + (FacadeHeaders.CLIENT_REVISION_ID → revision)
-
-        case None ⇒ headers.headers
+          val revision = response.headers(Header.REVISION)
+          response.copy(
+            headers =
+              (response.headers - Header.REVISION) + (FacadeHeaders.CLIENT_REVISION_ID → revision)
+          )
+        case _ ⇒ response
       }
-      (TransitionalHeaders(headers.uri, updatedHeaders, headers.statusCode), body)
     }
   }
 }

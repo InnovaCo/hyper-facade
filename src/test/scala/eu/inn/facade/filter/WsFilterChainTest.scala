@@ -6,9 +6,9 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
 import eu.inn.binders.dynamic.Text
-import eu.inn.facade.filter.chain.{OutputFilterChain, InputFilterChain, InputFilterChain$}
+import eu.inn.facade.filter.chain.{ResponseFilterChain$, RequestFilterChain$, InputFilterChain$}
 import eu.inn.facade.model.FacadeHeaders._
-import eu.inn.facade.model.{InputFilter, OutputFilter, TransitionalHeaders}
+import eu.inn.facade.model.{RequestFilter, ResponseFilter, TransitionalHeaders}
 import eu.inn.facade.http.RequestMapper._
 import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest, Header, Method}
@@ -31,7 +31,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  class TestInputFilter extends InputFilter {
+  class TestInputFilter extends RequestFilter {
     override def apply(requestHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
       if (requestHeaders.headers.nonEmpty) {
         val filteredHeaders = requestHeaders.headers.filterNot{ _._1 == "toBeFiltered" }
@@ -41,7 +41,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     }
   }
 
-  class TestOutputFilter extends OutputFilter {
+  class TestOutputFilter extends ResponseFilter {
     override def apply(responseHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
       if (responseHeaders.headers.nonEmpty) {
         val filteredHeaders = responseHeaders.headers.filterNot { _._1 == "toBeFiltered" }
@@ -75,7 +75,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       def exposeDynamicRequest: (DynamicRequest ⇒ Unit) = { filteredDynamicRequest ⇒
         filteredDynamicRequestPromise.complete(Success(filteredDynamicRequest))
       }
-      val server = system.actorOf(Props(wsWorker(InputFilterChain(), OutputFilterChain(), exposeDynamicRequest)), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(RequestFilterChain(), ResponseFilterChain(), exposeDynamicRequest)), "websocket-worker")
       try {
         val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
           case b: Http.Bound ⇒
@@ -136,7 +136,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       def exposeDynamicRequest: (DynamicRequest ⇒ Unit) = { filteredDynamicRequest ⇒
         filteredDynamicRequestPromise.complete(Success(filteredDynamicRequest))
       }
-      val server = system.actorOf(Props(wsWorker(InputFilterChain(Seq(new TestInputFilter)), OutputFilterChain(), exposeDynamicRequest)), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(RequestFilterChain(Seq(new TestInputFilter)), ResponseFilterChain(), exposeDynamicRequest)), "websocket-worker")
 
       val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
         case b: Http.Bound ⇒
@@ -195,7 +195,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         }
       }), "websocket-client")
 
-      val server = system.actorOf(Props(wsWorker(InputFilterChain(), OutputFilterChain())), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(RequestFilterChain(), ResponseFilterChain())), "websocket-worker")
 
       val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
         case b: Http.Bound ⇒
@@ -255,7 +255,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         }
       }), "websocket-client")
 
-      val server = system.actorOf(Props(wsWorker(InputFilterChain(), OutputFilterChain(Seq(new TestOutputFilter)))), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(RequestFilterChain(), ResponseFilterChain(Seq(new TestOutputFilter)))), "websocket-worker")
 
       val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
         case b: Http.Bound ⇒
@@ -293,8 +293,8 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     }
   }
 
-  def wsWorker(inputFilterChain: InputFilterChain,
-               outputFilterChain: OutputFilterChain,
+  def wsWorker(inputFilterChain: RequestFilterChain,
+               outputFilterChain: ResponseFilterChain,
                exposeDynamicRequestFunction: (DynamicRequest ⇒ Unit) = _ => (),
                exposeHttpRequestFunction: (HttpRequest ⇒ Unit) = _ => ()): Actor = {
     new WsTestWorker(inputFilterChain, outputFilterChain) {

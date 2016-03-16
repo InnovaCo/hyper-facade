@@ -78,13 +78,13 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
     }
 
     val contentType = headers.headerOption(CONTENT_TYPE)
-    filterChainComposer.inputFilterChain(uri, request.method.name, contentType).applyFilters(headers, body)
+    filterChainComposer.requestFilterChain(uri, request.method.name, contentType).applyFilters(headers, body)
   }
 
   def filterOut(response: Response[DynamicBody], uri: api.uri.Uri, method: String): Future[(TransitionalHeaders, DynamicBody)] = {
     val body = response.body
     val headers = updateResponseContentType(response, uri)
-    filterChainComposer.outputFilterChain(uri, method).applyFilters(headers, body)
+    filterChainComposer.responseFilterChain(uri, method).applyFilters(headers, body)
   }
 
   def updateRequestContentType(headers: TransitionalHeaders): TransitionalHeaders = {

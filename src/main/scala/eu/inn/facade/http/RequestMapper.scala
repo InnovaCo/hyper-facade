@@ -88,7 +88,7 @@ object RequestMapper {
     }
   }
 
-  def exceptionToResponse(t: Throwable)(implicit mcf: MessagingContextFactory): Response[Body] = {
+  def exceptionToResponse(t: Throwable)(implicit mcf: MessagingContextFactory): Response[DynamicBody] = {
     val errorId = IdGenerator.create()
     log.error("Can't handle request. #" + errorId, t)
     t match {

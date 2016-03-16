@@ -1,8 +1,6 @@
 package eu.inn.facade.model
 
-import eu.inn.hyperbus.model.DynamicRequest
-
-case class ClientRequest(underlyingRequest: DynamicRequest)
+//case class ClientRequest(underlyingRequest: FacadeRequest)
 
 object ClientSpecificMethod {
   val SUBSCRIBE = "subscribe"
