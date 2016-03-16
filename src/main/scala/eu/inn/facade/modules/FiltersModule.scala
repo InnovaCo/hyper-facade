@@ -12,8 +12,7 @@ import scala.collection.JavaConversions._
 class FiltersModule extends Module {
 
   bind [Seq[Filter]]        identifiedBy "privateResource"                      to Seq(new PrivateResourceFilter)
-  bind [Seq[Filter]]        identifiedBy "privateField"                         to Seq(new PrivateFieldsFilter(inject [RamlConfig] ) with InputFilter,
-                                                                                       new PrivateFieldsFilter(inject [RamlConfig] ) with OutputFilter)
+  bind [Seq[Filter]]        identifiedBy "privateField"                         to Seq(new PrivateFieldsFilter(inject [RamlConfig] ))
   bind [Seq[Filter]]        identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilter(inject [RamlConfig] ) with InputFilter,
                                                                                        new EnrichmentFilter(inject [RamlConfig] ) with OutputFilter)
   bind [Seq[Filter]]        identifiedBy "revisionHeaders"                      to Seq(new RevisionHeadersFilter)

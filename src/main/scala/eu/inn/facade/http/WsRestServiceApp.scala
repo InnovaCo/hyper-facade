@@ -4,10 +4,8 @@ import akka.actor._
 import akka.io.{IO, Inet, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
-import com.typesafe.config.Config
 import eu.inn.facade.StatsReporterFactory
 import eu.inn.facade.events.SubscriptionsManager
-import eu.inn.hyperbus.HyperBus
 import scaldi.{Injectable, Injector}
 import spray.can.Http
 import spray.can.server.{ServerSettings, UHttp}
@@ -17,22 +15,14 @@ import spray.routing._
 import scala.collection.immutable
 import scala.concurrent.Future
 
-class WsRestServiceApp(interface: String, port: Int)(implicit inj: Injector)
-  extends RestServiceApp(interface, port)
+class WsRestServiceApp(implicit inj: Injector)
+  extends RestServiceApp
   with Injectable {
 
   private val stats = inject [StatsReporterFactory].createStats("http")
   private val connectionCountStat = stats.counter("connection-count")
   private val rejectedConnectionsMetter = stats.meter("rejected-connects")
-  val config = inject [Config]
-  val hyperBus = inject [HyperBus]
   val subscriptionsManager = inject [SubscriptionsManager]
-
-  @volatile private[this] var _refFactory: Option[ActorRefFactory] = None
-
-  override implicit def actorRefFactory = _refFactory getOrElse sys.error(
-    "Route creation is not fully supported before `startServer` has been called, " +
-      "maybe you can turn your route definition into a `def` ?")
 
   override def startServer(interface: String,
                            port: Int,
@@ -47,7 +37,6 @@ class WsRestServiceApp(interface: String, port: Int)(implicit inj: Injector)
     val serviceActor = system.actorOf(
       props = Props {
         new Actor {
-          _refFactory = Some(context)
           val noMoreConnectionsWorker = context.actorOf(
             Props(classOf[NoMoreConnectionsWorker], maxConnectionCount),
             "no-more-connections"
@@ -80,7 +69,6 @@ class WsRestServiceApp(interface: String, port: Int)(implicit inj: Injector)
       },
       name = serviceActorName)
 
-    //val system = 0
     val io = IO(UHttp)(system)
     io.ask(Http.Bind(serviceActor, interface, port, backlog, options, settings))(bindingTimeout).flatMap {
       case b: Http.Bound ⇒ Future.successful(b)

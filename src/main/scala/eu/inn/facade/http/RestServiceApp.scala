@@ -6,6 +6,9 @@ import akka.actor.ActorSystem
 import akka.event.Logging._
 import akka.util.Timeout
 import com.typesafe.config.Config
+import eu.inn.config.ConfigExtenders._
+import eu.inn.hyperbus.HyperBus
+import eu.inn.servicecontrol.api.Service
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
 import spray.http._
@@ -13,21 +16,29 @@ import spray.routing._
 import spray.routing.directives.LogEntry
 
 import scala.collection.JavaConversions._
-import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext}
 import scala.util.{Failure, Success}
 
-class RestServiceApp(interface: String, port: Int)(implicit inj: Injector) extends SimpleRoutingApp
+class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
+  with Service
   with Injectable {
 
   implicit val timeout = Timeout(10 seconds)
   implicit val actorSystem = inject [ActorSystem]
   implicit val executionContext = inject [ExecutionContext]
 
-  private val conf = inject [Config].getConfig("inn.util.http.rest-service")
-  private val handleErrorsDirectives = inject [HandleErrorsDirectives]
   private val ErrorHandlerHeader = "X-Errors-Handled"
   val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
+
+  val config = inject [Config]
+  val restConfig = config.getConfig("inn.util.http.rest-service")
+  val handleErrorsDirectives = inject [HandleErrorsDirectives]
+  val shutdownTimeout = config.getFiniteDuration("inn.facade.shutdown-timeout")
+  val hyperBus = inject [HyperBus]  // it's time to initialize hyperbus
+  log.info("hyperbus is starting...: {}", hyperBus)
+  val interface = config.getString("inn.facade.rest-api.host")
+  val port = config.getInt("inn.facade.rest-api.port")
 
   def start(initRoutes: ⇒ Route) {
     startServer(interface, port) {
@@ -43,9 +54,9 @@ class RestServiceApp(interface: String, port: Int)(implicit inj: Injector) exten
   }
 
   def startWithDirectives(initRoutes: ⇒ Route): Route = {
-    enableAccessLogIf(conf.getBoolean("access-log.enabled")) {
+    enableAccessLogIf(restConfig.getBoolean("access-log.enabled")) {
       addJsonMediaTypeIfNotExists {
-        respondWithCORSHeaders(conf.getStringList("cors.allowed-origins"), conf.getStringList("cors.allowed-paths").map(Pattern.compile)) {
+        respondWithCORSHeaders(restConfig.getStringList("cors.allowed-origins"), restConfig.getStringList("cors.allowed-paths").map(Pattern.compile)) {
           mapHttpResponseHeaders(_.filterNot(_.name == ErrorHandlerHeader)) {
             handleErrorsDirectives.handleErrors(handleErrorsDirectives.DefaultErrorFormatter) {
               pathSuffix(Slash.?) {
@@ -56,6 +67,24 @@ class RestServiceApp(interface: String, port: Int)(implicit inj: Injector) exten
         }
       }
     }
+  }
+
+  override def stopService(controlBreak: Boolean): Unit = {
+    log.info("Stopping HyperBus Facade...")
+    println("Stopping HyperBus Facade...")
+    try {
+      Await.result(actorSystem.terminate(), shutdownTimeout)
+    } catch {
+      case t: Throwable ⇒
+        log.error("ActorSystem wasn't terminated gracefully", t)
+    }
+    try {
+      Await.result(hyperBus.shutdown(shutdownTimeout*4/5), shutdownTimeout)
+    } catch {
+      case t: Throwable ⇒
+        log.error("HyperBus didn't shutdown gracefully", t)
+    }
+    log.info("HyperBus Facade stopped")
   }
 
   private def respondWithCORSHeaders(allowedOrigins: Seq[String], allowedPaths: Seq[Pattern] = Nil): Directive0 =
