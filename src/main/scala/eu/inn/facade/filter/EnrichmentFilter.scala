@@ -1,26 +1,26 @@
 package eu.inn.facade.filter
 
-import eu.inn.binders.dynamic.{Obj, Text}
+import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
-import eu.inn.facade.raml.Annotation._
-import eu.inn.facade.raml.RamlConfig
-import eu.inn.hyperbus.model.DynamicBody
+import eu.inn.facade.raml.Field
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, Future}
 
 class EnrichmentFilterFactory extends RamlFilterFactory {
-  override def createRequestFilter(target: RamlTarget): Option[RequestFilter] = {
+  def createFilterChain(target: RamlTarget): FilterChain = {
     target match {
-      case TargetTypeDeclaration(typeName, fields) ⇒ Some(new EnrichRequestFilter(fields))
-      case _ ⇒ None // log warning
+      case TargetFields(typeName, fields) ⇒
+        FilterChain(
+          requestFilters = Seq(new EnrichRequestFilter(fields)),
+          responseFilters = Seq.empty,
+          eventFilters = Seq.empty
+        )
+      case _ ⇒ FilterChain.empty // log warning
     }
   }
-  override def createResponseFilter(target: RamlTarget): Option[ResponseFilter] = None
-  override def createEventFilter(target: RamlTarget): Option[EventFilter] = None
 }
 
-class EnrichRequestFilter(val privateFields: Seq[String]) extends RequestFilter {
+class EnrichRequestFilter(val privateFields: Seq[Field]) extends RequestFilter {
 
   /*
   def enrichBody(headers: TransitionalHeaders, body: DynamicBody): DynamicBody = {

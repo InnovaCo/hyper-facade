@@ -4,6 +4,7 @@ import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChainFactory
+import eu.inn.facade.model.{FacadeResponse, FacadeRequest}
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
@@ -94,8 +95,11 @@ class WsRestWorker(val serverConnection: ActorRef,
     case x: FrameCommandFailed =>
       log.error(s"Frame command $x failed from ${sender()}/$remoteAddress")
 
-    case message: Message[Body] ⇒
-      send(message)
+    case response: FacadeResponse ⇒
+      send(response.toDynamicResponse)
+
+    case event: FacadeRequest ⇒
+      send(event.toDynamicRequest)
   }
 
   def httpRequests: Receive = {
@@ -108,10 +112,10 @@ class WsRestWorker(val serverConnection: ActorRef,
   def processRequest(request: DynamicRequest) = {
     val key = RequestMapper.correlationId(request.headers)
     val actorName = "Subscr-" + key
-    val clientRequest = ClientRequest(request)
+    val facadeRequest = FacadeRequest(request)
     context.child(actorName) match {
-      case Some(actor) ⇒ actor.forward(clientRequest)
-      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperBus, subscriptionManager), actorName) ! clientRequest
+      case Some(actor) ⇒ actor.forward(facadeRequest)
+      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperBus, subscriptionManager), actorName) ! facadeRequest
     }
   }
 

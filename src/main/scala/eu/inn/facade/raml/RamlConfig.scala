@@ -1,5 +1,6 @@
 package eu.inn.facade.raml
 
+import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.raml.annotations.RamlAnnotation
 import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.transport.api.uri._
@@ -74,12 +75,12 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
   }
 }
 
-case class ResourceConfig(traits: Traits, requests: Requests, responses: Responses)
-object ResourceConfig {
-  def apply(traits: Traits): ResourceConfig = {
-    ResourceConfig(traits, Requests(Map()), Responses(Map()))
-  }
-}
+case class ResourceConfig(
+                           traits: Traits,
+                           requests: Requests,
+                           responses: Responses,
+                           filterChain: FilterChain
+                         )
 
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
 
@@ -109,7 +110,7 @@ object Method {
 
 case class ContentType(mediaType: String)
 
-case class DataStructure(headers: Seq[Header], body: Option[Body])
+case class DataStructure(headers: Seq[Header], body: Option[Body], filterChain: FilterChain)
 
 case class Header(name: String)
 
@@ -124,7 +125,7 @@ object DataType {
 case class Body(dataType: DataType)
 
 case class Field(name: String, dataType: DataType) {
-  def isPrivate: Boolean = dataType.annotations.exists(_.name == Annotation.PRIVATE)
+  //def isPrivate: Boolean = dataType.annotations.exists(_.name == Annotation.PRIVATE)
 }
 
 case class Annotation(name: String, value: Option[RamlAnnotation])

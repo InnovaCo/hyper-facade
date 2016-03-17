@@ -3,7 +3,6 @@ package eu.inn.facade.events
 import akka.actor._
 import akka.pattern.pipe
 import com.typesafe.config.Config
-import eu.inn.facade.filter.chain.FilterChains
 import eu.inn.facade.http.RequestMapper
 import eu.inn.facade.model._
 import eu.inn.facade.raml.{Method, RamlConfig}
@@ -23,7 +22,6 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   with Stash
   with Injectable {
 
-  val filterChains = inject[FilterChains]
   val ramlConfig = inject[RamlConfig]
   val maxResubscriptionsCount = inject[Config].getInt("inn.facade.maxResubscriptionsCount")
   var subscriptionId: Option[String] = None
