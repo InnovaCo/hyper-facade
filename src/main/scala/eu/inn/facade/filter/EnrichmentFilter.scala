@@ -1,21 +1,21 @@
 package eu.inn.facade.filter
 
-import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.filter.chain.Filters
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Field
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class EnrichmentFilterFactory extends RamlFilterFactory {
-  def createFilterChain(target: RamlTarget): FilterChain = {
+  def createFilters(target: RamlTarget): Filters = {
     target match {
       case TargetFields(typeName, fields) ⇒
-        FilterChain(
+        Filters(
           requestFilters = Seq(new EnrichRequestFilter(fields)),
           responseFilters = Seq.empty,
           eventFilters = Seq.empty
         )
-      case _ ⇒ FilterChain.empty // log warning
+      case _ ⇒ Filters.empty // log warning
     }
   }
 }
@@ -62,10 +62,10 @@ class EnrichRequestFilter(val privateFields: Seq[Field]) extends RequestFilter {
   }
 */
 
-  override def apply(input: FacadeRequest)
+  override def apply(originalRequest: FacadeRequest, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
-      input
+      request
     }
   }
 }

@@ -6,7 +6,7 @@ import akka.util.ByteString
 import eu.inn.binders.dynamic.{Null, Obj, Text}
 import eu.inn.binders.json._
 import eu.inn.facade.model.FacadeHeaders._
-import eu.inn.facade.model.TransitionalHeaders
+import eu.inn.facade.model.{FacadeHeaders, TransitionalHeaders}
 import eu.inn.hyperbus._
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.serialization.RequestHeader
@@ -121,6 +121,7 @@ object RequestMapper {
     TextFrame(ByteString(ba.toByteArray))
   }
 
+  /*
   def toHttpResponse(headers: TransitionalHeaders, body: DynamicBody): HttpResponse = {
     val statusCode = StatusCode.int2StatusCode(headers.statusCode getOrElse 200)
     val httpContentType: ContentType = contentType(headers.headerOption(Header.CONTENT_TYPE))
@@ -134,7 +135,7 @@ object RequestMapper {
     val jsonBody = Text(message).toJson
     HttpResponse(httpStatusCode, HttpEntity(httpContentType, jsonBody), List())
   }
-
+*/
   def extractRequestHeaders(requestUri: uri.Uri, headers: Headers): TransitionalHeaders = {
     TransitionalHeaders(requestUri, headers, None)
   }
@@ -157,6 +158,7 @@ object RequestMapper {
         DynamicRequest(uri, updatedBody, requestHeader)
     }
   }
+
 
   private def errorBody(dynamicBody: DynamicBody): ErrorBody = {
     val dynamicFields = dynamicBody.content.asMap
@@ -191,7 +193,7 @@ object RequestMapper {
         spray.http.ContentType(mediaType, `UTF-8`)
     }
   }
-
+/*
   private def extractHttpHeaders(headers: TransitionalHeaders): List[HttpHeader]= {
     var httpHeaders = List[HttpHeader]()
     headers.headers.foreach {
@@ -199,5 +201,5 @@ object RequestMapper {
         if (!isDynamicHeader(name)) httpHeaders = httpHeaders :+ RawHeader(name, value.head)
     }
     httpHeaders
-  }
+  }*/
 }

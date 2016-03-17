@@ -3,6 +3,7 @@ package eu.inn.facade.events
 import akka.actor._
 import akka.pattern.pipe
 import com.typesafe.config.Config
+import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.http.RequestMapper
 import eu.inn.facade.model._
 import eu.inn.facade.raml.{Method, RamlConfig}
@@ -23,6 +24,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   with Injectable {
 
   val ramlConfig = inject[RamlConfig]
+  val filterChain = inject[FilterChain]
   val maxResubscriptionsCount = inject[Config].getInt("inn.facade.maxResubscriptionsCount")
   var subscriptionId: Option[String] = None
 
@@ -59,7 +61,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     case resourceState: Response[DynamicBody] ⇒
       val facadeResponse = FacadeResponse(resourceState)
-      filterChains.filterResponse(request, facadeResponse) map { filteredResponse ⇒
+      val responseFilterContext = ResponseFilterContext(request.uri, )
+      filterChain.filterResponse(request, facadeResponse) map { filteredResponse ⇒
         websocketWorker ! filteredResponse
         filteredResponse.headers.get(Header.REVISION) match {
           // reliable feed
@@ -101,10 +104,10 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def processRequest(request: FacadeRequest): Unit = {
-    filterChains.filterRequest(request) flatMap { filteredRequest ⇒
+    filterChain.filterRequest(request) flatMap { filteredRequest ⇒
       implicit val mvx = serverMvx(filteredRequest)
       hyperBus <~ filteredRequest.toDynamicRequest flatMap { response ⇒
-        filterChains.filterResponse(request, FacadeResponse(response))
+        filterChain.filterResponse(request, FacadeResponse(response))
       }
     } recover {
       case e: FilterInterruptException ⇒
@@ -128,18 +131,18 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
     subscriptionId.foreach(subscriptionManager.off)
     subscriptionId = None
-    filterChains.filterRequest(request) map { filteredRequest ⇒
+    filterChain.filterRequest(request) map { filteredRequest ⇒
       implicit val mvx = serverMvx(filteredRequest)
       this.subscriptionId = Some(subscriptionManager.subscribe(request.uri, self, request.correlationId))
       context.become(subscribing(request, subscriptionSyncTries))
       hyperBus <~ request.copy(method = Method.GET).toDynamicRequest flatMap { response ⇒
-        filterChains.filterResponse(request, FacadeResponse(response))
+        filterChain.filterResponse(request, FacadeResponse(response))
       }
     } pipeTo self
   }
 
   def processUnreliableEvent(request: FacadeRequest, event: DynamicRequest): Unit = {
-    filterChains.filterEvent(request, FacadeRequest(event)) map { filteredRequest ⇒
+    filterChain.filterEvent(request, FacadeRequest(event)) map { filteredRequest ⇒
       websocketWorker ! filteredRequest.toDynamicRequest
     } recover {
       case e: FilterInterruptException ⇒
@@ -156,7 +159,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def processReliableEvent(request: FacadeRequest, event: DynamicRequest, lastRevisionId: Long, subscriptionSyncTries: Int): Unit = {
-    filterChains.filterEvent(request, FacadeRequest(event)) map { filteredRequest ⇒
+    filterChain.filterEvent(request, FacadeRequest(event)) map { filteredRequest ⇒
       val revisionId = filteredRequest.headers(Header.REVISION).head.toLong
 
       if (revisionId == lastRevisionId + 1) {

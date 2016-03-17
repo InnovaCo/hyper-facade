@@ -1,26 +1,23 @@
 package eu.inn.facade.filter
 
-import java.io.ByteArrayOutputStream
-
-import eu.inn.binders.dynamic.Text
+import eu.inn.facade.filter.chain.Filters
 import eu.inn.facade.model._
-import eu.inn.hyperbus.model.{NotFound, DynamicBody, ErrorBody}
+import eu.inn.hyperbus.model.{ErrorBody, NotFound}
 
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{ExecutionContext, Future}
 
 class PrivateResourceFilterFactory extends RamlFilterFactory {
-  override def createRequestFilter(target: RamlTarget): Option[RequestFilter] = {
+  override def createFilters(target: RamlTarget): Filters = {
     target match {
-      case TargetResource(uri) ⇒ Some(new PrivateResourceFilter)
-      case TargetMethod(uri, method) ⇒ Some(new PrivateResourceFilter)
-      case _ ⇒ None // log warning
+      case TargetResource(_) | TargetMethod(_, _) ⇒ Filters(
+        requestFilters = Seq(new PrivateResourceFilter),
+        responseFilters = Seq.empty,
+        eventFilters = Seq.empty
+      )
+      case _ ⇒ Filters.empty // log warning
     }
   }
-  override def createEventFilter(target: RamlTarget): Option[EventFilter] = None
-  override def createResponseFilter(target: RamlTarget): Option[ResponseFilter] = None
 }
-
 
 class PrivateResourceFilter extends RequestFilter {
   override def apply(input: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {

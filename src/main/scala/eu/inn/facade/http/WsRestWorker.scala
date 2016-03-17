@@ -3,7 +3,7 @@ package eu.inn.facade.http
 import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
-import eu.inn.facade.filter.chain.FilterChainFactory
+import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.{FacadeResponse, FacadeRequest}
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
@@ -30,7 +30,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   var remoteAddress = clientAddress
   var httpRequest: Option[HttpRequest] = None
 
-  val filterChainComposer = inject[FilterChainFactory]
+  val filterChainComposer = inject[FilterChain]
   val ramlConfig = inject[RamlConfig]
 
   override def preStart(): Unit = {

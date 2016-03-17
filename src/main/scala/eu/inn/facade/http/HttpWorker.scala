@@ -1,32 +1,25 @@
 package eu.inn.facade.http
 
 import akka.actor.ActorSystem
-import eu.inn.binders.json._
-import eu.inn.facade.filter.chain.{FilterChains, FilterChainFactory}
-import eu.inn.facade.model.{FilterInterruptException, FacadeResponse, FacadeRequest, TransitionalHeaders}
-import eu.inn.facade.model.FacadeHeaders._
+import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.model.{FacadeRequest, FacadeResponse, FilterInterruptException}
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.HyperBus
 import eu.inn.hyperbus.model._
-import eu.inn.hyperbus.model.Header._
-import eu.inn.hyperbus.serialization.StringDeserializer
-import eu.inn.hyperbus.transport.api
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
-import spray.http.ContentTypes._
 import spray.http._
 import spray.routing.Directives._
 import spray.routing._
 
-import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.Success
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
 class HttpWorker(implicit inj: Injector) extends Injectable {
 
   val hyperBus = inject[HyperBus]
   val ramlConfig = inject[RamlConfig]
-  val filterChains = inject[FilterChains]
+  val filterChain = inject[FilterChain]
   val log = LoggerFactory.getLogger(HttpWorker.this.getClass.getName)
   implicit val actorSystem = inject[ActorSystem]
   implicit val executionContext = inject[ExecutionContext]
@@ -44,9 +37,9 @@ class HttpWorker(implicit inj: Injector) extends Injectable {
     val resourceUri = ramlConfig.resourceUri(request.uri.path.toString)
     val facadeRequest = FacadeRequest(resourceUri, request)
 
-    filterChains.filterRequest(facadeRequest) flatMap { filteredRequest ⇒
+    filterChain.filterRequest(facadeRequest) flatMap { filteredRequest ⇒
       hyperBus <~ filteredRequest.toDynamicRequest flatMap { response ⇒
-        filterChains.filterResponse(facadeRequest, FacadeResponse(response))
+        filterChain.filterResponse(facadeRequest, FacadeResponse(response))
       }
     } recover {
       case e: FilterInterruptException ⇒

@@ -6,7 +6,7 @@ import com.mulesoft.raml1.java.parser.model.bodies.Response
 import com.mulesoft.raml1.java.parser.model.datamodel.DataElement
 import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
-import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.filter.chain.Filters
 import eu.inn.facade.model._
 import eu.inn.facade.raml.annotations.RamlAnnotation
 import scaldi.{Injectable, Injector}
@@ -43,10 +43,10 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   }
 
   private def createFilterChain(target: RamlTarget, traits: Seq[Trait]) = {
-    traits.foldLeft(FilterChain.empty) { (filterChain, tr) ⇒
+    traits.foldLeft(Filters.empty) { (filterChain, tr) ⇒
       val filterFactories = inject[Seq[RamlFilterFactory]](tr.name)
       filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
-        filterChainInner ++ factory.createFilterChain(target)
+        filterChainInner ++ factory.createFilters(target)
       }
     }
   }
@@ -91,7 +91,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   }
 
   private def extractTypeDefinitions(ramlReqRspWrapper: RamlRequestResponseWrapper,
-                                     methodFilterChain: FilterChain): Map[Option[ContentType], DataStructure] = {
+                                     methodFilters: Filters): Map[Option[ContentType], DataStructure] = {
     val headers = ramlReqRspWrapper.headers.foldLeft(Seq.newBuilder[Header]) { (headerList, ramlHeader) ⇒
       headerList += Header(ramlHeader.name())
     }.result()
@@ -127,8 +127,8 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
 
             val filterChain = filterMap.map { case (factory, filteredFields) ⇒
               val target = TargetFields(name, filteredFields)
-              factory.createFilterChain(target)
-            }.foldLeft (methodFilterChain) { (filterChain, next) ⇒
+              factory.createFilters(target)
+            }.foldLeft (methodFilters) { (filterChain, next) ⇒
               filterChain ++ next
             }
 
@@ -136,10 +136,10 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             val dataType = DataStructure(headers, Some(body), filterChain)
             dataType
 
-          case None ⇒ DataStructure(headers, Some(Body(DataType())), methodFilterChain)
+          case None ⇒ DataStructure(headers, Some(Body(DataType())), methodFilters)
         }
 
-        case None ⇒ DataStructure(headers, Some(Body(DataType())), methodFilterChain)
+        case None ⇒ DataStructure(headers, Some(Body(DataType())), methodFilters)
       }
       typeDefinitions += (contentType → dataStructure)
     }.result()

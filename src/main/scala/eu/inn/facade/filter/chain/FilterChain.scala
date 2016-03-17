@@ -5,36 +5,23 @@ import eu.inn.facade.utils.FutureUtils
 
 import scala.concurrent.{ExecutionContext, Future}
 
-case class FilterChain(
-                         requestFilters: Seq[RequestFilter],
-                         responseFilters: Seq[ResponseFilter],
-                         eventFilters: Seq[EventFilter]
-                       ) {
-
-  def filterRequest(input: FacadeRequest)
+trait FilterChain {
+  def filterRequest(context: RequestFilterContext, request: FacadeRequest)
                    (implicit ec: ExecutionContext): Future[FacadeRequest] = {
-    FutureUtils.chain(input, requestFilters.map(f ⇒ f.apply _))
+    FutureUtils.chain(request, requestFilters(context, request).map(f ⇒ f.apply(context, _ : FacadeRequest)))
   }
 
-  def filterResponse(input: FacadeRequest, output: FacadeResponse)
+  def filterResponse(context: ResponseFilterContext, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
-    FutureUtils.chain(output, responseFilters.map(f ⇒ f.apply(input, _ : FacadeResponse)))
+    FutureUtils.chain(response, responseFilters(context, response).map(f ⇒ f.apply(context, _ : FacadeResponse)))
   }
 
-  def filterEvent(input: FacadeRequest, output: FacadeRequest)
+  def filterEvent(context: EventFilterContext, event: FacadeRequest)
                  (implicit ec: ExecutionContext): Future[FacadeRequest] = {
-    FutureUtils.chain(output, eventFilters.map(f ⇒ f.apply(input, _ : FacadeRequest)))
+    FutureUtils.chain(event, eventFilters(context, event).map(f ⇒ f.apply(context, _ : FacadeRequest)))
   }
 
-  def ++ (other: FilterChain): FilterChain = {
-    FilterChain(
-      requestFilters ++ other.requestFilters,
-      responseFilters ++ other.responseFilters,
-      eventFilters ++ other.eventFilters
-    )
-  }
-}
-
-object FilterChain {
-  val empty = FilterChain(Seq.empty,Seq.empty,Seq.empty)
+  def requestFilters(context: RequestFilterContext, request: FacadeRequest): Seq[RequestFilter]
+  def responseFilters(context: ResponseFilterContext, response: FacadeResponse): Seq[ResponseFilter]
+  def eventFilters(context: EventFilterContext, event: FacadeRequest): Seq[EventFilter]
 }

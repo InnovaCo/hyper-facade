@@ -1,12 +1,12 @@
 package eu.inn.facade.model
 
-import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.filter.chain.Filters
 import eu.inn.facade.raml.Field
 
 trait Filter
 
 trait RamlFilterFactory {
-  def createFilterChain(target: RamlTarget): FilterChain
+  def createFilters(target: RamlTarget): Filters
 }
 
 sealed trait RamlTarget

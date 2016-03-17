@@ -2,14 +2,19 @@ package eu.inn.facade.filter.chain
 
 import eu.inn.facade.model._
 import eu.inn.facade.raml.{DataStructure, RamlConfig}
+import eu.inn.facade.utils.FutureUtils
 import eu.inn.hyperbus.transport.api.uri.Uri
 import scaldi.{Injectable, Injector}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory with Injectable {
 
-  val ramlConfig = inject[RamlConfig]
+class FilterChainRaml(ramlConfig: RamlConfig) extends FilterChain with Injectable {
+  override def requestFilters(request: FacadeRequest): Seq[RequestFilter] = ???
+  override def responseFilters(request: FacadeRequest, response: FacadeResponse): Seq[ResponseFilter] = ???
+  override def eventFilters(request: FacadeRequest, event: FacadeRequest): Seq[EventFilter] = ???
 
+/*
   override def requestFilterChain(input: FacadeRequest): RequestFilterChain = {
     val dataStructure = ramlConfig.requestDataStructure(input.uri.pattern.specific, input.method, input.contentType)
     val dataStructures: Seq[DataStructure] = dataStructure match {
@@ -67,5 +72,5 @@ class FilterChainRamlFactory(implicit inj: Injector) extends FilterChainFactory 
         case None ⇒ filters
       }
     }
-  }
+  }*/
 }

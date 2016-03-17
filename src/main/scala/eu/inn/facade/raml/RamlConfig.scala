@@ -1,9 +1,12 @@
 package eu.inn.facade.raml
 
-import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.filter.chain.Filters
+import eu.inn.facade.model.{FacadeResponse, FacadeRequest}
 import eu.inn.facade.raml.annotations.RamlAnnotation
 import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.transport.api.uri._
+
+import scala.concurrent.Future
 
 class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
 
@@ -79,7 +82,7 @@ case class ResourceConfig(
                            traits: Traits,
                            requests: Requests,
                            responses: Responses,
-                           filterChain: FilterChain
+                           filters: Filters
                          )
 
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
@@ -110,7 +113,7 @@ object Method {
 
 case class ContentType(mediaType: String)
 
-case class DataStructure(headers: Seq[Header], body: Option[Body], filterChain: FilterChain)
+case class DataStructure(headers: Seq[Header], body: Option[Body], filters: Filters)
 
 case class Header(name: String)
 

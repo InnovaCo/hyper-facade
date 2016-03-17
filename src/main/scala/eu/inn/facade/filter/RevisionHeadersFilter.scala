@@ -6,10 +6,11 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /**
   * This filter renames header "revision" to "hyperbus-revision"
+  * todo: replace with def input/output filter
   */
 class RevisionHeadersFilter extends ResponseFilter {
 
-  override def apply(request: FacadeRequest, response: FacadeResponse)
+  override def apply(originalRequest: FacadeRequest, originalResponse: FacadeResponse, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       response.headers.get(Header.REVISION) match {
@@ -17,7 +18,7 @@ class RevisionHeadersFilter extends ResponseFilter {
           val revision = response.headers(Header.REVISION)
           response.copy(
             headers =
-              (response.headers - Header.REVISION) + (FacadeHeaders.CLIENT_REVISION_ID → revision)
+              (response.headers - Header.REVISION) + (FacadeHeaders.CLIENT_REVISION → revision)
           )
         case _ ⇒ response
       }

@@ -1,7 +1,8 @@
 package eu.inn.facade.filter
 
-import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.model.Filter
+import eu.inn.binders.dynamic.Null
+import eu.inn.facade.filter.chain.{FilterChainRaml, FilterChain}
+import eu.inn.facade.model._
 import eu.inn.facade.modules.{ConfigModule, FiltersModule}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
@@ -11,32 +12,36 @@ class FilterChainRamlFactoryTest extends FreeSpec with Matchers with Injectable 
 
 
   implicit val injector = new ConfigModule :: new FiltersModule :: new Module {
-    bind [Seq[Filter]] identifiedBy "paged" to Seq(new NoOpFilter)
+    bind [Seq[RamlFilterFactory]] identifiedBy "paged" to Seq(new NoOpFilterFactory)
   }
   injector.initNonLazy()
-  val filterChainFactory = inject [FilterChainFactory]
+  val filterChain = inject [FilterChain].asInstanceOf[FilterChainRaml]
 
   "FilterChainRamlFactory " - {
     "trait based filter chain" in {
-      val chain = filterChainFactory.requestFilterChain(Uri("/private"), "get", None)
-
-      chain.filters shouldBe inject [Seq[Filter]]("privateResource")
+      val filters = filterChain.requestFilters(FacadeRequest(Uri("/private"), "get", Map.empty, Null))
+      filters.length should equal(1)
+      filters.head shouldBe a[PrivateResourceFilter]
     }
 
     "annotation based filter chain" in {
-      val chain = filterChainFactory.requestFilterChain(Uri("/status/test-service"), "get", None)
-
-      val inputEnrichmentFilter = inject [Seq[Filter]]("x-client-ip")
-      chain.filters shouldBe inputEnrichmentFilter
+      val filters = filterChain.requestFilters(FacadeRequest(Uri("/status/test-service"), "get", Map.empty, Null))
+      filters.length should equal(1)
+      filters.head shouldBe a[EnrichRequestFilter]
     }
 
     "trait and annotation based filter chain" in {
-      val chain = filterChainFactory.responseFilterChain(Uri("/users"), "get")
+      val filters = filterChain.responseFilters(
+        FacadeRequest(Uri("/users"), "get", Map.empty, Null),
+        FacadeResponse(200, Map.empty, Null)
+      )
 
-      val outputPrivateFieldFilter = inject [Seq[Filter]]("privateField")
-      val pagedOutputFilter = inject [Seq[Filter]]("paged")
       val defaultResponseFilters = inject [Seq[Filter]]("defaultResponseFilters")
-      chain.filters shouldBe pagedOutputFilter ++ outputPrivateFieldFilter ++ defaultResponseFilters
+
+      filters.size should equal(defaultResponseFilters.size + 2)
+      filters.head shouldBe a[NoOpFilter]
+      filters.tail.head shouldBe a[PrivateFieldsFilter]
+      filters.tail.tail should equal(defaultResponseFilters)
     }
   }
 }
