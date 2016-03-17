@@ -7,9 +7,9 @@ import scala.concurrent.{ExecutionContext, Future}
 
 case class EventFilterContext(
                                   uri: Uri,
-                                  httpUri: spray.http.Uri,
                                   requestHeaders: Map[String, Seq[String]],
                                   requestBody: Value,
+                                  eventMethod: String,
                                   eventHeaders: Map[String, Seq[String]],
                                   eventBody: Value
                                 )

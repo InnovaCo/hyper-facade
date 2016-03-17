@@ -1,10 +1,15 @@
 package eu.inn.facade.model
 
 import eu.inn.binders.dynamic.Value
+import eu.inn.binders.naming.SnakeCaseToCamelCaseConverter
 import eu.inn.hyperbus.model._
-import eu.inn.hyperbus.serialization.StringDeserializer
+import eu.inn.hyperbus.serialization.{ResponseHeader, StringDeserializer}
 import eu.inn.hyperbus.transport.api.uri.Uri
-import spray.http.{HttpRequest, HttpResponse}
+import spray.http.HttpCharsets._
+import spray.http.HttpHeaders.RawHeader
+import spray.http.MediaTypes._
+import spray.http._
+import eu.inn.binders.json._
 
 trait FacadeMessage {
   def headers: Map[String, Seq[String]]
@@ -14,7 +19,7 @@ trait FacadeMessage {
 case class FacadeRequest(uri: Uri, method: String, headers: Map[String, Seq[String]], body: Value) extends FacadeMessage {
   def toDynamicRequest: DynamicRequest = {
     DynamicRequest(uri, DynamicBody(body),
-      new HeadersBuilder(FacadeRequest.facadeHeadersToHyperbus(headers))
+      new HeadersBuilder(headers)
       .withMethod(method)
       .result()
     )
@@ -30,14 +35,16 @@ case class FacadeRequest(uri: Uri, method: String, headers: Map[String, Seq[Stri
   }
 }
 
+// todo: converters make explicit
+
 object FacadeRequest {
-  def apply(uri: Uri, request: HttpRequest): FacadeRequest = {
-    FacadeRequest(uri,
+  val snakeCaseToCamelCase = new SnakeCaseToCamelCaseConverter
+
+  def apply(request: HttpRequest): FacadeRequest = {
+    FacadeRequest(Uri(request.uri.path.toString),
       request.method.name,
-      request.headers.map { kv ⇒
-        kv.name → kv.value
-      } groupBy (_._1)  map { kv ⇒
-        kv._1 → kv._2.map(_._2)
+      request.headers.groupBy (_.name) map { kv ⇒
+        snakeCaseToCamelCase.convert(kv._1) → kv._2.map(_.value)
       },
     StringDeserializer.dynamicBody(Some(request.entity.asString)).content
     )
@@ -47,58 +54,64 @@ object FacadeRequest {
     FacadeRequest(
       request.uri,
       request.method,
-      hyperBusHeadersToFacade(request.headers),
+      request.headers.filterNot(_ == Header.METHOD),
       request.body.content
     )
   }
-
-  private def facadeHeadersToHyperbus(headers: Map[String, Seq[String]]): Map[String, Seq[String]] = {
-    headers.foldLeft(Map.newBuilder[String, Seq[String]]) {
-      case (newHeaders, (Header.CONTENT_TYPE, value :: tail))
-        if value.startsWith(FacadeHeaders.CERTAIN_CONTENT_TYPE_START)
-          && value.endsWith(FacadeHeaders.CERTAIN_CONTENT_TYPE_END) ⇒
-
-        val beginIndex = FacadeHeaders.CERTAIN_CONTENT_TYPE_START.length
-        val endIndex = value.length - FacadeHeaders.CERTAIN_CONTENT_TYPE_END.length
-
-        newHeaders += Header.CONTENT_TYPE → Seq(value.substring(beginIndex, endIndex))
-
-      case (newHeaders, (k, v)) if directFacadeToHyperBus.contains(k) ⇒
-        newHeaders += directFacadeToHyperBus(k) → v
-    } result()
-  }
-
-  private def hyperBusHeadersToFacade(headers: Map[String, Seq[String]]): Map[String, Seq[String]] = {
-    headers.foldLeft(Map.newBuilder[String, Seq[String]]) {
-      case (newHeaders, (Header.CONTENT_TYPE, value :: tail)) ⇒
-        newHeaders += Header.CONTENT_TYPE → Seq(
-          FacadeHeaders.CERTAIN_CONTENT_TYPE_START + value + FacadeHeaders.CERTAIN_CONTENT_TYPE_END
-        )
-
-      case (newHeaders, (k, v)) if directHyperBusToFacade.contains(k) ⇒
-        newHeaders += directHyperBusToFacade(k) → v
-    } result()
-  }
-
-  private val directHeaderMapping = Seq(
-    FacadeHeaders.CLIENT_CORRELATION_ID → Header.CORRELATION_ID,
-    FacadeHeaders.CLIENT_MESSAGE_ID → Header.MESSAGE_ID,
-    FacadeHeaders.CLIENT_REVISION → Header.REVISION
-  )
-  private val directFacadeToHyperBus = directHeaderMapping.toMap
-  private val directHyperBusToFacade = directHeaderMapping.map(kv ⇒ kv._2 → kv._1).toMap
 }
 
 
 case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: Value) extends FacadeMessage {
-  def toDynamicResponse: Response[DynamicBody] = ???
-  def toHttpResponse: HttpResponse = ???
+  def toDynamicResponse: Response[DynamicBody] = {
+    StandardResponse(
+      ResponseHeader(status, headers),
+      DynamicBody(body)
+    ).asInstanceOf[Response[DynamicBody]]
+  }
+
+  def toHttpResponse: HttpResponse = {
+    val statusCode = StatusCode.int2StatusCode(status)
+    val contentType = contentTypeToSpray(headers.get(Header.CONTENT_TYPE).flatMap(_.headOption))
+    val jsonBody = body.toJson
+    HttpResponse(statusCode, HttpEntity(contentType, jsonBody), headers.flatMap{ case (name, values) ⇒
+      values.map { value ⇒
+        RawHeader(name, value)
+      }
+    }.toList)
+  }
+
+  private def contentTypeToSpray(contentType: Option[String]): spray.http.ContentType = {
+    contentType match {
+      case None ⇒ `application/json`
+      case Some(dynamicContentType) ⇒
+        val indexOfSlash = dynamicContentType.indexOf('/')
+        val (mainType, subType) = indexOfSlash match {
+          case -1 ⇒
+            (dynamicContentType, "")
+          case index ⇒
+            val mainType = dynamicContentType.substring(0, indexOfSlash)
+            val subType = dynamicContentType.substring(indexOfSlash + 1)
+            (mainType, subType)
+        }
+        // todo: why we need to register??? replace with header?
+        val mediaType = MediaTypes.register(MediaType.custom(mainType, subType, compressible = true, binary = false))
+        spray.http.ContentType(mediaType, `UTF-8`)
+    }
+  }
 }
 
 object FacadeResponse {
-  def apply(response: Response[DynamicBody]): FacadeResponse = ???
+  def apply(response: Response[DynamicBody]): FacadeResponse = {
+    FacadeResponse(response.status, response.headers, response.body.content)
+  }
 }
 
 class FilterInterruptException(val response: FacadeResponse,
                                message: String,
                                cause: Throwable = null) extends Exception (message, cause)
+
+class FilterRestartException(val request: FacadeRequest,
+                               message: String,
+                               cause: Throwable = null) extends Exception (message, cause)
+
+class RestartLimitReachedException(num: Int, max: Int) extends Exception (s"Maximum ($max) restart limits exceeded ($num)")

@@ -6,10 +6,9 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
 import eu.inn.binders.dynamic.{Null, Text}
-import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model._
-import eu.inn.facade.http.RequestMapper._
+import eu.inn.facade.filter.chain.{SimpleFilterChain, FilterChain}
 import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
+import eu.inn.facade.model._
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest, Header, Method}
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -23,7 +22,7 @@ import spray.can.websocket.frame.TextFrame
 import spray.http.{HttpHeaders, HttpMethods, HttpRequest}
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{ExecutionContext, Await, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.Success
 
 class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
@@ -31,7 +30,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   class TestRequestFilter extends RequestFilter {
-    override def  apply(input: FacadeRequest)
+    override def  apply(context: RequestFilterContext, input: FacadeRequest)
                        (implicit ec: ExecutionContext): Future[FacadeRequest] = {
       if (input.headers.nonEmpty) {
         Future(input.copy(
@@ -48,7 +47,8 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   }
 
   class TestResponseFilter extends ResponseFilter {
-    override def apply(input: FacadeRequest, output: FacadeResponse)(implicit ec: ExecutionContext): Future[FacadeResponse] = {
+    override def apply(context: ResponseFilterContext, output: FacadeResponse)
+                      (implicit ec: ExecutionContext): Future[FacadeResponse] = {
       if (output.headers.nonEmpty) {
         Future(output.copy(
           headers = output.headers.filterNot { _._1 == "toBeFiltered" }
@@ -63,21 +63,12 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     }
   }
 
-  val filterChain = new FilterChain {
-    override def requestFilters(request: FacadeRequest): Seq[RequestFilter] = Seq(
-      new TestRequestFilter
-    )
-    override def responseFilters(request: FacadeRequest, response: FacadeResponse): Seq[ResponseFilter] = Seq(
-      new TestResponseFilter
-    )
-    override def eventFilters(request: FacadeRequest, event: FacadeRequest): Seq[EventFilter] = Seq.empty
-  }
+  val filterChain = new SimpleFilterChain(
+    initRequestFilters = Seq(new TestRequestFilter),
+    initResponseFilters = Seq(new TestResponseFilter)
+  ) // todo: + test eventFilters
 
-  val emptyFilterChain = new FilterChain {
-    override def requestFilters(request: FacadeRequest): Seq[RequestFilter] = Seq.empty
-    override def responseFilters(request: FacadeRequest, response: FacadeResponse): Seq[ResponseFilter] = Seq.empty
-    override def eventFilters(request: FacadeRequest, event: FacadeRequest): Seq[EventFilter] = Seq.empty
-  }
+  val emptyFilterChain = new SimpleFilterChain()
 
   "WsFilterChain " - {
     "websocket: applyInputFilters empty filterChain, non-empty headers" in {

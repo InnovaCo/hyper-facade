@@ -1,4 +1,4 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.raml
 
 import eu.inn.binders.dynamic.{Obj, Value}
 import eu.inn.facade.filter.chain.Filters
@@ -33,22 +33,22 @@ trait PrivateFieldsFilter {
 }
 
 class PrivateFieldsResponseFilter(val privateFields: Seq[Field]) extends ResponseFilter with PrivateFieldsFilter {
-  override def apply(input: FacadeRequest, output: FacadeResponse)
+  override def apply(context: ResponseFilterContext, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
-      output.copy(
-        body = filterBody(input.body)
+      response.copy(
+        body = filterBody(response.body)
       )
     }
   }
 }
 
 class PrivateFieldsEventFilter(val privateFields: Seq[Field]) extends EventFilter with PrivateFieldsFilter {
-  override def apply(input: FacadeRequest, output: FacadeRequest)
+  override def apply(context: EventFilterContext, response: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
-      output.copy(
-        body = filterBody(input.body)
+      response.copy(
+        body = filterBody(response.body)
       )
     }
   }

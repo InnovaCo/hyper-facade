@@ -25,7 +25,7 @@ abstract class WsTestWorker(filterChain: FilterChain) extends HttpServiceActor w
   def businessLogic: Receive = {
     case frame: TextFrame =>
       val facadeRequest = FacadeRequest(toDynamicRequest(frame))
-      filterChain.filterRequest(facadeRequest) map { filteredRequest ⇒
+      filterChain.filterRequest(facadeRequest, facadeRequest) map { filteredRequest ⇒
         exposeDynamicRequest(filteredRequest.toDynamicRequest)
       }
 /*  todo: intention isn't clear here

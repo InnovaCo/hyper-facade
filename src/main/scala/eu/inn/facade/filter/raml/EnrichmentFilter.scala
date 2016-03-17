@@ -1,4 +1,4 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.raml
 
 import eu.inn.facade.filter.chain.Filters
 import eu.inn.facade.model._
@@ -62,7 +62,7 @@ class EnrichRequestFilter(val privateFields: Seq[Field]) extends RequestFilter {
   }
 */
 
-  override def apply(originalRequest: FacadeRequest, request: FacadeRequest)
+  override def apply(context: RequestFilterContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       request

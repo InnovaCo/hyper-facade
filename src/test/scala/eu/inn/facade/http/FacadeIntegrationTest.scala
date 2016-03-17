@@ -124,7 +124,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       val responseFuture = pipeline(Get(http.Uri(uri)))
       whenReady(responseFuture, Timeout(Span(5, Seconds))) { response ⇒
         response.entity.asString shouldBe """"response""""
-        response.headers should contain (RawHeader(FacadeHeaders.CLIENT_REVISION_ID, "1"))
+        response.headers should contain (RawHeader(FacadeHeaders.CLIENT_REVISION, "1"))
 
         val mediaType = MediaTypes.register(MediaType.custom("application", "vnd.user-profile+json", true, false))
         val contentType = ContentType(mediaType, `UTF-8`)
@@ -373,7 +373,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           val queuedEvent = DynamicRequest(Uri("/test-service/reliable"),
             DynamicBody(Obj(Map("content" → Text("haha")))),
             Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
-              FacadeHeaders.CLIENT_REVISION_ID → Seq("2"),
+              FacadeHeaders.CLIENT_REVISION → Seq("2"),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
               Header.MESSAGE_ID → Seq("messageId"),
               Header.CORRELATION_ID → Seq("correlationId"))))
@@ -390,7 +390,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           val directEvent = DynamicRequest(Uri("/test-service/reliable"),
             DynamicBody(Obj(Map("content" → Text("haha")))),
             Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
-              FacadeHeaders.CLIENT_REVISION_ID → Seq("3"),
+              FacadeHeaders.CLIENT_REVISION → Seq("3"),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
               Header.MESSAGE_ID → Seq("messageId"),
               Header.CORRELATION_ID → Seq("correlationId"))))
@@ -425,7 +425,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           val directEvent = DynamicRequest(Uri("/test-service/reliable"),
             DynamicBody(Obj(Map("content" → Text("haha")))),
             Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
-              FacadeHeaders.CLIENT_REVISION_ID → Seq("5"),
+              FacadeHeaders.CLIENT_REVISION → Seq("5"),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
               Header.MESSAGE_ID → Seq("messageId"),
               Header.CORRELATION_ID → Seq("correlationId"))))

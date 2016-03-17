@@ -7,7 +7,6 @@ import scala.concurrent.{ExecutionContext, Future}
 
 case class ResponseFilterContext(
                                  uri: Uri,
-                                 httpUri: spray.http.Uri,
                                  method: String,
                                  requestHeaders: Map[String, Seq[String]],
                                  requestBody: Value,

@@ -5,17 +5,13 @@ import java.io.ByteArrayOutputStream
 import akka.util.ByteString
 import eu.inn.binders.dynamic.{Null, Obj, Text}
 import eu.inn.binders.json._
-import eu.inn.facade.model.FacadeHeaders._
-import eu.inn.facade.model.{FacadeHeaders, TransitionalHeaders}
+import eu.inn.facade.model.TransitionalHeaders
 import eu.inn.hyperbus._
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api.{NoTransportRouteException, uri}
 import org.slf4j.LoggerFactory
 import spray.can.websocket.frame.{Frame, TextFrame}
-import spray.http.HttpCharsets._
-import spray.http.HttpHeaders.RawHeader
-import spray.http.MediaTypes._
 import spray.http._
 
 object RequestMapper {
@@ -176,23 +172,7 @@ object RequestMapper {
     }
   }
 
-  private def contentType(contentType: Option[String]): spray.http.ContentType = {
-    contentType match {
-      case None ⇒ `application/json`
-      case Some(dynamicContentType) ⇒
-        val indexOfSlash = dynamicContentType.indexOf('/')
-        val (mainType, subType) = indexOfSlash match {
-          case -1 ⇒
-            (dynamicContentType, "")
-          case index ⇒
-            val mainType = dynamicContentType.substring(0, indexOfSlash)
-            val subType = dynamicContentType.substring(indexOfSlash + 1)
-            (mainType, subType)
-        }
-        val mediaType = MediaTypes.register(MediaType.custom(mainType, subType, true, false))
-        spray.http.ContentType(mediaType, `UTF-8`)
-    }
-  }
+
 /*
   private def extractHttpHeaders(headers: TransitionalHeaders): List[HttpHeader]= {
     var httpHeaders = List[HttpHeader]()
