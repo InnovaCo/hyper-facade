@@ -4,9 +4,9 @@ import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model.{FacadeResponse, FacadeRequest}
+import eu.inn.facade.model.{FacadeHeaders, FacadeMessage, FacadeRequest, FacadeResponse}
 import eu.inn.facade.raml.RamlConfig
-import eu.inn.hyperbus.HyperBus
+import eu.inn.hyperbus.{HyperBus, IdGenerator}
 import eu.inn.hyperbus.model._
 import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
@@ -74,16 +74,16 @@ class WsRestWorker(val serverConnection: ActorRef,
   def businessLogic: Receive = {
     case message: Frame ⇒
       try {
-        val dynamicRequest = RequestMapper.toDynamicRequest(message)
-        val uriPattern = dynamicRequest.uri.pattern.specific
-        val method = dynamicRequest.method
+        val facadeRequest = FacadeRequest(message)
+        val uriPattern = facadeRequest.uri.pattern.specific
+        val method = facadeRequest.method
         if (isPingRequest(uriPattern, method)) {
-          pong(dynamicRequest)
+          pong(facadeRequest)
         }
         else {
-          val requestWithClientIp = dynamicRequest.copy(
+          val requestWithClientIp = facadeRequest.copy(
             // todo: support Forwarded by RFC 7239
-            headers = Headers.plain(Headers(dynamicRequest.headers) + ("X-Forwarded-For" → Seq(remoteAddress)))
+            headers = facadeRequest.headers + ("X-Forwarded-For" → Seq(remoteAddress))
           )
           processRequest(requestWithClientIp)
         }
@@ -100,11 +100,8 @@ class WsRestWorker(val serverConnection: ActorRef,
     case x: FrameCommandFailed =>
       log.error(s"Frame command $x failed from ${sender()}/$remoteAddress")
 
-    case response: FacadeResponse ⇒
-      send(response.toDynamicResponse)
-
-    case event: FacadeRequest ⇒
-      send(event.toDynamicRequest)
+    case message: FacadeMessage ⇒
+      send(message)
   }
 
   def httpRequests: Receive = {
@@ -114,10 +111,9 @@ class WsRestWorker(val serverConnection: ActorRef,
     }
   }
 
-  def processRequest(request: DynamicRequest) = {
-    val key = RequestMapper.correlationId(request.headers)
+  def processRequest(facadeRequest: FacadeRequest) = {
+    val key = facadeRequest.clientCorrelationId.get
     val actorName = "Subscr-" + key
-    val facadeRequest = FacadeRequest(request)
     context.child(actorName) match {
       case Some(actor) ⇒ actor.forward(facadeRequest)
       case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperBus, subscriptionManager), actorName) ! facadeRequest
@@ -128,19 +124,21 @@ class WsRestWorker(val serverConnection: ActorRef,
     uri == "/meta/ping" && method == "ping"
   }
 
-  def pong(dynamicRequest: DynamicRequest) = {
-    val finalCorrelationId = RequestMapper.correlationId(dynamicRequest.headers)
-    implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
-    send(Ok(DynamicBody(Text("pong"))))
+  def pong(facadeRequest: FacadeRequest) = {
+    val headers = Map(
+      FacadeHeaders.CLIENT_CORRELATION_ID → Seq(facadeRequest.clientCorrelationId.get),
+      FacadeHeaders.CLIENT_MESSAGE_ID → Seq(IdGenerator.create())
+    )
+    send(FacadeResponse(eu.inn.hyperbus.model.Status.OK, headers, Text("pong")))
   }
 
-  def send(message: Message[Body]): Unit = {
+  def send(message: FacadeMessage): Unit = {
     if (isConnectionTerminated) {
       log.warning(s"Can't send message $message to $serverConnection/$remoteAddress: connection was terminated")
     }
     else {
       try {
-        send(RequestMapper.toFrame(message))
+        send(message.toFrame)
       } catch {
         case t: Throwable ⇒
           log.error(t, s"Can't serialize $message to $serverConnection/$remoteAddress")

@@ -5,7 +5,7 @@ import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, Tim
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.Config
 import eu.inn.binders.dynamic.{Null, Obj, Text}
-import eu.inn.facade.model.FacadeHeaders
+import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
 import eu.inn.hyperbus.HyperBus
@@ -17,7 +17,7 @@ import eu.inn.hyperbus.transport.api.{Subscription, TransportConfigurationLoader
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.{BeforeAndAfterEach, FreeSpec, Matchers}
 import scaldi.Injectable
 import spray.can.Http
 import spray.can.websocket.frame.TextFrame
@@ -32,13 +32,13 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.io.Source
-import scala.util.Success
+import scala.util.{Success, Try}
 
 
 /**
   * Important: Kafka should be up and running to pass this test
   */
-class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with Injectable {
+class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with Injectable with BeforeAndAfterEach {
   implicit val injector = Injectors()
   implicit val actorSystem = inject[ActorSystem]
   val statusMonitorFacade = inject[HttpWorker]
@@ -50,6 +50,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
   }
   val hyperBus = inject[HyperBus] // initialize hyperbus
   val testService = new TestService(testServiceHyperBus)
+  val subscriptions = scala.collection.mutable.MutableList[Subscription]()
 
   // Unfortunately WsRestServiceApp doesn't provide a Future or any other way to ensure that listener is
   // bound to socket, so we need this stupid timeout to initialize the listener
@@ -57,40 +58,35 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
   "Facade integration" - {
     "http get. Resource configured in RAML" in {
-      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(DynamicBody(Text("response"))), { request ⇒
           request.uri shouldBe Uri("/status/test-service")
           request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
         }
       ) onSuccess {
-        case subscr ⇒ onCommandSubscription = Some(subscr)
+        case subscr ⇒ register(subscr)
       }
 
       Source.fromURL("http://localhost:54321/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
-      onCommandSubscription foreach testService.unsubscribe
     }
 
     "http get. Resource is not configured in RAML" in {
-      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/someSecretResource")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(DynamicBody(Text("response"))), { request ⇒
           request.uri shouldBe Uri("/someSecretResource")
           request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
         }
       ) onSuccess {
-        case subscr ⇒ onCommandSubscription = Some(subscr)
+        case subscr ⇒ register(subscr)
       }
 
       Source.fromURL("http://localhost:54321/someSecretResource?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
-      onCommandSubscription foreach testService.unsubscribe
     }
 
     "http get. Error response" in {
-      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/failedResource")), Map(Header.METHOD → Specific(Method.GET))),
-        ServiceUnavailable(ErrorBody("Service is unavailable", Some("No connection to DB")))) onSuccess {
-        case subscr ⇒ onCommandSubscription = Some(subscr)
+        ServiceUnavailable(ErrorBody("service_is_not_available", Some("No connection to DB")))) onSuccess {
+        case subscr ⇒ register(subscr)
       }
 
       val clientActorSystem = ActorSystem()
@@ -98,24 +94,26 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       val uri404 = "http://localhost:54321/test-service/reliable"
       val responseFuture404 = pipeline(Get(http.Uri(uri404)))
       whenReady(responseFuture404, Timeout(Span(5, Seconds))) { response ⇒
-        response.entity.asString shouldBe """Resource not found"""
+        response.entity.asString should include (""""code":"not_found"""")
+        response.status.intValue shouldBe 404
       }
 
       val uri503 = "http://localhost:54321/failedResource"
       val responseFuture503 = pipeline(Get(http.Uri(uri503)))
       whenReady(responseFuture503, Timeout(Span(5, Seconds))) { response ⇒
-        response.entity.asString should startWith ("""{"code":"Service is unavailable","description":"No connection to DB","errorId":""")
+        response.entity.asString should include (""""code":"service_is_not_available"""")
+        response.status.intValue shouldBe 503
 
-        onCommandSubscription foreach testService.unsubscribe
+        subscriptions.foreach(hyperBus.off)
+        subscriptions.clear
         Await.result(clientActorSystem.terminate(), Duration.Inf)
       }
     }
 
     "http get reliable resource. Check hyperbus-revision" in {
-      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(DynamicBody(Text("response")), Headers(Map(Header.REVISION → Seq("1"), Header.CONTENT_TYPE → Seq("user-profile"))))) onSuccess {
-        case subscr ⇒ onCommandSubscription = Some(subscr)
+        case subscr ⇒ register(subscr)
       }
 
       val clientActorSystem = ActorSystem()
@@ -124,13 +122,14 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       val responseFuture = pipeline(Get(http.Uri(uri)))
       whenReady(responseFuture, Timeout(Span(5, Seconds))) { response ⇒
         response.entity.asString shouldBe """"response""""
-        response.headers should contain (RawHeader(FacadeHeaders.CLIENT_REVISION, "1"))
+        response.headers should contain (RawHeader("hyper-bus-revision", "1"))
 
         val mediaType = MediaTypes.register(MediaType.custom("application", "vnd.user-profile+json", true, false))
         val contentType = ContentType(mediaType, `UTF-8`)
         response.headers should contain (`Content-Type`(contentType))
 
-        onCommandSubscription foreach testService.unsubscribe
+        subscriptions.foreach(hyperBus.off)
+        subscriptions.clear
         Await.result(clientActorSystem.terminate(), Duration.Inf)
       }
     }
@@ -166,31 +165,25 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       client ! Connect() // init websocket connection
 
-      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(DynamicBody(Obj(Map("content" → Text("fullResource")))))) onSuccess {
-        case subscr ⇒ onCommandSubscription = Some(subscr)
+        case subscr ⇒ register(subscr)
       }
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! DynamicRequest(
-          RequestHeader(
-            Uri("/test-service/unreliable"),
-            Map(Header.METHOD → Seq("subscribe"),
-                Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-                FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-                FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
-          ),
-          DynamicBody(Obj(Map("content" → Text("haha")))))
+        client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
+          Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+            FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+          Obj(Map("content" → Text("haha"))))
       }
 
       whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState should startWith ("""{"response":{"status":200,"headers":{"messageId":""")
-          resourceState should endWith ("""body":{"content":"fullResource"}}""")
-          onCommandSubscription foreach testService.unsubscribe
+          resourceState should startWith("""{"status":200,"headers":{"hyperBusMessageId":""")
+          resourceState should endWith("""body":{"content":"fullResource"}}""")
         } else fail("Full resource state wasn't sent to the client")
       }
 
@@ -204,20 +197,14 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       whenReady(publishedEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val eventMessage = clientMessageQueue.get(1)
         if (eventMessage.isDefined) {
-          val referenceRequest = """{"request":{"uri":{"pattern":"/test-service/unreliable"},"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"method":["feed:post"],"contentType":["application/vnd+test-1.json"]}},"body":{"content":"haha"}}"""
+          val referenceRequest = """{"uri":"/test-service/unreliable","method":"feed:post","headers":{"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"],"contentType":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
           eventMessage.get.payload.utf8String shouldBe referenceRequest
         } else fail("Event wasn't sent to the client")
       }
 
-      client ! DynamicRequest(
-        RequestHeader(
-          Uri("/test-service/unreliable"),
-          Map(Header.METHOD → Seq("unsubscribe"),
-            FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
-        ),
-        DynamicBody(Obj(Map()))
-      )
+      client ! FacadeRequest(Uri("/test-service/unreliable"), "unsubscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
     }
 
     "websocket: handle error response" in {
@@ -252,23 +239,19 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled_exception", Some("Internal server error"), errorId = "123")))
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! DynamicRequest(
-          RequestHeader(
-            Uri("/test-service/unreliable"),
-            Map(Header.METHOD → Seq("subscribe"),
-              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+        client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
+            Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
               FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
-          ),
-          DynamicBody(Obj(Map("content" → Text("haha")))))
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+            Obj(Map("content" → Text("haha"))))
       }
 
       whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState should startWith ("""{"response":{"status":500,"headers":{"messageId":""")
-          resourceState should endWith (""""body":{"code":"unhandled_exception","description":"Internal server error","errorId":"123"}}""")
+          resourceState should startWith ("""{"status":500,"headers":""")
+          resourceState should include (""""code":"unhandled_exception"""")
         } else fail("Full resource state wasn't sent to the client")
       }
     }
@@ -312,55 +295,49 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       val initialResourceState = Ok(
         DynamicBody(Obj(Map("content" → Text("fullResource")))),
         Headers.plain(Map("revision" → Seq("1"),
-          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
 
       val updatedResourceState = Ok(
         DynamicBody(Obj(Map("content" → Text("fullResource")))),
         Headers.plain(Map("revision" → Seq("4"),
-          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
 
-      val subscriptionRequest = DynamicRequest(
-        RequestHeader(
-          Uri("/test-service/reliable"),
-          Map(Header.METHOD → Seq("subscribe"),
-              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
-        ),
-        DynamicBody(Obj(Map())))
+      val subscriptionRequest = FacadeRequest(Uri("/test-service/reliable"), "subscribe",
+        Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
 
       val eventRev2 = ReliableFeedTestRequest(
         FeedTestBody("haha"),
         Headers.plain(Map("revision" → Seq("2"),
-          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
 
       val eventRev3 = ReliableFeedTestRequest(
         FeedTestBody("haha"),
         Headers.plain(Map("revision" → Seq("3"),
-          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
 
       val eventBadRev5 = ReliableFeedTestRequest(
         FeedTestBody("updateFromFuture"),
         Headers.plain(Map("revision" → Seq("5"),
-          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
 
       val eventGoodRev5 = ReliableFeedTestRequest(
         FeedTestBody("haha"),
         Headers.plain(Map("revision" → Seq("5"),
-          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
 
-      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
         initialResourceState,
-      // emulate latency between request for full resource state and response
+        // emulate latency between request for full resource state and response
         _ ⇒ Thread.sleep(10000)) onSuccess {
-        case subscription: Subscription ⇒ onCommandSubscription = Some(subscription)
+        case subscription: Subscription ⇒ register(subscription)
       }
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
@@ -373,7 +350,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          val referenceState = """{"response":{"status":200,"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"hyperbus-revision":["1"]}},"body":{"content":"fullResource"}}"""
+          val referenceState = """{"status":200,"headers":{"hyperBusRevision":["1"],"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"]},"body":{"content":"fullResource"}}"""
           resourceState shouldBe referenceState
         } else fail("Full resource state wasn't sent to the client")
       }
@@ -381,12 +358,12 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       whenReady(queuedEventPromise.future, Timeout(Span(15, Seconds))) { b ⇒
         val queuedEventMessage = clientMessageQueue.get(1)
         if (queuedEventMessage.isDefined) {
-          val receivedEvent = RequestMapper.toDynamicRequest(queuedEventMessage.get)
+          val receivedEvent = FacadeRequest(queuedEventMessage.get)
           val queuedEvent = DynamicRequest(Uri("/test-service/reliable"),
             DynamicBody(Obj(Map("content" → Text("haha")))),
             Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
               FacadeHeaders.CLIENT_REVISION → Seq("2"),
-              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+              Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
               FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
               FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
           receivedEvent.toString shouldBe queuedEvent.toString
@@ -398,21 +375,22 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       whenReady(publishedEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val directEventMessage = clientMessageQueue.get(2)
         if (directEventMessage.isDefined) {
-          val receivedEvent = RequestMapper.toDynamicRequest(directEventMessage.get)
+          val receivedEvent = FacadeRequest(directEventMessage.get)
           val directEvent = DynamicRequest(Uri("/test-service/reliable"),
             DynamicBody(Obj(Map("content" → Text("haha")))),
             Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
               FacadeHeaders.CLIENT_REVISION → Seq("3"),
-              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+              Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
               FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
               FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
           receivedEvent.toString shouldBe directEvent.toString
         } else fail("Last event wasn't sent to the client")
 
-        onCommandSubscription foreach testService.unsubscribe
+        subscriptions.foreach(hyperBus.off)
+        subscriptions.clear
         testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
           updatedResourceState) onSuccess {
-          case subscription: Subscription ⇒ onCommandSubscription = Some(subscription)
+          case subscription: Subscription ⇒ register(subscription)
         }
         // This event should be ignored, because it's an "event from future". Resource state retrieving should be triggered
         testService.publish(eventBadRev5)
@@ -422,37 +400,32 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceUpdatedStateMessage = clientMessageQueue.get(3)
         if (resourceUpdatedStateMessage.isDefined) {
           val resourceUpdatedState = resourceUpdatedStateMessage.get.payload.utf8String
-          val referenceState = """{"response":{"status":200,"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"hyperbus-revision":["4"]}},"body":{"content":"fullResource"}}"""
+          val referenceState = """{"status":200,"headers":{"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"],"hyperBusRevision":["4"]},"body":{"content":"fullResource"}}"""
           resourceUpdatedState shouldBe referenceState
         } else fail("Full resource state wasn't sent to the client")
 
-        onCommandSubscription foreach testService.unsubscribe
+        subscriptions.foreach(hyperBus.off)
+        subscriptions.clear
         testService.publish(eventGoodRev5)
       }
 
       whenReady(afterResubscriptionEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val directEventMessage = clientMessageQueue.get(4)
         if (directEventMessage.isDefined) {
-          val receivedEvent = RequestMapper.toDynamicRequest(directEventMessage.get)
+          val receivedEvent = FacadeRequest(directEventMessage.get)
           val directEvent = DynamicRequest(Uri("/test-service/reliable"),
             DynamicBody(Obj(Map("content" → Text("haha")))),
             Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
               FacadeHeaders.CLIENT_REVISION → Seq("5"),
-              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+              Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
               FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
               FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
           receivedEvent.toString shouldBe directEvent.toString
         } else fail("Last event wasn't sent to the client")
 
-        client ! DynamicRequest(
-          RequestHeader(
-            Uri("/test-service/reliable"),
-            Map(Header.METHOD → Seq("unsubscribe"),
-              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
-          ),
-          DynamicBody(Obj(Map()))
-        )
+        client ! FacadeRequest(Uri("/test-service/reliable"), "unsubscribe",
+          Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
       }
     }
 
@@ -484,35 +457,29 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       client ! Connect() // init websocket connection
 
-      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(
           DynamicBody(Obj(Map("content" → Text("fullResource")))),
-          Headers.plain(Map("revision" → Seq("1"),
-            FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))) onSuccess {
-        case subscr ⇒ onCommandSubscription = Some(subscr)
+          Headers.plain(Map(
+            Header.REVISION → Seq("1"),
+            Header.MESSAGE_ID → Seq("messageId"),
+            Header.CORRELATION_ID → Seq("correlationId"))))) onSuccess {
+        case subscr ⇒ register(subscr)
       }
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! DynamicRequest(
-          RequestHeader(
-            Uri("/test-service/reliable"),
-            Map(Header.METHOD → Seq(Method.GET),
-              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
-          ),
-          DynamicBody(Null))
+        client ! FacadeRequest(Uri("/test-service/reliable"), Method.GET,
+          Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+            FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
       }
 
       whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState shouldBe """{"response":{"status":200,"headers":{"messageId":["messageId"],"correlationId":["correlationId"],"hyperbus-revision":["1"]}},"body":{"content":"fullResource"}}"""
+          resourceState shouldBe """{"status":200,"headers":{"hyperBusRevision":["1"],"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"]},"body":{"content":"fullResource"}}"""
         } else fail("Full resource state wasn't sent to the client")
-        onCommandSubscription foreach testService.unsubscribe
       }
     }
 
@@ -544,33 +511,27 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       client ! Connect() // init websocket connection
 
-      var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.POST))),
         Ok(
           DynamicBody(Text("got it")),
           Headers.plain(Map(Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))) onSuccess {
-        case subscr ⇒ onCommandSubscription = Some(subscr)
+        case subscr ⇒ register(subscr)
       }
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! DynamicRequest(
-          RequestHeader(
-            Uri("/test-service/reliable"),
-            Map(Header.METHOD → Seq(Method.POST),
-              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+        client ! FacadeRequest(Uri("/test-service/reliable"), Method.POST,
+            Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
               FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
-          ),
-          DynamicBody(Map("post request" → Text("some request body"))))
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+          Obj(Map("post request" → Text("some request body"))))
       }
 
       whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState shouldBe """{"response":{"status":200,"headers":{"messageId":["messageId"],"correlationId":["correlationId"]}},"body":"got it"}"""
+          resourceState shouldBe """{"status":200,"headers":{"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"]},"body":"got it"}"""
         } else fail("Full resource state wasn't sent to the client")
-        onCommandSubscription foreach testService.unsubscribe
       }
     }
   }
@@ -594,5 +555,14 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
   private def newPoolExecutor(): Executor = {
     val maximumPoolSize: Int = Runtime.getRuntime.availableProcessors() * 16
     new ThreadPoolExecutor(0, maximumPoolSize, 5 * 60L, TimeUnit.SECONDS, new SynchronousQueue[Runnable])
+  }
+
+  override def afterEach(): Unit = {
+    subscriptions.foreach(hyperBus.off)
+    subscriptions.clear
+  }
+
+  def register(subscription: Subscription) = {
+    subscriptions += subscription
   }
 }

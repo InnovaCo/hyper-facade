@@ -90,11 +90,11 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         }
       }), "websocket-client")
 
-      val filteredDynamicRequestPromise = Promise[DynamicRequest]()
-      def exposeDynamicRequest: (DynamicRequest ⇒ Unit) = { filteredDynamicRequest ⇒
-        filteredDynamicRequestPromise.complete(Success(filteredDynamicRequest))
+      val filteredFacadeRequestPromise = Promise[FacadeRequest]()
+      def exposeFacadeRequest: (FacadeRequest ⇒ Unit) = { filteredDynamicRequest ⇒
+        filteredFacadeRequestPromise.complete(Success(filteredDynamicRequest))
       }
-      val server = system.actorOf(Props(wsWorker(emptyFilterChain, exposeDynamicRequest)), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(emptyFilterChain, exposeFacadeRequest)), "websocket-worker")
       try {
         val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
           case b: Http.Bound ⇒
@@ -104,23 +104,19 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
           client ! Connect()
 
           whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-            client ! DynamicRequest(
-              RequestHeader(
-                Uri("/test"),
-                Map(Header.METHOD → Seq(Method.GET),
-                    Header.MESSAGE_ID → Seq("messageId"),
-                    Header.CORRELATION_ID → Seq("correlationId"),
-                    "toBeFiltered" → Seq("This header should be dropped by filter"))
-              ),
-              DynamicBody(Text("haha")))
+            client ! FacadeRequest(
+                Uri("/test"), Method.GET,
+                Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+                  FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"),
+                  "toBeFiltered" → Seq("This header should be dropped by filter")
+                ),Text("haha"))
 
-            whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
-              case DynamicRequest(uri, body, headers) ⇒
+            whenReady(filteredFacadeRequestPromise.future, Timeout(Span(5, Seconds))) {
+              case FacadeRequest(uri, method, headers, body) ⇒
                 uri shouldBe Uri("/test")
-                headers(Header.METHOD) shouldBe Seq(Method.GET)
-                headers(Header.MESSAGE_ID) shouldBe Seq("messageId")
-                headers(Header.CORRELATION_ID) shouldBe Seq("correlationId")
-                body shouldBe DynamicBody(Text("haha"))
+                headers(FacadeHeaders.CLIENT_MESSAGE_ID) shouldBe Seq("messageId")
+                headers(FacadeHeaders.CLIENT_CORRELATION_ID) shouldBe Seq("correlationId")
+                body shouldBe Text("haha")
             }
           }
         }
@@ -151,11 +147,11 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         }
       }), "websocket-client")
 
-      val filteredDynamicRequestPromise = Promise[DynamicRequest]()
-      def exposeDynamicRequest: (DynamicRequest ⇒ Unit) = { filteredDynamicRequest ⇒
-        filteredDynamicRequestPromise.complete(Success(filteredDynamicRequest))
+      val filteredFacadeRequestPromise = Promise[FacadeRequest]()
+      def exposeFacadeRequest: (FacadeRequest ⇒ Unit) = { filteredFacadeRequest ⇒
+        filteredFacadeRequestPromise.complete(Success(filteredFacadeRequest))
       }
-      val server = system.actorOf(Props(wsWorker(filterChain, exposeDynamicRequest)), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(filterChain, exposeFacadeRequest)), "websocket-worker")
 
       val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
         case b: Http.Bound ⇒
@@ -165,23 +161,18 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         client ! Connect()
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-          client ! DynamicRequest(
-            RequestHeader(
-              Uri("/test"),
-              Map(Header.METHOD → Seq(Method.GET),
-                Header.MESSAGE_ID → Seq("messageId"),
-                Header.CORRELATION_ID → Seq("correlationId"))
-            ),
-            DynamicBody(Text("haha")))
+          client ! FacadeRequest(Uri("/test"), Method.GET,
+                Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+                FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Text("haha"))
 
           try {
-            whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
-              case DynamicRequest(uri, body, headers) ⇒
+            whenReady(filteredFacadeRequestPromise.future, Timeout(Span(5, Seconds))) {
+              case FacadeRequest(uri, method, headers, body) ⇒
                 uri shouldBe Uri("/test")
-                headers(Header.METHOD) shouldBe Seq(Method.GET)
-                headers(Header.MESSAGE_ID) shouldBe Seq("messageId")
-                headers(Header.CORRELATION_ID) shouldBe Seq("correlationId")
-                body shouldBe DynamicBody(Text("haha"))
+                method shouldBe Method.GET
+                headers(FacadeHeaders.CLIENT_MESSAGE_ID) shouldBe Seq("messageId")
+                headers(FacadeHeaders.CLIENT_CORRELATION_ID) shouldBe Seq("correlationId")
+                body shouldBe Text("haha")
             }
           } catch {
             case ex: Throwable ⇒ fail(ex)
@@ -314,9 +305,9 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   }
 
   def wsWorker(filterChain: FilterChain,
-               exposeDynamicRequestFunction: (DynamicRequest ⇒ Unit) = _ => ()): Actor = {
+               exposeFacadeRequestFunction: (FacadeRequest ⇒ Unit) = _ => ()): Actor = {
     new WsTestWorker(filterChain) {
-      override def exposeDynamicRequest(dynamicRequest: DynamicRequest) = exposeDynamicRequestFunction(dynamicRequest)
+      override def exposeFacadeRequest(facadeRequest: FacadeRequest) = exposeFacadeRequestFunction(facadeRequest)
     }
   }
 

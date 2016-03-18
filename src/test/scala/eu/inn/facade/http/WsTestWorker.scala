@@ -2,7 +2,6 @@ package eu.inn.facade.http
 
 import akka.actor.ActorRef
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.http.RequestMapper._
 import eu.inn.facade.model.FacadeRequest
 import eu.inn.hyperbus.model.DynamicRequest
 import spray.can.websocket.frame.TextFrame
@@ -24,9 +23,9 @@ abstract class WsTestWorker(filterChain: FilterChain) extends HttpServiceActor w
 
   def businessLogic: Receive = {
     case frame: TextFrame =>
-      val facadeRequest = FacadeRequest(toDynamicRequest(frame))
+      val facadeRequest = FacadeRequest(frame)
       filterChain.filterRequest(facadeRequest, facadeRequest) map { filteredRequest ⇒
-        exposeDynamicRequest(filteredRequest.toDynamicRequest)
+        exposeFacadeRequest(filteredRequest)
       }
 /*  todo: intention isn't clear here
     case request: DynamicRequest =>
@@ -42,5 +41,5 @@ abstract class WsTestWorker(filterChain: FilterChain) extends HttpServiceActor w
     case request: HttpRequest =>*/
   }
 
-  def exposeDynamicRequest(dynamicRequest: DynamicRequest): Unit
+  def exposeFacadeRequest(facadeRequest: FacadeRequest): Unit
 }

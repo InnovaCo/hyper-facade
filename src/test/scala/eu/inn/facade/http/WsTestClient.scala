@@ -1,8 +1,8 @@
 package eu.inn.facade.http
 
 import akka.actor.ActorSystem
-import akka.io.{Tcp, IO}
-import eu.inn.facade.http.RequestMapper._
+import akka.io.{IO, Tcp}
+import eu.inn.facade.model.{FacadeMessage, FacadeRequest}
 import eu.inn.hyperbus.model.DynamicRequest
 import spray.can.server.UHttp
 import spray.can.websocket.WebSocketClientWorker
@@ -27,8 +27,8 @@ class WsTestClient(connect: Http.Connect, val upgradeRequest: HttpRequest)(impli
     case frame: TextFrame ⇒
       onMessage(frame)
 
-    case dynamicRequest: DynamicRequest ⇒
-      connection ! toFrame(dynamicRequest)
+    case facadeMessage: FacadeMessage ⇒
+      connection ! facadeMessage.toFrame
 
     case _: Http.ConnectionClosed ⇒
       context.stop(self)

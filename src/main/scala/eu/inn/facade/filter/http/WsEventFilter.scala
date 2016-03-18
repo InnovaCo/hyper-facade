@@ -16,8 +16,10 @@ class WsEventFilter extends EventFilter {
             FacadeHeaders.CERTAIN_CONTENT_TYPE_START + value + FacadeHeaders.CERTAIN_CONTENT_TYPE_END
           )
 
-        case (k, v) if WsEventFilter.directHyperBusToFacade.contains(k) ⇒
-          headersBuilder += WsEventFilter.directHyperBusToFacade(k) → v
+        case (k, v) ⇒
+          if (WsEventFilter.directHyperBusToFacade.contains(k)) {
+            headersBuilder += WsEventFilter.directHyperBusToFacade(k) → v
+          }
       }
 
       request.copy(

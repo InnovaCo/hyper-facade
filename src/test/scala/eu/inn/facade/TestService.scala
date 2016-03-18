@@ -16,7 +16,7 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-@body("application/vnd+test-1.json")
+@body("feed-test")
 case class FeedTestBody(content: String) extends Body
 
 @request(Method.FEED_POST, "/test-service/reliable")

@@ -2,11 +2,12 @@ package eu.inn.facade.http
 
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
-import eu.inn.facade.raml.RamlConfig
-import eu.inn.hyperbus.HyperBus
-import eu.inn.hyperbus.model.ErrorBody
+import eu.inn.facade.raml.{Body, RamlConfig}
+import eu.inn.hyperbus.{HyperBus, IdGenerator, model}
+import eu.inn.hyperbus.model._
+import eu.inn.hyperbus.transport.api.NoTransportRouteException
 import org.slf4j.Logger
-import scaldi.{Injector, Injectable}
+import scaldi.{Injectable, Injector}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
@@ -23,15 +24,17 @@ trait RequestProcessor extends Injectable {
   val maxRestarts = 5 // todo: move to config
 
   def processRequestToFacade(originalRequest: FacadeRequest): Future[FacadeResponse] = {
-    val f = beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
+    beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
       processRequestWithRaml(originalRequest, r, 0) flatMap { filteredRequest ⇒
-        hyperBus <~ filteredRequest.toDynamicRequest flatMap { response ⇒
-          ramlFilterChain.filterResponse(originalRequest, FacadeResponse(response))
+        hyperBus <~ filteredRequest.toDynamicRequest recover {
+          handleHyperbusExceptions(originalRequest)
+        } flatMap { response ⇒
+          ramlFilterChain.filterResponse(originalRequest, FacadeResponse(response)) flatMap { r ⇒
+            afterFilterChain.filterResponse(originalRequest, r)
+          }
         }
       }
-    }
-
-    handleFilterExceptions(originalRequest, f) { response ⇒
+    } recover handleFilterExceptions(originalRequest) { response ⇒
       response
     }
   }
@@ -53,19 +56,34 @@ trait RequestProcessor extends Injectable {
     }
   }
 
-  def handleFilterExceptions[T](originalRequest: FacadeRequest, future: Future[T])
-                               (func: FacadeResponse ⇒ T): Future[T] = {
-    future recover {
-      case e: FilterInterruptException ⇒
-        if (e.getCause != null) {
-          log.error(s"Request execution interrupted: $originalRequest", e)
-        }
-        func(e.response)
+  def handleHyperbusExceptions(originalRequest: FacadeRequest) : PartialFunction[Throwable, Response[DynamicBody]] = {
+    case hyperBusException: HyperBusException[ErrorBody] ⇒
+      hyperBusException
 
-      case NonFatal(e) ⇒
-        val response = RequestMapper.exceptionToResponse(e)
-        log.error(s"Service answered with error #${response.body.asInstanceOf[ErrorBody].errorId}. Stopping actor")
-        func(FacadeResponse(response))
-    }
+    case noRoute: NoTransportRouteException ⇒
+      implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))
+      model.NotFound(ErrorBody("not_found", Some(s"'${originalRequest.uri.pattern.specific}' is not found.")))
+
+    case NonFatal(nonFatal) ⇒
+      handleInternalError(nonFatal, originalRequest)
+  }
+
+  def handleFilterExceptions[T](originalRequest: FacadeRequest)(func: FacadeResponse ⇒ T) : PartialFunction[Throwable, T] = {
+    case e: FilterInterruptException ⇒
+      if (e.getCause != null) {
+        log.error(s"Request execution interrupted: $originalRequest", e)
+      }
+      func(e.response)
+
+    case NonFatal(nonFatal) ⇒
+      val response = handleInternalError(nonFatal, originalRequest)
+      func(FacadeResponse(response))
+  }
+
+  def handleInternalError(exception: Throwable, originalRequest: FacadeRequest): Response[ErrorBody] = {
+    implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))
+    log.error(s"Exception while handling $originalRequest", exception)
+    val errorId = IdGenerator.create()
+    model.InternalServerError(ErrorBody("internal_server_error", Some(exception.getMessage), errorId = errorId))
   }
 }

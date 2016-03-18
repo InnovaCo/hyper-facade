@@ -5,7 +5,7 @@ import com.typesafe.config.Config
 import eu.inn.facade.http.RequestProcessor
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Method
-import eu.inn.hyperbus.HyperBus
+import eu.inn.hyperbus.{HyperBus, IdGenerator}
 import eu.inn.hyperbus.model._
 import org.slf4j.LoggerFactory
 import akka.pattern.pipe
@@ -42,7 +42,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     case event: DynamicRequest ⇒
       processEventWhileSubscribing(originalRequest, event)
 
-    case resourceState: Response[DynamicBody] ⇒
+    case resourceState: Response[DynamicBody] @unchecked ⇒
       processResourceState(originalRequest, resourceState, subscriptionSyncTries)
   }
 
@@ -57,6 +57,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def subscribedUnreliable(request: FacadeRequest): Receive = {
     case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
       context.stop(self)
+
     case event: DynamicRequest ⇒
       processUnreliableEvent(request, event)
   }
@@ -69,16 +70,20 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     subscriptionId.foreach(subscriptionManager.off)
     subscriptionId = None
 
-    val f = beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
+    beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
       processRequestWithRaml(originalRequest, r, 0) map { filteredRequest ⇒
-        implicit val mvx = serverMvx(filteredRequest)
-        this.subscriptionId = Some(subscriptionManager.subscribe(filteredRequest.uri, self, filteredRequest.correlationId))
+        val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
+          filteredRequest.headers(Header.MESSAGE_ID)).head
+
+        implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
+        this.subscriptionId = Some(subscriptionManager.subscribe(filteredRequest.uri, self, correlationId))
         context.become(subscribing(originalRequest, subscriptionSyncTries))
-        hyperBus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest pipeTo self
+        hyperBus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
+          handleHyperbusExceptions(originalRequest)
+        } pipeTo self
         Unit
       }
-    }
-    handleFilterExceptions(originalRequest, f) { response ⇒
+    } recover handleFilterExceptions(originalRequest) { response ⇒
       websocketWorker ! response
       context.stop(self)
       Unit
@@ -101,7 +106,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def processResourceState(originalRequest: FacadeRequest, resourceState: Response[DynamicBody], subscriptionSyncTries: Int) = {
     val facadeResponse = FacadeResponse(resourceState)
 
-    val processFuture = ramlFilterChain.filterResponse(originalRequest, facadeResponse) flatMap { filteredResponse ⇒
+    ramlFilterChain.filterResponse(originalRequest, facadeResponse) flatMap { filteredResponse ⇒
       afterFilterChain.filterResponse(originalRequest, filteredResponse) map { finalResponse ⇒
         websocketWorker ! finalResponse
         finalResponse.headers.get(FacadeHeaders.CLIENT_REVISION) match {
@@ -115,22 +120,18 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         }
         unstashAll()
       }
-    }
-
-    handleFilterExceptions(originalRequest, processFuture) { response ⇒
+    } recover handleFilterExceptions(originalRequest) { response ⇒
       websocketWorker ! response
       context.stop(self)
     }
   }
 
   def processUnreliableEvent(originalRequest: FacadeRequest, event: DynamicRequest): Unit = {
-    val f = afterFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
-      ramlFilterChain.filterEvent(originalRequest, e) map { filteredRequest ⇒
-        websocketWorker ! filteredRequest.toDynamicRequest
+    ramlFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
+      afterFilterChain.filterEvent(originalRequest, e) map { filteredRequest ⇒
+        websocketWorker ! filteredRequest
       }
-    }
-
-    handleFilterExceptions(originalRequest, f) { response ⇒
+    } recover handleFilterExceptions(originalRequest) { response ⇒
       if (log.isDebugEnabled) {
         log.debug(s"Event is discarded for request $originalRequest with filter response $response")
       }
@@ -141,13 +142,13 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
                            lastRevisionId: Long,
                            subscriptionSyncTries: Int): Unit = {
 
-    val f = afterFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
-      ramlFilterChain.filterEvent(originalRequest, e) map { filteredRequest ⇒
+    ramlFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
+      afterFilterChain.filterEvent(originalRequest, e) map { filteredRequest ⇒
 
         val revisionId = filteredRequest.headers(FacadeHeaders.CLIENT_REVISION).head.toLong
 
         if (revisionId == lastRevisionId + 1) {
-          websocketWorker ! filteredRequest.toDynamicRequest
+          websocketWorker ! filteredRequest
         }
         else
         if (revisionId > lastRevisionId + 1) {
@@ -156,9 +157,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         }
         // if revisionId <= lastRevisionId -- just ignore this event
       }
-    }
-
-    handleFilterExceptions(originalRequest, f) { response ⇒
+    } recover handleFilterExceptions(originalRequest) { response ⇒
       if (log.isDebugEnabled) {
         log.debug(s"Event is discarded for request $originalRequest with filter response $response")
       }
@@ -168,12 +167,6 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   override def postStop(): Unit = {
     subscriptionId.foreach(subscriptionManager.off)
     subscriptionId = None
-  }
-
-  def serverMvx(filteredRequest: FacadeRequest) = MessagingContextFactory.withCorrelationId(serverCorrelationId(filteredRequest))
-
-  def serverCorrelationId(request: FacadeRequest): String = {
-    request.correlationId + self.path // todo: check what's here
   }
 }
 

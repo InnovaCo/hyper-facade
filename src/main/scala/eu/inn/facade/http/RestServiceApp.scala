@@ -8,6 +8,7 @@ import akka.util.Timeout
 import com.typesafe.config.Config
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
+import spray.can.server.ServerSettings
 import spray.http._
 import spray.routing._
 import spray.routing.directives.LogEntry
@@ -25,12 +26,13 @@ class RestServiceApp(interface: String, port: Int)(implicit inj: Injector) exten
   implicit val executionContext = inject [ExecutionContext]
 
   private val conf = inject [Config].getConfig("inn.util.http.rest-service")
+  private val rootConf = inject [Config]
   private val handleErrorsDirectives = inject [HandleErrorsDirectives]
   private val ErrorHandlerHeader = "X-Errors-Handled"
   val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
 
   def start(initRoutes: ⇒ Route) {
-    startServer(interface, port) {
+    startServer(interface, port, settings = Some(ServerSettings(rootConf))) {
       startWithDirectives(initRoutes)
     } onComplete {
       case Success(_) ⇒
