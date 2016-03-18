@@ -17,8 +17,10 @@ class HttpWsResponseFilter extends ResponseFilter {
             FacadeHeaders.CERTAIN_CONTENT_TYPE_START + value + FacadeHeaders.CERTAIN_CONTENT_TYPE_END
           )
 
-        case (k, v) if HttpWsResponseFilter.directHyperBusToFacade.contains(k) ⇒
-          headersBuilder += HttpWsResponseFilter.directHyperBusToFacade(k) → v
+        case (k, v) ⇒
+          if (HttpWsResponseFilter.directHyperBusToFacade.contains(k)) {
+            headersBuilder += HttpWsResponseFilter.directHyperBusToFacade(k) → v
+          }
       }
 
       response.copy(

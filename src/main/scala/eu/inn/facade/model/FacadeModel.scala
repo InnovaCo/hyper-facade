@@ -1,6 +1,6 @@
 package eu.inn.facade.model
 
-import eu.inn.binders.dynamic.Value
+import eu.inn.binders.dynamic.{Null, Value}
 import eu.inn.binders.naming.SnakeCaseToCamelCaseConverter
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.serialization.{ResponseHeader, StringDeserializer}
@@ -40,13 +40,19 @@ case class FacadeRequest(uri: Uri, method: String, headers: Map[String, Seq[Stri
 object FacadeRequest {
   val snakeCaseToCamelCase = new SnakeCaseToCamelCaseConverter
 
-  def apply(request: HttpRequest): FacadeRequest = {
-    FacadeRequest(Uri(request.uri.path.toString),
+  def apply(request: HttpRequest, remoteAddress: String): FacadeRequest = {
+    FacadeRequest(Uri(request.uri.toString),
       request.method.name,
       request.headers.groupBy (_.name) map { kv ⇒
         snakeCaseToCamelCase.convert(kv._1) → kv._2.map(_.value)
-      },
-    StringDeserializer.dynamicBody(Some(request.entity.asString)).content
+      } += ("X-Forwarded-For" → Seq(remoteAddress))
+      ,
+      if (request.entity.nonEmpty){
+        StringDeserializer.dynamicBody(Some(request.entity.asString)).content
+      }
+      else {
+        Null
+      }
     )
   }
 

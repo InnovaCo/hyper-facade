@@ -18,12 +18,13 @@ class HttpWorker(implicit val injector: Injector) extends RequestProcessor {
 
   val restRoutes = new RestRoutes {
     val request = extract(_.request)
-    val routes: Route = request { (request) ⇒
-        onSuccess(processRequest(request)) { response ⇒
+    val routes: Route = clientIP { ip =>
+      request { (request) ⇒
+        processRequest(request) { response: FacadeResponse ⇒
           complete(response)
         }
       }
-  }
+    }
 
   def processRequest(request: HttpRequest): Future[HttpResponse] = {
     processRequestToFacade(FacadeRequest(request)) map { response ⇒

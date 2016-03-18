@@ -9,11 +9,14 @@ import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, Trait
 import eu.inn.facade.filter.chain.Filters
 import eu.inn.facade.model._
 import eu.inn.facade.raml.annotations.RamlAnnotation
+import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
 
 import scala.collection.JavaConversions._
+import scala.util.control.NonFatal
 
 class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable {
+  val log = LoggerFactory.getLogger(getClass)
 
   def parseRaml: RamlConfig = {
     val (resourcesByUri, uris) = api.resources()
@@ -44,9 +47,17 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
 
   private def createFilterChain(target: RamlTarget, traits: Seq[Trait]) = {
     traits.foldLeft(Filters.empty) { (filterChain, tr) ⇒
-      val filterFactories = inject[Seq[RamlFilterFactory]](tr.name)
-      filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
-        filterChainInner ++ factory.createFilters(target)
+
+      try {
+        val filterFactories = inject[Seq[RamlFilterFactory]](tr.name)
+        filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
+          filterChainInner ++ factory.createFilters(target)
+        }
+      }
+      catch {
+        case NonFatal(e) ⇒
+          log.error(s"Can't inject filter for $tr", e)
+          filterChain
       }
     }
   }
@@ -115,9 +126,15 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
 
             val filterMap = fields.foldLeft(Seq.newBuilder[(RamlFilterFactory,Field)]) { (filterSeq, field) ⇒
               field.dataType.annotations.foreach { annotation ⇒
-                val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
-                filterFactories.foreach { filterFactory : RamlFilterFactory ⇒
-                  filterSeq += (filterFactory → field)
+                try {
+                  val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
+                  filterFactories.foreach { filterFactory: RamlFilterFactory ⇒
+                    filterSeq += (filterFactory → field)
+                  }
+                }
+                catch {
+                  case NonFatal(e) ⇒
+                    log.error(s"Can't inject filter for annotation ${annotation.name}", e)
                 }
               }
               filterSeq

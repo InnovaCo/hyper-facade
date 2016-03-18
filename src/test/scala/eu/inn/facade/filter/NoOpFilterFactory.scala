@@ -9,15 +9,16 @@ class NoOpFilterFactory extends RamlFilterFactory {
   override def createFilters(target: RamlTarget): Filters = {
     Filters(
       requestFilters = Seq.empty,
-      responseFilters = Seq(new NoOpFilter),
+      responseFilters = Seq(new NoOpFilter(target)),
       eventFilters = Seq.empty
     )
   }
 }
 
-class NoOpFilter extends ResponseFilter {
+class NoOpFilter(target: RamlTarget) extends ResponseFilter {
   override def apply(context: ResponseFilterContext, output: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future.successful(output)
   }
+  override def toString = s"NoOpFilter@${this.hashCode}/$target"
 }

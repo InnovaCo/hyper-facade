@@ -51,8 +51,8 @@ class WsRestWorker(val serverConnection: ActorRef,
         case wsContext: websocket.HandshakeContext ⇒
           httpRequest = Some(wsContext.request)
 
-          // todo: this is dangerous, network infrastructure should guarantee that http_x_forwarded_for is always overridden at server-side
-          remoteAddress = wsContext.request.headers.find(_.is("http_x_forwarded_for")).map(_.value).getOrElse(clientAddress)
+          // todo: support Forwarded & by RFC 7239
+          remoteAddress = wsContext.request.headers.find(_.is("X-Forwarded-For")).map(_.value).getOrElse(clientAddress)
         case _ ⇒
       }
       handshaking(handshakeRequest)
@@ -75,11 +75,16 @@ class WsRestWorker(val serverConnection: ActorRef,
     case message: Frame ⇒
       try {
         val dynamicRequest = RequestMapper.toDynamicRequest(message)
-        val uriPattern = dynamicRequest.uri.pattern.specific.toString
+        val uriPattern = dynamicRequest.uri.pattern.specific
         val method = dynamicRequest.method
-        if (isPingRequest(uriPattern, method)) pong(dynamicRequest)
+        if (isPingRequest(uriPattern, method)) {
+          pong(dynamicRequest)
+        }
         else {
-          val requestWithClientIp = RequestMapper.addField("http_x_forwarded_for", remoteAddress, dynamicRequest)
+          val requestWithClientIp = dynamicRequest.copy(
+            // todo: support Forwarded by RFC 7239
+            headers = Headers.plain(Headers(dynamicRequest.headers) + ("X-Forwarded-For" → Seq(remoteAddress)))
+          )
           processRequest(requestWithClientIp)
         }
       }

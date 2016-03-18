@@ -8,7 +8,8 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration._
 
 class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
@@ -51,7 +52,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       val request = FacadeRequest(Uri("testUri"), "get", Map.empty, Text("test body"))
 
       val interrupt = intercept[FilterInterruptException] {
-        filterChain.filterRequest(request, request).futureValue
+        filterChain.filterRequest(request, request).awaitFuture
       }
 
       interrupt.response.body shouldBe Text("Forbidden")
@@ -76,12 +77,12 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     val response = FacadeResponse(201, Map.empty, Text("test body"))
 
     val interrupt = intercept[FilterInterruptException] {
-      filterChain.filterResponse(request,response).futureValue
+      filterChain.filterResponse(request,response).awaitFuture
     }
 
     interrupt.response.body shouldBe Null
     interrupt.response.headers shouldBe Map("x-http-header" → Seq("Accept-Language"))
-    interrupt.response.status shouldBe Some(200)
+    interrupt.response.status shouldBe 200
   }
 
   "applyOutputFilters non empty headers" in {
@@ -97,4 +98,11 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     filteredResponse.headers shouldBe Map("contentType" → Seq("application/json"), "messageId" → Seq("#12345"), "correlationId" → Seq("#54321"))
     filteredResponse.status shouldBe 200
   }
+
+  implicit class TestAwait[T](future: Future[T]) {
+    def awaitFuture: T = {
+      Await.result(future, 10.seconds)
+    }
+  }
 }
+

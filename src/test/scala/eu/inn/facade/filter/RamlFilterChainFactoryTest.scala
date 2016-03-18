@@ -41,12 +41,8 @@ class RamlFilterChainFactoryTest extends FreeSpec with Matchers with Injectable 
       val context = filterChain.responseFilterContext(request, response)
       val filters = filterChain.responseFilters(context, response)
 
-      val defaultResponseFilters = inject [Seq[Filter]]("defaultResponseFilters")
-
-      filters.size should equal(defaultResponseFilters.size + 2)
       filters.head shouldBe a[NoOpFilter]
       filters.tail.head shouldBe a[PrivateFieldsFilter]
-      filters.tail.tail should equal(defaultResponseFilters)
     }
   }
 }

@@ -178,8 +178,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
             Uri("/test-service/unreliable"),
             Map(Header.METHOD → Seq("subscribe"),
                 Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-                Header.MESSAGE_ID → Seq("messageId"),
-                Header.CORRELATION_ID → Seq("correlationId"))
+                FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+                FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
           ),
           DynamicBody(Obj(Map("content" → Text("haha")))))
       }
@@ -213,8 +213,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         RequestHeader(
           Uri("/test-service/unreliable"),
           Map(Header.METHOD → Seq("unsubscribe"),
-            Header.MESSAGE_ID → Seq("messageId"),
-            Header.CORRELATION_ID → Seq("correlationId"))
+            FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
         ),
         DynamicBody(Obj(Map()))
       )
@@ -257,8 +257,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
             Uri("/test-service/unreliable"),
             Map(Header.METHOD → Seq("subscribe"),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId"))
+              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
           ),
           DynamicBody(Obj(Map("content" → Text("haha")))))
       }
@@ -311,37 +311,49 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       val initialResourceState = Ok(
         DynamicBody(Obj(Map("content" → Text("fullResource")))),
-        Headers.plain(Map("revision" → Seq("1"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("1"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
 
       val updatedResourceState = Ok(
         DynamicBody(Obj(Map("content" → Text("fullResource")))),
-        Headers.plain(Map("revision" → Seq("4"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("4"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
 
       val subscriptionRequest = DynamicRequest(
         RequestHeader(
           Uri("/test-service/reliable"),
           Map(Header.METHOD → Seq("subscribe"),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId"))
+              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
         ),
         DynamicBody(Obj(Map())))
 
       val eventRev2 = ReliableFeedTestRequest(
         FeedTestBody("haha"),
-        Headers.plain(Map("revision" → Seq("2"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("2"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
 
       val eventRev3 = ReliableFeedTestRequest(
         FeedTestBody("haha"),
-        Headers.plain(Map("revision" → Seq("3"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("3"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
 
       val eventBadRev5 = ReliableFeedTestRequest(
         FeedTestBody("updateFromFuture"),
-        Headers.plain(Map("revision" → Seq("5"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("5"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
 
       val eventGoodRev5 = ReliableFeedTestRequest(
         FeedTestBody("haha"),
-        Headers.plain(Map("revision" → Seq("5"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        Headers.plain(Map("revision" → Seq("5"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
 
       var onCommandSubscription: Option[Subscription] = None
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
@@ -375,8 +387,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
             Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
               FacadeHeaders.CLIENT_REVISION → Seq("2"),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId"))))
+              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
           receivedEvent.toString shouldBe queuedEvent.toString
         } else fail("Queued event wasn't sent to the client")
 
@@ -392,8 +404,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
             Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
               FacadeHeaders.CLIENT_REVISION → Seq("3"),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId"))))
+              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
           receivedEvent.toString shouldBe directEvent.toString
         } else fail("Last event wasn't sent to the client")
 
@@ -427,8 +439,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
             Headers.plain(Map(Header.METHOD → Seq(Method.FEED_POST),
               FacadeHeaders.CLIENT_REVISION → Seq("5"),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId"))))
+              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))
           receivedEvent.toString shouldBe directEvent.toString
         } else fail("Last event wasn't sent to the client")
 
@@ -436,8 +448,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           RequestHeader(
             Uri("/test-service/reliable"),
             Map(Header.METHOD → Seq("unsubscribe"),
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId"))
+              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
           ),
           DynamicBody(Obj(Map()))
         )
@@ -476,7 +488,9 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(
           DynamicBody(Obj(Map("content" → Text("fullResource")))),
-          Headers.plain(Map("revision" → Seq("1"), Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))) onSuccess {
+          Headers.plain(Map("revision" → Seq("1"),
+            FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))))) onSuccess {
         case subscr ⇒ onCommandSubscription = Some(subscr)
       }
 
@@ -486,8 +500,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
             Uri("/test-service/reliable"),
             Map(Header.METHOD → Seq(Method.GET),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId"))
+              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
           ),
           DynamicBody(Null))
       }
@@ -544,8 +558,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
             Uri("/test-service/reliable"),
             Map(Header.METHOD → Seq(Method.POST),
               Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              Header.MESSAGE_ID → Seq("messageId"),
-              Header.CORRELATION_ID → Seq("correlationId"))
+              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"))
           ),
           DynamicBody(Map("post request" → Text("some request body"))))
       }

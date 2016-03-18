@@ -5,12 +5,13 @@ import java.nio.file.Paths
 import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.typesafe.config.ConfigFactory
 import eu.inn.facade.filter.chain.Filters
+import eu.inn.facade.filter.raml.{PrivateFieldsEventFilter, PrivateFieldsResponseFilter, EnrichRequestFilter}
 import eu.inn.facade.modules.Injectors
-import org.scalatest.{FreeSpec, Matchers}
 import eu.inn.facade.raml.Annotation._
 import eu.inn.facade.raml.DataType._
 import eu.inn.facade.raml.Method._
 import eu.inn.hyperbus.transport.api.uri.Uri
+import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
 class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
@@ -49,7 +50,12 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
               Field("clientIP", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(CLIENT_IP)))),
               Field("clientLanguage", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(CLIENT_LANGUAGE))))),
           Seq()))
-      ramlConfig.requestDataStructure("/status/test-service", GET, None) shouldBe Some(DataStructure(testServiceHeaders, Some(testServiceBody), Filters.empty))
+
+      val ds = ramlConfig.requestDataStructure("/status/test-service", GET, None)
+      ds.get.copy(filters = Filters.empty) shouldBe
+        DataStructure(testServiceHeaders, Some(testServiceBody), Filters.empty)
+
+      ds.get.filters.requestFilters.head shouldBe a[EnrichRequestFilter]
     }
 
     "response data structure" in {
@@ -59,7 +65,10 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
           Seq(Field("statusCode", DataType("number", Seq(), Seq())),
               Field("processedBy", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(PRIVATE))))),
           Seq()))
-      ramlConfig.responseDataStructure("/users", GET, 200) shouldBe Some(DataStructure(usersHeaders, Some(usersBody), Filters.empty))
+      val ds = ramlConfig.responseDataStructure("/users", GET, 200)
+      ds.get.copy(filters = Filters.empty) shouldBe DataStructure(usersHeaders, Some(usersBody), Filters.empty)
+      ds.get.filters.responseFilters.head shouldBe a[PrivateFieldsResponseFilter]
+      ds.get.filters.eventFilters.head shouldBe a[PrivateFieldsEventFilter]
 
       val testServiceHeaders = Seq(Header("content-type"))
       val testServiceBody = Body(
