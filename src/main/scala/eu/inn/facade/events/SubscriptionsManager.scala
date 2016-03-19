@@ -6,10 +6,8 @@ import java.util.concurrent.atomic.AtomicLong
 import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.Config
 import eu.inn.facade.HyperBusFactory
-import eu.inn.facade.model.FacadeRequest
 import eu.inn.hyperbus.HyperBus
-import eu.inn.hyperbus.model.{DynamicRequest, Header}
-import eu.inn.hyperbus.serialization.RequestHeader
+import eu.inn.hyperbus.model.{DynamicRequest, Header, Headers}
 import eu.inn.hyperbus.transport.api.Subscription
 import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, RequestMatcher}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -54,9 +52,8 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
               val matched = consumer.uri.matchUri(eventRequest.uri)
               log.debug(s"Event #(${eventRequest.messageId}) ${if (matched) "forwarded" else "NOT matched"} to ${consumer.clientActor}/${consumer.correlationId}")
               if (matched) {
-                val request = FacadeRequest(eventRequest.uri, eventRequest.method,
-                    eventRequest.headers + (Header.CORRELATION_ID → Seq(consumer.correlationId)),
-                    eventRequest.body.content
+                val request = eventRequest.copy(
+                  headers = Headers.plain(eventRequest.headers + (Header.CORRELATION_ID → Seq(consumer.correlationId)))
                 )
                 consumer.clientActor ! request
               }

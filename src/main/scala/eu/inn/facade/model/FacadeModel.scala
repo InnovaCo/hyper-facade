@@ -41,11 +41,6 @@ case class FacadeRequest(uri: Uri, method: String, headers: Map[String, Seq[Stri
     TextFrame(this.toJson)
   }
 
-  /*def correlationId: String = {
-    val messageId = headers(Header.MESSAGE_ID)
-    headers.getOrElse(Header.CORRELATION_ID, messageId).head
-  }*/
-
   def clientCorrelationId: Option[String] = {
     val messageId = headers.getOrElse(FacadeHeaders.CLIENT_MESSAGE_ID, Seq.empty)
     headers.getOrElse(FacadeHeaders.CLIENT_CORRELATION_ID, messageId).headOption
@@ -53,6 +48,11 @@ case class FacadeRequest(uri: Uri, method: String, headers: Map[String, Seq[Stri
 
   def contentType: Option[String] = {
     headers.get(Header.CONTENT_TYPE).flatMap(_.headOption)
+  }
+
+  override def toString = {
+    implicit val uriSpecificSerializer = new UriSpecificSerializer
+    s"FacadeRequest(${this.toJson})"
   }
 }
 
@@ -115,6 +115,10 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
 
   def toFrame: Frame = {
     TextFrame(this.toJson)
+  }
+
+  override def toString = {
+    s"FacadeResponse(${this.toJson})"
   }
 
   private def contentTypeToSpray(contentType: Option[String]): spray.http.ContentType = {

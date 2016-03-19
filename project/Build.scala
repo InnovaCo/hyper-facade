@@ -51,7 +51,7 @@ object Build extends sbt.Build {
           "com.fasterxml.jackson.module"   %% "jackson-module-scala"        % "2.4.3",
           "com.typesafe.akka"              %% "akka-actor"                  % "2.4.1",
           "com.typesafe.akka"              %% "akka-cluster"                % "2.4.1",
-          "com.typesafe.akka"              %% "akka-testkit"                % "2.4.1"     % "test",
+          //"com.typesafe.akka"              %% "akka-testkit"                % "2.4.1"     % "test",
           "com.wandoulabs.akka"            %% "spray-websocket"             % "0.1.4",
           "eu.inn"                         %% "binders-core"                % "0.11.77",
           "eu.inn"                         %% "hyperbus"                    % "0.1.62",

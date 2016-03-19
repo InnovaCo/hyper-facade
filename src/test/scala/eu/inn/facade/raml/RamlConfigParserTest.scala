@@ -76,7 +76,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
           Seq(Field("statusCode", DataType("number", Seq(), Seq())),
               Field("processedBy", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(PRIVATE))))),
           Seq()))
-      ramlConfig.responseDataStructure("/status/test-service", GET, 200) shouldBe Some(DataStructure(testServiceHeaders, Some(testServiceBody), Filters.empty))
+      ramlConfig.responseDataStructure("/status/test-service", GET, 200).get.copy(filters = Filters.empty) shouldBe DataStructure(testServiceHeaders, Some(testServiceBody), Filters.empty)
 
       val test404Headers = Seq[Header]()
       val test404Body = Body(DataType())
@@ -107,7 +107,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
 
       ramlConfig.requestDataStructure("/reliable-feed/{content:*}", POST, resourceStateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceStateBody), Filters.empty))
       ramlConfig.requestDataStructure("/reliable-feed/{content:*}", POST, resourceUpdateContentType) shouldBe Some(DataStructure(feedHeaders, Some(reliableResourceUpdateBody), Filters.empty))
-      ramlConfig.requestDataStructure("/reliable-feed/{content:*}", POST, None) shouldBe Some(DataStructure(feedHeaders, Some(testRequestBody), Filters.empty))
+      ramlConfig.requestDataStructure("/reliable-feed/{content:*}", POST, None).get.copy(filters = Filters.empty) shouldBe DataStructure(feedHeaders, Some(testRequestBody), Filters.empty)
     }
 
     "request URI substitution" in {
