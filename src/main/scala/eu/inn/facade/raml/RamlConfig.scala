@@ -1,12 +1,9 @@
 package eu.inn.facade.raml
 
 import eu.inn.facade.filter.chain.Filters
-import eu.inn.facade.model.{FacadeResponse, FacadeRequest}
 import eu.inn.facade.raml.annotations.RamlAnnotation
 import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.transport.api.uri._
-
-import scala.concurrent.Future
 
 class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
 
@@ -80,6 +77,7 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
 
 case class ResourceConfig(
                            traits: Traits,
+                           annotations: Seq[Annotation],
                            requests: Requests,
                            responses: Responses,
                            filters: Filters

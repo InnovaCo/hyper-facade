@@ -42,7 +42,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       var hyperBusSubscription: Option[Subscription] = None
       addClient(initialSubscription)
 
-      val methodFilter = Map(Header.METHOD → RegexMatcher("feed:.*"))
+      val methodFilter = Map(Header.METHOD → RegexMatcher("^feed:.*$"))
       hyperBus.onEvent(RequestMatcher(Some(groupUri), methodFilter), groupName) { eventRequest: DynamicRequest ⇒
         Future{
           log.debug(s"Event received ($groupName): $eventRequest")

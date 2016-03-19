@@ -3,6 +3,7 @@ package eu.inn.facade.raml
 import com.mulesoft.raml1.java.parser.impl.datamodel.ObjectFieldImpl
 import com.mulesoft.raml1.java.parser.model.api.Api
 import com.mulesoft.raml1.java.parser.model.bodies.Response
+import com.mulesoft.raml1.java.parser.model.common.RAMLLanguageElement
 import com.mulesoft.raml1.java.parser.model.datamodel.DataElement
 import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
@@ -32,10 +33,13 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     val traits = extractResourceTraits(resource) // todo: use annotations instead
     val requests = extractResourceRequests(currentUri, traits, resource)
     val responses = extractResourceResponses(currentUri, traits, resource)
+    val annotations = extractAnnotations(resource)
 
+    // todo: + method & request filters
     val filterChain = createFilterChain(TargetResource(currentUri), traits.commonTraits)
+    val filterChainA = createFilterChainA(TargetResource(currentUri), annotations)
 
-    val resourceConfig = ResourceConfig(traits, requests, responses, filterChain)
+    val resourceConfig = ResourceConfig(traits, annotations, requests, responses, filterChain ++ filterChainA)
 
     val configuration = Map.newBuilder[String, ResourceConfig]
     configuration += (currentUri → resourceConfig)
@@ -57,6 +61,23 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
       catch {
         case NonFatal(e) ⇒
           log.error(s"Can't inject filter for $tr", e)
+          filterChain
+      }
+    }
+  }
+
+  private def createFilterChainA(target: RamlTarget, annotations: Seq[Annotation]) = {
+    annotations.foldLeft(Filters.empty) { (filterChain, annotation) ⇒
+
+      try {
+        val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
+        filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
+          filterChainInner ++ factory.createFilters(target)
+        }
+      }
+      catch {
+        case NonFatal(e) ⇒
+          log.error(s"Can't inject filter for $annotation", e)
           filterChain
       }
     }
@@ -186,7 +207,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     }
   }
 
-  private def extractAnnotations(ramlField: DataElement): Seq[Annotation] = {
+  private def extractAnnotations(ramlField: RAMLLanguageElement): Seq[Annotation] = {
     ramlField.annotations.foldLeft(Seq.newBuilder[Annotation]) { (annotations, annotation) ⇒
       val value = annotation.value() match {
         case x: RamlAnnotation ⇒ Some(x)

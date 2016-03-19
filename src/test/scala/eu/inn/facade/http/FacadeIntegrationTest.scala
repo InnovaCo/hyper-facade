@@ -79,6 +79,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         case subscr ⇒ register(subscr)
       }
 
+      Thread.sleep(1000)
+
       Source.fromURL("http://localhost:54321/someSecretResource?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
     }
 
@@ -339,7 +341,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         case subscription: Subscription ⇒ register(subscription)
       }
 
-      whenReady(onClientUpgradePromise.future, Timeout(Span(50, Seconds))) { b ⇒
+      whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
         client ! subscriptionRequest
         Thread.sleep(3000)
         testService.publish(eventRev2)
@@ -354,7 +356,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         } else fail("Full resource state wasn't sent to the client")
       }
 
-      whenReady(queuedEventPromise.future, Timeout(Span(150, Seconds))) { b ⇒
+      whenReady(queuedEventPromise.future, Timeout(Span(15, Seconds))) { b ⇒
         val queuedEventMessage = clientMessageQueue.get(1)
         if (queuedEventMessage.isDefined) {
           val receivedEvent = FacadeRequest(queuedEventMessage.get)
@@ -373,7 +375,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         testService.publish(eventRev3)
       }
 
-      whenReady(publishedEventPromise.future, Timeout(Span(50, Seconds))) { b ⇒
+      whenReady(publishedEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val directEventMessage = clientMessageQueue.get(2)
         if (directEventMessage.isDefined) {
           val receivedEvent = FacadeRequest(directEventMessage.get)
@@ -399,7 +401,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         testService.publish(eventBadRev5)
       }
 
-      whenReady(refreshedResourceStatePromise.future, Timeout(Span(50, Seconds))) { b ⇒
+      whenReady(refreshedResourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val resourceUpdatedStateMessage = clientMessageQueue.get(3)
         if (resourceUpdatedStateMessage.isDefined) {
           val resourceUpdatedState = resourceUpdatedStateMessage.get.payload.utf8String
@@ -412,7 +414,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         testService.publish(eventGoodRev5)
       }
 
-      whenReady(afterResubscriptionEventPromise.future, Timeout(Span(50, Seconds))) { b ⇒
+      whenReady(afterResubscriptionEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val directEventMessage = clientMessageQueue.get(4)
         if (directEventMessage.isDefined) {
           val receivedEvent = FacadeRequest(directEventMessage.get)

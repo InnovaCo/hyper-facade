@@ -19,7 +19,7 @@ class RamlFilterChainFactoryTest extends FreeSpec with Matchers with Injectable 
   val filterChain = inject [FilterChain].asInstanceOf[RamlFilterChain]
 
   "FilterChainRamlFactory " - {
-    "trait based filter chain" in {
+    "resource filter chain" in {
       val request = FacadeRequest(Uri("/private"), "get", Map.empty, Null)
       val context = filterChain.requestFilterContext(request)
       val filters = filterChain.requestFilters(context, request)

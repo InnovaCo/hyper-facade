@@ -61,12 +61,12 @@ annotationTypes:
   x-client-ip:
   x-client-language:
   privateField:
+  privateResource:
 
 traits:
   secured:
   paged:
   rateLimited:
-  privateResource:
 
 /users:
   is: [ secured ]
@@ -104,7 +104,7 @@ traits:
             type: string
 
 /private:
-  is: [ privateResource ]
+  (privateResource):
 
 /unreliable-feed/{content}:
   post:

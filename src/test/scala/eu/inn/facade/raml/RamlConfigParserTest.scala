@@ -34,7 +34,6 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
       ramlConfig.traitNames("/users", GET) shouldBe Seq("paged", "rateLimited", "secured")
       ramlConfig.traitNames("/users", POST) shouldBe Seq("secured")
       ramlConfig.traitNames("/status/test-service", GET) shouldBe Seq("paged")
-      ramlConfig.traitNames("/private", GET) shouldBe Seq("privateResource")
     }
 
     "request data structure" in {
