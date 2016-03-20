@@ -1,7 +1,6 @@
 package eu.inn.facade.raml
 
 import eu.inn.facade.filter.chain.Filters
-import eu.inn.facade.raml.annotations.RamlAnnotation
 import eu.inn.hyperbus.transport.api.uri._
 
 class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {

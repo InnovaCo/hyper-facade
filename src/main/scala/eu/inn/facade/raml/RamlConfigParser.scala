@@ -9,7 +9,6 @@ import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
 import eu.inn.facade.filter.chain.Filters
 import eu.inn.facade.model._
-import eu.inn.facade.raml.annotations.RamlAnnotation
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector, StringIdentifier}
 

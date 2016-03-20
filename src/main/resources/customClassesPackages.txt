@@ -1,1 +1,1 @@
-eu.inn.hyperbus.raml.annotationtypes
+eu.inn.facade.raml.annotationtypes
