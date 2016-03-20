@@ -2,7 +2,6 @@ package eu.inn.facade.raml
 
 import eu.inn.facade.filter.chain.Filters
 import eu.inn.facade.raml.annotations.RamlAnnotation
-import eu.inn.hyperbus.transport.api
 import eu.inn.hyperbus.transport.api.uri._
 
 class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
@@ -30,6 +29,7 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
     foundUri
   }
 
+  /*
   def requestDataStructure(uriPattern: String, method: String, contentType: Option[String]): Option[DataStructure] = {
     resourcesByUri.get(uriPattern) match {
       case Some(resourceConfig) ⇒ resourceConfig.requests.dataStructures.get(Method(method), getContentType(contentType))
@@ -57,6 +57,7 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
       case None ⇒ Seq()
     }
   }
+*/
 
   private def traits(uriPattern: String, method: String): Seq[Trait] = {
     resourcesByUri.get(uriPattern) match {
@@ -78,16 +79,28 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
 case class ResourceConfig(
                            traits: Traits,
                            annotations: Seq[Annotation],
-                           requests: Requests,
-                           responses: Responses,
+                           methods: Map[Method, ResourceMethod],
                            filters: Filters
                          )
 
+case class ResourceMethod(method: Method,
+                          requests: Requests,
+                          responses: Map[Int, Responses],
+                          filters: Filters)
+
+//case class Request(contentType: ContentType, dataStructure: DataStructure)
+
+//case class Response(statusCode: Int, dataStructure: DataStructure)
+
+case class Requests(dataStructures: Map[Option[ContentType], DataStructure])
+
+case class Responses(dataStructures: Map[Option[ContentType], DataStructure])
+
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
 
-case class Requests(dataStructures: Map[(Method, Option[ContentType]), DataStructure])
+//case class Requests(dataStructures: Map[(Method, Option[ContentType]), DataStructure])
 
-case class Responses(dataStructures: Map[(Method, Int), DataStructure])
+//case class Responses(dataStructures: Map[(Method, Int), DataStructure])
 
 case class Trait(name: String, parameters: Map[String, String])
 object Trait {

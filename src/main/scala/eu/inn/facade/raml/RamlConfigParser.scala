@@ -11,7 +11,7 @@ import eu.inn.facade.filter.chain.Filters
 import eu.inn.facade.model._
 import eu.inn.facade.raml.annotations.RamlAnnotation
 import org.slf4j.LoggerFactory
-import scaldi.{Injectable, Injector}
+import scaldi.{Injectable, Injector, StringIdentifier}
 
 import scala.collection.JavaConversions._
 import scala.util.control.NonFatal
@@ -30,16 +30,13 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   }
 
   private def parseResource(currentUri: String, resource: Resource): Map[String, ResourceConfig] = {
-    val traits = extractResourceTraits(resource) // todo: use annotations instead
-    val requests = extractResourceRequests(currentUri, traits, resource)
-    val responses = extractResourceResponses(currentUri, traits, resource)
-    val annotations = extractAnnotations(resource)
+    val traits = extractResourceTraits(resource) // todo: eliminate?
 
-    // todo: + method & request filters
-    val filterChain = createFilterChain(TargetResource(currentUri), traits.commonTraits)
-    val filterChainA = createFilterChainA(TargetResource(currentUri), annotations)
+    val resourceAnnotations = extractAnnotations(resource)
+    val resourceFilters = createFilters(TargetResource(currentUri), resourceAnnotations)
+    val resourceMethods = extractResourceMethods(currentUri, resource, resourceFilters)
 
-    val resourceConfig = ResourceConfig(traits, annotations, requests, responses, filterChain ++ filterChainA)
+    val resourceConfig = ResourceConfig(traits, resourceAnnotations, resourceMethods, resourceFilters)
 
     val configuration = Map.newBuilder[String, ResourceConfig]
     configuration += (currentUri → resourceConfig)
@@ -49,30 +46,20 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     }.result()
   }
 
-  private def createFilterChain(target: RamlTarget, traits: Seq[Trait]) = {
-    traits.foldLeft(Filters.empty) { (filterChain, tr) ⇒
-
-      try {
-        val filterFactories = inject[Seq[RamlFilterFactory]](tr.name)
-        filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
-          filterChainInner ++ factory.createFilters(target)
-        }
-      }
-      catch {
-        case NonFatal(e) ⇒
-          log.error(s"Can't inject filter for $tr", e)
-          filterChain
-      }
-    }
-  }
-
-  private def createFilterChainA(target: RamlTarget, annotations: Seq[Annotation]) = {
+  private def createFilters(target: RamlTarget, annotations: Seq[Annotation]) = {
     annotations.foldLeft(Filters.empty) { (filterChain, annotation) ⇒
-
       try {
-        val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
-        filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
-          filterChainInner ++ factory.createFilters(target)
+        val ident = StringIdentifier(annotation.name)
+        inj.getBinding(List(ident)) match {
+          case Some(_) ⇒
+            val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
+            filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
+              filterChainInner ++ factory.createFilters(target)
+            }
+
+          case None ⇒
+            log.warn(s"Annotation ${annotation.name} has no bound filter to create")
+            filterChain
         }
       }
       catch {
@@ -83,51 +70,38 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     }
   }
 
-  private def extractResourceRequests(currentUri: String, traits: Traits, resource: Resource): Requests = {
-    val acc = Map.newBuilder[(Method, Option[ContentType]), DataStructure]
-    val requestsByMethodAndType = resource.methods.foldLeft(acc) { (requestMap, ramlMethod) ⇒
-      val method = Method(ramlMethod.method())
-      val methodFilterChain = createFilterChain(TargetMethod(currentUri, method.name),
-        traits.methodSpecificTraits.getOrElse(method, Seq.empty)
-      )
-
-      val dataTypes: Map[Option[ContentType], DataStructure] =
-        extractTypeDefinitions(RamlRequestResponseWrapper(ramlMethod), methodFilterChain)
-      dataTypes.foldLeft(requestMap) { (requestMap, mapEntry) ⇒
-        val (contentType, dataStructure) = mapEntry
-        requestMap += ((method, contentType) → dataStructure)
-      }
-    }.result()
-    Requests(requestsByMethodAndType)
+  private def extractResourceMethods(currentUri: String, resource: Resource, parentFilters: Filters): Map[Method, ResourceMethod] = {
+    val builder = Map.newBuilder[Method, ResourceMethod]
+    resource.methods.foreach { ramlMethod ⇒
+      builder += Method(ramlMethod.method) → extractResourceMethod(currentUri, ramlMethod, resource, parentFilters)
+    }
+    builder.result()
   }
 
-  private def extractResourceResponses(currentUri: String, traits: Traits, resource: Resource): Responses = {
-    val acc = Map.newBuilder[(Method, Int), DataStructure]
-    val responsesByMethod = resource.methods.foldLeft(acc) { (responseMap, ramlMethod) ⇒
-      val method = Method(ramlMethod.method())
-      val methodFilterChain = createFilterChain(TargetMethod(currentUri, method.name),
-        traits.methodSpecificTraits.getOrElse(method, Seq.empty)
-      )
+  def extractResourceMethod(currentUri: String, ramlMethod: methodsAndResources.Method, resource: Resource, parentFilters: Filters): ResourceMethod = {
+    val method = Method(ramlMethod.method())
+    val methodAnnotations = extractAnnotations(ramlMethod)
+    val methodFilters = parentFilters ++ createFilters(TargetMethod(currentUri, method.name), methodAnnotations)
 
-      ramlMethod.responses.foldLeft(responseMap) { (responseMap, ramlResponse) ⇒
-        val statusCode: Int = Integer.parseInt(ramlResponse.code.value)
-        val dataTypesMap: Map[Option[ContentType], DataStructure] =
-          extractTypeDefinitions(RamlRequestResponseWrapper(ramlResponse), methodFilterChain)
-        dataTypesMap.foldLeft(responseMap) { (responseMap, mapEntry) ⇒
-          val dataStructure = mapEntry._2
-          responseMap += ((method, statusCode) → dataStructure)
-        }
-      }
-    }.result()
-    Responses(responsesByMethod)
+    val requests = Requests(extractTypeDefinitions(RamlRequestResponseWrapper(ramlMethod), methodFilters))
+
+    val responsesBuilder = Map.newBuilder[Int, Responses]
+    ramlMethod.responses.foreach { ramlResponse ⇒
+      val statusCode = ramlResponse.code.value.toInt
+      val responseDataTypes = extractTypeDefinitions(RamlRequestResponseWrapper(ramlResponse), methodFilters)
+      responsesBuilder += statusCode → Responses(responseDataTypes)
+    }
+
+    ResourceMethod(method, requests, responsesBuilder.result(), methodFilters)
   }
 
   private def extractTypeDefinitions(ramlReqRspWrapper: RamlRequestResponseWrapper,
-                                     methodFilters: Filters): Map[Option[ContentType], DataStructure] = {
+                                     parentFilters: Filters) = {
     val headers = ramlReqRspWrapper.headers.foldLeft(Seq.newBuilder[Header]) { (headerList, ramlHeader) ⇒
       headerList += Header(ramlHeader.name())
     }.result()
     val typeNames: Map[Option[String], Option[String]] = getTypeNamesByContentType(ramlReqRspWrapper)
+
     typeNames.foldLeft(Map.newBuilder[Option[ContentType], DataStructure]) { (typeDefinitions, typeDefinition) ⇒
       val (contentTypeName, typeName) = typeDefinition
       val contentType: Option[ContentType] = contentTypeName match {
@@ -166,7 +140,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             val filterChain = filterMap.map { case (factory, filteredFields) ⇒
               val target = TargetFields(name, filteredFields)
               factory.createFilters(target)
-            }.foldLeft (methodFilters) { (filterChain, next) ⇒
+            }.foldLeft (parentFilters) { (filterChain, next) ⇒
               filterChain ++ next
             }
 
@@ -174,10 +148,10 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             val dataType = DataStructure(headers, Some(body), filterChain)
             dataType
 
-          case None ⇒ DataStructure(headers, Some(Body(DataType())), methodFilters)
+          case None ⇒ DataStructure(headers, Some(Body(DataType())), parentFilters)
         }
 
-        case None ⇒ DataStructure(headers, Some(Body(DataType())), methodFilters)
+        case None ⇒ DataStructure(headers, Some(Body(DataType())), parentFilters)
       }
       typeDefinitions += (contentType → dataStructure)
     }.result()

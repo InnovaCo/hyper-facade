@@ -1,52 +1,67 @@
 package eu.inn.facade.filter.chain
 
 import eu.inn.facade.model._
-import eu.inn.facade.raml.{ContentType, Method, RamlConfig}
-import scaldi.Injectable
+import eu.inn.facade.raml.{ContentType, Method, RamlConfig, ResourceMethod}
 
+class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
 
-class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain with Injectable {
   def requestFilters(context: RequestFilterContext, request: FacadeRequest): Seq[RequestFilter] = {
-    ramlConfig.resourcesByUri.get(request.uri.formatted) match {
-      case Some(resource) ⇒
-        val dataTypeFilters =
-          resource.requests.dataStructures.get(
-            (Method(request.method),None)
-          ).map(_.filters.requestFilters).getOrElse(Seq.empty)
-
-        resource.filters.requestFilters ++ dataTypeFilters
-      case None ⇒ Seq.empty
-    }
+    requestOrEventFilters(request.uri.formatted, request.method, request.contentType).requestFilters
   }
 
   def responseFilters(context: ResponseFilterContext, response: FacadeResponse): Seq[ResponseFilter] = {
-    ramlConfig.resourcesByUri.get(context.uri.formatted) match {
-      case Some(resource) ⇒
-        val responseFilters =
-          resource.responses.dataStructures.get(
-            (Method(context.method), response.status)
-          ).map(_.filters.responseFilters).getOrElse(Seq.empty)
+    val uri = context.uri.formatted
+    val method = context.method
+    val result = filtersOrMethod(uri, method) match {
+      case Left(filters) ⇒
+        filters
 
-        resource.filters.responseFilters ++ responseFilters
-      case None ⇒ Seq.empty
+      case Right(resourceMethod) ⇒
+        resourceMethod.responses.get(response.status) match {
+          case Some(responseDataStructures) ⇒
+            responseDataStructures.dataStructures.get(response.contentType.map(ContentType)) match {
+              case Some(responseDataStructure) ⇒
+                responseDataStructure.filters
+              case None ⇒
+                resourceMethod.filters
+            }
+          case None ⇒
+            resourceMethod.filters
+        }
     }
+    result.responseFilters
   }
 
   def eventFilters(context: EventFilterContext, event: FacadeRequest): Seq[EventFilter] = {
-    ramlConfig.resourcesByUri.get(context.uri.formatted) match {
+    val uri = context.uri.formatted
+    val methodName = if (event.method.startsWith("feed:")) event.method.substring(5) else event.method
+    requestOrEventFilters(uri, methodName, event.contentType).eventFilters
+  }
+
+  private def requestOrEventFilters(uri: String, method: String, contentType: Option[String]): Filters = {
+    filtersOrMethod(uri, method) match {
+      case Left(filters) ⇒ filters
+      case Right(resourceMethod) ⇒
+        resourceMethod.requests.dataStructures.get(contentType.map(ContentType)) match {
+          case Some(requestDataStructure) ⇒
+            requestDataStructure.filters
+          case None ⇒
+            resourceMethod.filters
+        }
+    }
+  }
+
+  private def filtersOrMethod(uri: String, method: String): Either[Filters, ResourceMethod] = {
+    ramlConfig.resourcesByUri.get(uri) match {
       case Some(resource) ⇒
-        val methodFilters =
-          resource.requests.dataStructures.get(
-            (Method(event.method),None)
-          ).map(_.filters.eventFilters).getOrElse(Seq.empty)
-
-        val dataTypeFilters =
-          resource.requests.dataStructures.get(
-            (Method(event.method), event.contentType.map(ContentType))
-          ).map(_.filters.eventFilters).getOrElse(Seq.empty)
-
-        resource.filters.eventFilters ++ methodFilters ++ dataTypeFilters
-      case None ⇒ Seq.empty
+        resource.methods.get(Method(method)) match {
+          case Some(resourceMethod) ⇒
+            Right(resourceMethod)
+          case None ⇒
+            Left(resource.filters)
+        }
+      case None ⇒
+        Left(Filters.empty)
     }
   }
 }

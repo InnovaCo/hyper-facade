@@ -104,9 +104,8 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
 
   def toHttpResponse: HttpResponse = {
     val statusCode = StatusCode.int2StatusCode(status)
-    val contentType = contentTypeToSpray(headers.get(Header.CONTENT_TYPE).flatMap(_.headOption))
     val jsonBody = body.toJson
-    HttpResponse(statusCode, HttpEntity(contentType, jsonBody), headers.flatMap{ case (name, values) ⇒
+    HttpResponse(statusCode, HttpEntity(contentTypeToSpray(contentType), jsonBody), headers.flatMap{ case (name, values) ⇒
       values.map { value ⇒
         RawHeader(FacadeResponse.camelCaseToDashCase.convert(name), value)
       }
@@ -119,6 +118,10 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
 
   override def toString = {
     s"FacadeResponse(${this.toJson})"
+  }
+
+  def contentType: Option[String] = {
+    headers.get(Header.CONTENT_TYPE).flatMap(_.headOption)
   }
 
   private def contentTypeToSpray(contentType: Option[String]): spray.http.ContentType = {
