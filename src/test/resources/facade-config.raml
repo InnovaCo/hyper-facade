@@ -62,16 +62,17 @@ annotationTypes:
   x-client-language:
   privateField:
   privateResource:
+  paged:
 
 traits:
   secured:
-  paged:
   rateLimited:
 
 /users:
   is: [ secured ]
   get:
-    is: [ paged, rateLimited ]
+    is: [ rateLimited ]
+    (paged):
     body:
       type: StatusRequest
     headers:
@@ -88,7 +89,7 @@ traits:
     is: [ rateLimited ]
   /test-service:
     get:
-      is: [ paged ]
+      (paged):
       body:
         type: TestRequest
       headers:
