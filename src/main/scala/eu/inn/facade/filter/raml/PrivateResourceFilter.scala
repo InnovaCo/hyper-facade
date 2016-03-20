@@ -1,20 +1,20 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.facade.filter.chain.Filters
+import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model._
 import eu.inn.hyperbus.model.{ErrorBody, NotFound}
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class PrivateResourceFilterFactory extends RamlFilterFactory {
-  override def createFilters(target: RamlTarget): Filters = {
+  override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
     target match {
-      case TargetResource(_) | TargetMethod(_, _) ⇒ Filters(
+      case TargetResource(_) | TargetMethod(_, _) ⇒ SimpleFilterChain(
         requestFilters = Seq(new PrivateResourceFilter),
         responseFilters = Seq.empty,
         eventFilters = Seq.empty
       )
-      case _ ⇒ Filters.empty // log warning
+      case _ ⇒ FilterChain.empty // log warning
     }
   }
 }

@@ -8,7 +8,7 @@ import eu.inn.binders.dynamic.{Null, Obj, ObjV, Text}
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
-import eu.inn.hyperbus.HyperBus
+import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -47,8 +47,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       statusMonitorFacade.restRoutes.routes
     }
   }
-  val hyperBus = inject[HyperBus] // initialize hyperbus
-  val testService = new TestService(testServiceHyperBus)
+  val hyperbus = inject[Hyperbus] // initialize hyperbus
+  val testService = new TestService(testServiceHyperbus)
   val subscriptions = scala.collection.mutable.MutableList[Subscription]()
 
   // Unfortunately WsRestServiceApp doesn't provide a Future or any other way to ensure that listener is
@@ -105,7 +105,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         response.entity.asString should include (""""code":"service_is_not_available"""")
         response.status.intValue shouldBe 503
 
-        subscriptions.foreach(hyperBus.off)
+        subscriptions.foreach(hyperbus.off)
         subscriptions.clear
         Await.result(clientActorSystem.terminate(), Duration.Inf)
       }
@@ -123,13 +123,13 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       val responseFuture = pipeline(Get(http.Uri(uri)))
       whenReady(responseFuture, Timeout(Span(5, Seconds))) { response ⇒
         response.entity.asString shouldBe """"response""""
-        response.headers should contain (RawHeader("hyper-bus-revision", "1"))
+        response.headers should contain (RawHeader("hyperbus-revision", "1"))
 
         val mediaType = MediaTypes.register(MediaType.custom("application", "vnd.user-profile+json", true, false))
         val contentType = ContentType(mediaType, `UTF-8`)
         response.headers should contain (`Content-Type`(contentType))
 
-        subscriptions.foreach(hyperBus.off)
+        subscriptions.foreach(hyperbus.off)
         subscriptions.clear
         Await.result(clientActorSystem.terminate(), Duration.Inf)
       }
@@ -179,11 +179,11 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           Obj(Map("content" → Text("haha"))))
       }
 
-      whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
+      whenReady(resourceStatePromise.future, Timeout(Span(10, Seconds))) { b ⇒
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState should startWith("""{"status":200,"headers":{"hyperBusMessageId":""")
+          resourceState should startWith("""{"status":200,"headers":{"hyperbusMessageId":""")
           resourceState should endWith("""body":{"content":"fullResource"}}""")
         } else fail("Full resource state wasn't sent to the client")
       }
@@ -198,7 +198,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       whenReady(publishedEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
         val eventMessage = clientMessageQueue.get(1)
         if (eventMessage.isDefined) {
-          val referenceRequest = """{"uri":"/test-service/unreliable","method":"feed:post","headers":{"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"],"contentType":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
+          val referenceRequest = """{"uri":"/test-service/unreliable","method":"feed:post","headers":{"hyperbusMessageId":["messageId"],"hyperbusCorrelationId":["correlationId"],"contentType":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
           eventMessage.get.payload.utf8String shouldBe referenceRequest
         } else fail("Event wasn't sent to the client")
       }
@@ -247,7 +247,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
             Obj(Map("content" → Text("haha"))))
       }
 
-      whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
+      whenReady(resourceStatePromise.future, Timeout(Span(10, Seconds))) { b ⇒
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
@@ -351,12 +351,12 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          val referenceState = """{"status":200,"headers":{"hyperBusRevision":["1"],"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"]},"body":{"content":"fullResource"}}"""
+          val referenceState = """{"status":200,"headers":{"hyperbusRevision":["1"],"hyperbusMessageId":["messageId"],"hyperbusCorrelationId":["correlationId"]},"body":{"content":"fullResource"}}"""
           resourceState shouldBe referenceState
         } else fail("Full resource state wasn't sent to the client")
       }
 
-      whenReady(queuedEventPromise.future, Timeout(Span(15, Seconds))) { b ⇒
+      whenReady(queuedEventPromise.future, Timeout(Span(20, Seconds))) { b ⇒
         val queuedEventMessage = clientMessageQueue.get(1)
         if (queuedEventMessage.isDefined) {
           val receivedEvent = FacadeRequest(queuedEventMessage.get)
@@ -391,7 +391,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           receivedEvent shouldBe directEvent
         } else fail("Last event wasn't sent to the client")
 
-        subscriptions.foreach(hyperBus.off)
+        subscriptions.foreach(hyperbus.off)
         subscriptions.clear
         testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
           updatedResourceState) onSuccess {
@@ -405,11 +405,11 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceUpdatedStateMessage = clientMessageQueue.get(3)
         if (resourceUpdatedStateMessage.isDefined) {
           val resourceUpdatedState = resourceUpdatedStateMessage.get.payload.utf8String
-          val referenceState = """{"status":200,"headers":{"hyperBusRevision":["4"],"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"]},"body":{"content":"fullResource"}}"""
+          val referenceState = """{"status":200,"headers":{"hyperbusRevision":["4"],"hyperbusMessageId":["messageId"],"hyperbusCorrelationId":["correlationId"]},"body":{"content":"fullResource"}}"""
           resourceUpdatedState shouldBe referenceState
         } else fail("Full resource state wasn't sent to the client")
 
-        subscriptions.foreach(hyperBus.off)
+        subscriptions.foreach(hyperbus.off)
         subscriptions.clear
         testService.publish(eventGoodRev5)
       }
@@ -485,7 +485,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState shouldBe """{"status":200,"headers":{"hyperBusRevision":["1"],"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"]},"body":{"content":"fullResource"}}"""
+          resourceState shouldBe """{"status":200,"headers":{"hyperbusRevision":["1"],"hyperbusMessageId":["messageId"],"hyperbusCorrelationId":["correlationId"]},"body":{"content":"fullResource"}}"""
         } else fail("Full resource state wasn't sent to the client")
       }
     }
@@ -537,7 +537,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         val resourceStateMessage = clientMessageQueue.get(0)
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState shouldBe """{"status":200,"headers":{"hyperBusMessageId":["messageId"],"hyperBusCorrelationId":["correlationId"]},"body":"got it"}"""
+          resourceState shouldBe """{"status":200,"headers":{"hyperbusMessageId":["messageId"],"hyperbusCorrelationId":["correlationId"]},"body":"got it"}"""
         } else fail("Full resource state wasn't sent to the client")
       }
     }
@@ -551,12 +551,12 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
     HttpHeaders.RawHeader("Sec-WebSocket-Key", "x3JJHMbDL1EzLkh9GBhXDw=="),
     HttpHeaders.RawHeader("Sec-WebSocket-Extensions", "permessage-deflate"))
 
-  def testServiceHyperBus: HyperBus = {
+  def testServiceHyperbus: Hyperbus = {
     val config = inject[Config]
     val testServiceTransportMgr = new TransportManager(TransportConfigurationLoader.fromConfig(config))
     val hypeBusGroupKey = "hyperbus.facade.group-name"
-    val defaultHyperBusGroup = if (config.hasPath(hypeBusGroupKey)) Some(config.getString(hypeBusGroupKey)) else None
-    new HyperBus(testServiceTransportMgr, defaultHyperBusGroup)(ExecutionContext.fromExecutor(newPoolExecutor()))
+    val defaultHyperbusGroup = if (config.hasPath(hypeBusGroupKey)) Some(config.getString(hypeBusGroupKey)) else None
+    new Hyperbus(testServiceTransportMgr, defaultHyperbusGroup)(ExecutionContext.fromExecutor(newPoolExecutor()))
   }
 
   private def newPoolExecutor(): Executor = {
@@ -565,7 +565,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
   }
 
   override def afterEach(): Unit = {
-    subscriptions.foreach(hyperBus.off)
+    subscriptions.foreach(hyperbus.off)
     subscriptions.clear
   }
 

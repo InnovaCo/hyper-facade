@@ -4,15 +4,15 @@ import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import eu.inn.facade.events.SubscriptionsManager
 import eu.inn.facade.http.{HttpWorker, HandleErrorsDirectives}
-import eu.inn.facade.{HyperBusFactory, StatsReporterFactory}
-import eu.inn.hyperbus.HyperBus
+import eu.inn.facade.{HyperbusFactory, StatsReporterFactory}
+import eu.inn.hyperbus.Hyperbus
 import scaldi.Module
 
 import scala.concurrent.ExecutionContext
 
 class ServiceModule extends Module {
-  bind [HyperBusFactory]        identifiedBy 'hbFactory            to new HyperBusFactory(inject [Config])
-  bind [HyperBus]               identifiedBy 'hyperbus             to inject [HyperBusFactory].hyperBus
+  bind [HyperbusFactory]        identifiedBy 'hbFactory            to new HyperbusFactory(inject [Config])
+  bind [Hyperbus]               identifiedBy 'hyperbus             to inject [HyperbusFactory].hyperbus
   bind [StatsReporterFactory]   identifiedBy 'statsFactory         to new StatsReporterFactory(inject [Config])
   bind [ActorSystem]            identifiedBy 'actorSystem          to ActorSystem("facade", inject [Config])
   bind [ExecutionContext]       identifiedBy 'executionContext     to inject [ActorSystem].dispatcher

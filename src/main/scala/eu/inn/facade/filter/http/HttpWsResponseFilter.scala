@@ -18,8 +18,8 @@ class HttpWsResponseFilter extends ResponseFilter {
           )
 
         case (k, v) ⇒
-          if (HttpWsResponseFilter.directHyperBusToFacade.contains(k)) {
-            headersBuilder += HttpWsResponseFilter.directHyperBusToFacade(k) → v
+          if (HttpWsResponseFilter.directHyperbusToFacade.contains(k)) {
+            headersBuilder += HttpWsResponseFilter.directHyperbusToFacade(k) → v
           }
       }
 
@@ -31,5 +31,5 @@ class HttpWsResponseFilter extends ResponseFilter {
 }
 
 object HttpWsResponseFilter {
-  val directHyperBusToFacade = FacadeHeaders.directHeaderMapping.map(kv ⇒ kv._2 → kv._1).toMap
+  val directHyperbusToFacade = FacadeHeaders.directHeaderMapping.map(kv ⇒ kv._2 → kv._1).toMap
 }

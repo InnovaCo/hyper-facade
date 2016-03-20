@@ -17,8 +17,8 @@ class WsEventFilter extends EventFilter {
           )
 
         case (k, v) ⇒
-          if (WsEventFilter.directHyperBusToFacade.contains(k)) {
-            headersBuilder += WsEventFilter.directHyperBusToFacade(k) → v
+          if (WsEventFilter.directHyperbusToFacade.contains(k)) {
+            headersBuilder += WsEventFilter.directHyperbusToFacade(k) → v
           }
       }
 
@@ -30,6 +30,6 @@ class WsEventFilter extends EventFilter {
 }
 
 object WsEventFilter {
-  val directHyperBusToFacade = FacadeHeaders.directHeaderMapping.map(kv ⇒ kv._2 → kv._1).toMap
+  val directHyperbusToFacade = FacadeHeaders.directHeaderMapping.map(kv ⇒ kv._2 → kv._1).toMap
 }
 

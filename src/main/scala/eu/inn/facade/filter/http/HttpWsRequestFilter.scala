@@ -35,8 +35,8 @@ class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
           messageIdFound = true
 
         case (k, v) ⇒
-          if (HttpWsRequestFilter.directFacadeToHyperBus.contains(k)) {
-            headersBuilder += HttpWsRequestFilter.directFacadeToHyperBus(k) → v
+          if (HttpWsRequestFilter.directFacadeToHyperbus.contains(k)) {
+            headersBuilder += HttpWsRequestFilter.directFacadeToHyperbus(k) → v
           }
       }
 
@@ -59,5 +59,5 @@ class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
 }
 
 object HttpWsRequestFilter {
-  val directFacadeToHyperBus =  FacadeHeaders.directHeaderMapping.toMap
+  val directFacadeToHyperbus =  FacadeHeaders.directHeaderMapping.toMap
 }

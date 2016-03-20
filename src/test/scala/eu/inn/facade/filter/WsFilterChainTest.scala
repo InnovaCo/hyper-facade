@@ -64,8 +64,8 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   }
 
   val filterChain = new SimpleFilterChain(
-    initRequestFilters = Seq(new TestRequestFilter),
-    initResponseFilters = Seq(new TestResponseFilter)
+    requestFilters = Seq(new TestRequestFilter),
+    responseFilters = Seq(new TestResponseFilter)
   ) // todo: + test eventFilters
 
   val emptyFilterChain = new SimpleFilterChain()

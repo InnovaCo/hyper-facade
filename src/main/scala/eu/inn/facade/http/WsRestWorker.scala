@@ -6,7 +6,7 @@ import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.{FacadeHeaders, FacadeMessage, FacadeRequest, FacadeResponse}
 import eu.inn.facade.raml.RamlConfig
-import eu.inn.hyperbus.{HyperBus, IdGenerator}
+import eu.inn.hyperbus.{Hyperbus, IdGenerator}
 import eu.inn.hyperbus.model._
 import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
@@ -17,7 +17,7 @@ import spray.routing.HttpServiceActor
 
 class WsRestWorker(val serverConnection: ActorRef,
                    workerRoutes: WsRestRoutes,
-                   hyperBus: HyperBus,
+                   hyperbus: Hyperbus,
                    subscriptionManager: SubscriptionsManager,
                    clientAddress: String)
                   (implicit inj: Injector)
@@ -116,7 +116,7 @@ class WsRestWorker(val serverConnection: ActorRef,
     val actorName = "Subscr-" + key
     context.child(actorName) match {
       case Some(actor) ⇒ actor.forward(facadeRequest)
-      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperBus, subscriptionManager), actorName) ! facadeRequest
+      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperbus, subscriptionManager), actorName) ! facadeRequest
     }
   }
 
@@ -150,13 +150,13 @@ class WsRestWorker(val serverConnection: ActorRef,
 object WsRestWorker {
   def props(serverConnection: ActorRef,
             workerRoutes: WsRestRoutes,
-            hyperBus: HyperBus,
+            hyperbus: Hyperbus,
             subscriptionManager: SubscriptionsManager,
             clientAddress: String)
            (implicit inj: Injector) = Props(new WsRestWorker(
     serverConnection,
     workerRoutes,
-    hyperBus,
+    hyperbus,
     subscriptionManager,
     clientAddress))
 }

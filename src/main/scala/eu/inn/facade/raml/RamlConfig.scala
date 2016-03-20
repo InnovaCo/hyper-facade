@@ -1,6 +1,6 @@
 package eu.inn.facade.raml
 
-import eu.inn.facade.filter.chain.Filters
+import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.hyperbus.transport.api.uri._
 
 class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
@@ -28,36 +28,6 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
     foundUri
   }
 
-  /*
-  def requestDataStructure(uriPattern: String, method: String, contentType: Option[String]): Option[DataStructure] = {
-    resourcesByUri.get(uriPattern) match {
-      case Some(resourceConfig) ⇒ resourceConfig.requests.dataStructures.get(Method(method), getContentType(contentType))
-      case None ⇒ None
-    }
-  }
-
-  def responseDataStructure(uriPattern: String, method: String, statusCode: Int): Option[DataStructure] = {
-    resourcesByUri.get(uriPattern) match {
-      case Some(resourceConfig) ⇒ resourceConfig.responses.dataStructures.get(Method(method), statusCode)
-      case None ⇒ None
-    }
-  }
-
-  def responseDataStructures(uri: api.uri.Uri, method: String): Seq[DataStructure] = {
-    resourcesByUri.get(uri.pattern.specific) match {
-      case Some(resourceConfig) ⇒
-        resourceConfig.responses.dataStructures.foldLeft(Seq.newBuilder[DataStructure]) { (structuresByMethod, kv) ⇒
-          val (httpMethod, _) = kv._1
-          val structure = kv._2
-          if (httpMethod == Method(method)) structuresByMethod += structure
-          else structuresByMethod
-        }.result()
-
-      case None ⇒ Seq()
-    }
-  }
-*/
-
   private def traits(uriPattern: String, method: String): Seq[Trait] = {
     resourcesByUri.get(uriPattern) match {
       case Some(config) ⇒
@@ -79,27 +49,19 @@ case class ResourceConfig(
                            traits: Traits,
                            annotations: Seq[Annotation],
                            methods: Map[Method, ResourceMethod],
-                           filters: Filters
+                           filters: SimpleFilterChain
                          )
 
 case class ResourceMethod(method: Method,
                           requests: Requests,
                           responses: Map[Int, Responses],
-                          filters: Filters)
-
-//case class Request(contentType: ContentType, dataStructure: DataStructure)
-
-//case class Response(statusCode: Int, dataStructure: DataStructure)
+                          filters: SimpleFilterChain)
 
 case class Requests(dataStructures: Map[Option[ContentType], DataStructure])
 
 case class Responses(dataStructures: Map[Option[ContentType], DataStructure])
 
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
-
-//case class Requests(dataStructures: Map[(Method, Option[ContentType]), DataStructure])
-
-//case class Responses(dataStructures: Map[(Method, Int), DataStructure])
 
 case class Trait(name: String, parameters: Map[String, String])
 object Trait {
@@ -123,7 +85,7 @@ object Method {
 
 case class ContentType(mediaType: String)
 
-case class DataStructure(headers: Seq[Header], body: Option[Body], filters: Filters)
+case class DataStructure(headers: Seq[Header], body: Option[Body], filters: SimpleFilterChain)
 
 case class Header(name: String)
 
@@ -137,9 +99,7 @@ object DataType {
 
 case class Body(dataType: DataType)
 
-case class Field(name: String, dataType: DataType) {
-  //def isPrivate: Boolean = dataType.annotations.exists(_.name == Annotation.PRIVATE)
-}
+case class Field(name: String, dataType: DataType)
 
 case class Annotation(name: String, value: Option[RamlAnnotation])
 

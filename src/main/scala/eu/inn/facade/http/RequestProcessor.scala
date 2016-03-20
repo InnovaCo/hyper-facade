@@ -3,7 +3,7 @@ package eu.inn.facade.http
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.raml.{Body, RamlConfig}
-import eu.inn.hyperbus.{HyperBus, IdGenerator, model}
+import eu.inn.hyperbus.{Hyperbus, IdGenerator, model}
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.NoTransportRouteException
 import org.slf4j.Logger
@@ -16,7 +16,7 @@ trait RequestProcessor extends Injectable {
   def log: Logger
   implicit def injector: Injector
   implicit def executionContext: ExecutionContext
-  val hyperBus = inject[HyperBus]
+  val hyperbus = inject[Hyperbus]
   val ramlConfig = inject[RamlConfig]
   val beforeFilterChain = inject[FilterChain]("beforeFilterChain")
   val ramlFilterChain = inject[FilterChain]("ramlFilterChain")
@@ -26,7 +26,7 @@ trait RequestProcessor extends Injectable {
   def processRequestToFacade(originalRequest: FacadeRequest): Future[FacadeResponse] = {
     beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
       processRequestWithRaml(originalRequest, r, 0) flatMap { filteredRequest ⇒
-        hyperBus <~ filteredRequest.toDynamicRequest recover {
+        hyperbus <~ filteredRequest.toDynamicRequest recover {
           handleHyperbusExceptions(originalRequest)
         } flatMap { response ⇒
           ramlFilterChain.filterResponse(originalRequest, FacadeResponse(response)) flatMap { r ⇒
@@ -57,8 +57,8 @@ trait RequestProcessor extends Injectable {
   }
 
   def handleHyperbusExceptions(originalRequest: FacadeRequest) : PartialFunction[Throwable, Response[DynamicBody]] = {
-    case hyperBusException: HyperBusException[ErrorBody] ⇒
-      hyperBusException
+    case hyperbusException: HyperbusException[ErrorBody] ⇒
+      hyperbusException
 
     case noRoute: NoTransportRouteException ⇒
       implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))

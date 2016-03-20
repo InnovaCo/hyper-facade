@@ -1,13 +1,13 @@
 package eu.inn.facade.filter
 
-import eu.inn.facade.filter.chain.Filters
+import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.facade.model._
 
-import scala.concurrent.{Future, ExecutionContext}
+import scala.concurrent.{ExecutionContext, Future}
 
 class NoOpFilterFactory extends RamlFilterFactory {
-  override def createFilters(target: RamlTarget): Filters = {
-    Filters(
+  override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
+    SimpleFilterChain(
       requestFilters = Seq.empty,
       responseFilters = Seq(new NoOpFilter(target)),
       eventFilters = Seq.empty

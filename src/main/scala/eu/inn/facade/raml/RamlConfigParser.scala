@@ -7,7 +7,7 @@ import com.mulesoft.raml1.java.parser.model.common.RAMLLanguageElement
 import com.mulesoft.raml1.java.parser.model.datamodel.DataElement
 import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
-import eu.inn.facade.filter.chain.Filters
+import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model._
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector, StringIdentifier}
@@ -46,14 +46,14 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   }
 
   private def createFilters(target: RamlTarget, annotations: Seq[Annotation]) = {
-    annotations.foldLeft(Filters.empty) { (filterChain, annotation) ⇒
+    annotations.foldLeft(FilterChain.empty) { (filterChain, annotation) ⇒
       try {
         val ident = StringIdentifier(annotation.name)
         inj.getBinding(List(ident)) match {
           case Some(_) ⇒
             val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
             filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
-              filterChainInner ++ factory.createFilters(target)
+              filterChainInner ++ factory.createFilterChain(target)
             }
 
           case None ⇒
@@ -69,7 +69,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     }
   }
 
-  private def extractResourceMethods(currentUri: String, resource: Resource, parentFilters: Filters): Map[Method, ResourceMethod] = {
+  private def extractResourceMethods(currentUri: String, resource: Resource, parentFilters: SimpleFilterChain): Map[Method, ResourceMethod] = {
     val builder = Map.newBuilder[Method, ResourceMethod]
     resource.methods.foreach { ramlMethod ⇒
       builder += Method(ramlMethod.method) → extractResourceMethod(currentUri, ramlMethod, resource, parentFilters)
@@ -77,7 +77,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     builder.result()
   }
 
-  def extractResourceMethod(currentUri: String, ramlMethod: methodsAndResources.Method, resource: Resource, parentFilters: Filters): ResourceMethod = {
+  def extractResourceMethod(currentUri: String, ramlMethod: methodsAndResources.Method, resource: Resource, parentFilters: SimpleFilterChain): ResourceMethod = {
     val method = Method(ramlMethod.method())
     val methodAnnotations = extractAnnotations(ramlMethod)
     val methodFilters = parentFilters ++ createFilters(TargetMethod(currentUri, method.name), methodAnnotations)
@@ -95,7 +95,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   }
 
   private def extractTypeDefinitions(ramlReqRspWrapper: RamlRequestResponseWrapper,
-                                     parentFilters: Filters) = {
+                                     parentFilters: SimpleFilterChain) = {
     val headers = ramlReqRspWrapper.headers.foldLeft(Seq.newBuilder[Header]) { (headerList, ramlHeader) ⇒
       headerList += Header(ramlHeader.name())
     }.result()
@@ -138,7 +138,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
 
             val filterChain = filterMap.map { case (factory, filteredFields) ⇒
               val target = TargetFields(name, filteredFields)
-              factory.createFilters(target)
+              factory.createFilterChain(target)
             }.foldLeft (parentFilters) { (filterChain, next) ⇒
               filterChain ++ next
             }

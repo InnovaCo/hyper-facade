@@ -3,7 +3,7 @@ package eu.inn.facade
 import com.typesafe.config.Config
 import eu.inn.facade.http.{HttpWorker, WsRestServiceApp}
 import eu.inn.facade.modules.Injectors
-import eu.inn.hyperbus.HyperBus
+import eu.inn.hyperbus.Hyperbus
 import org.slf4j.LoggerFactory
 import scaldi.Injectable
 
@@ -21,8 +21,8 @@ object MainApp extends App with Injectable {
       httpWorker.restRoutes.routes
     }
   }
-  val hyperBus = inject [HyperBus]  // it's time to initialize hyperbus
-  log.info("hyperbus is starting...: {}", hyperBus)
+  val hyperbus = inject [Hyperbus]  // it's time to initialize hyperbus
+  log.info("hyperbus is starting...: {}", hyperbus)
 
   def initProperties(): Unit = {
     if (args.length > 0) {

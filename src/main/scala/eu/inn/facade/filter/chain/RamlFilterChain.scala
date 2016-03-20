@@ -5,11 +5,11 @@ import eu.inn.facade.raml.{ContentType, Method, RamlConfig, ResourceMethod}
 
 class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
 
-  def requestFilters(context: RequestFilterContext, request: FacadeRequest): Seq[RequestFilter] = {
+  def findRequestFilters(context: RequestFilterContext, request: FacadeRequest): Seq[RequestFilter] = {
     requestOrEventFilters(request.uri.formatted, request.method, request.contentType).requestFilters
   }
 
-  def responseFilters(context: ResponseFilterContext, response: FacadeResponse): Seq[ResponseFilter] = {
+  def findResponseFilters(context: ResponseFilterContext, response: FacadeResponse): Seq[ResponseFilter] = {
     val uri = context.uri.formatted
     val method = context.method
     val result = filtersOrMethod(uri, method) match {
@@ -32,13 +32,13 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
     result.responseFilters
   }
 
-  def eventFilters(context: EventFilterContext, event: FacadeRequest): Seq[EventFilter] = {
+  def findEventFilters(context: EventFilterContext, event: FacadeRequest): Seq[EventFilter] = {
     val uri = context.uri.formatted
     val methodName = if (event.method.startsWith("feed:")) event.method.substring(5) else event.method
     requestOrEventFilters(uri, methodName, event.contentType).eventFilters
   }
 
-  private def requestOrEventFilters(uri: String, method: String, contentType: Option[String]): Filters = {
+  private def requestOrEventFilters(uri: String, method: String, contentType: Option[String]): SimpleFilterChain = {
     filtersOrMethod(uri, method) match {
       case Left(filters) ⇒ filters
       case Right(resourceMethod) ⇒
@@ -51,7 +51,7 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
     }
   }
 
-  private def filtersOrMethod(uri: String, method: String): Either[Filters, ResourceMethod] = {
+  private def filtersOrMethod(uri: String, method: String): Either[SimpleFilterChain, ResourceMethod] = {
     ramlConfig.resourcesByUri.get(uri) match {
       case Some(resource) ⇒
         resource.methods.get(Method(method)) match {
@@ -61,7 +61,7 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
             Left(resource.filters)
         }
       case None ⇒
-        Left(Filters.empty)
+        Left(FilterChain.empty)
     }
   }
 }

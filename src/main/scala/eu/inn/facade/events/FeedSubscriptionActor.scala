@@ -6,13 +6,13 @@ import com.typesafe.config.Config
 import eu.inn.facade.http.RequestProcessor
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Method
-import eu.inn.hyperbus.HyperBus
+import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
 import org.slf4j.LoggerFactory
 import scaldi.Injector
 
 class FeedSubscriptionActor(websocketWorker: ActorRef,
-                            hyperBus: HyperBus,
+                            hyperbus: Hyperbus,
                             subscriptionManager: SubscriptionsManager)
                        (implicit val injector: Injector)
   extends Actor
@@ -102,7 +102,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           filteredRequest.headers(Header.MESSAGE_ID)).head
         val newSubscriptionId = subscriptionManager.subscribe(filteredRequest.uri, self, correlationId)
         implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
-        hyperBus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
+        hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
           handleHyperbusExceptions(originalRequest)
         } pipeTo self
         UpdateSubscriptionId(newSubscriptionId)
@@ -219,10 +219,10 @@ case object RestartSubscription
 
 object FeedSubscriptionActor {
   def props(websocketWorker: ActorRef,
-            hyperBus: HyperBus,
+            hyperbus: Hyperbus,
             subscriptionManager: SubscriptionsManager)
            (implicit inj: Injector) = Props(new FeedSubscriptionActor(
     websocketWorker,
-    hyperBus,
+    hyperbus,
     subscriptionManager)).withDispatcher("deque-dispatcher")
 }

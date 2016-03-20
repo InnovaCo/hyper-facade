@@ -18,11 +18,11 @@ class FiltersModule extends Module {
 
 
   bind [FilterChain]              identifiedBy "beforeFilterChain"                    to new SimpleFilterChain(
-    initRequestFilters            = Seq(new HttpWsRequestFilter(inject[RamlConfig]))
+    requestFilters            = Seq(new HttpWsRequestFilter(inject[RamlConfig]))
   )
   bind [FilterChain]              identifiedBy "afterFilterChain"                     to new SimpleFilterChain(
-    initResponseFilters           = Seq(new HttpWsResponseFilter),
-    initEventFilters              = Seq(new WsEventFilter)
+    responseFilters           = Seq(new HttpWsResponseFilter),
+    eventFilters              = Seq(new WsEventFilter)
   )
   bind [FilterChain]              identifiedBy "ramlFilterChain"                      to new RamlFilterChain(inject[RamlConfig])
 
