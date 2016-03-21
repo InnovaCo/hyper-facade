@@ -1,9 +1,8 @@
 package eu.inn.facade.events
 
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.atomic.AtomicLong
 
-import akka.actor.{ActorRef, ActorSystem}
+import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, Props, Terminated}
 import com.typesafe.config.Config
 import eu.inn.facade.HyperbusFactory
 import eu.inn.hyperbus.Hyperbus
@@ -23,19 +22,19 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
   val log = LoggerFactory.getLogger(SubscriptionsManager.this.getClass.getName)
   implicit val actorSystem = inject[ActorSystem]
   implicit val executionContext = inject[ExecutionContext]
+  val watchRef = actorSystem.actorOf(Props(new SubscriptionWatch(this)))
 
-  def subscribe(uri: Uri, clientActor: ActorRef, correlationId: String): String =
-    subscriptionManager.subscribe(uri, clientActor, correlationId)
-  def off(subscriptionId: String) = subscriptionManager.off(subscriptionId)
+  def subscribe(clientActorRef: ActorRef, uri: Uri, correlationId: String): Unit =
+    subscriptionManager.subscribe(clientActorRef, uri, correlationId)
+  def off(clientActorRef: ActorRef) = subscriptionManager.off(clientActorRef)
   private val subscriptionManager = new Manager
 
   class Manager {
     val groupName = HyperbusFactory.defaultHyperbusGroup(inject[Config])
-    val idCounter = new AtomicLong(0)
     val groupSubscriptions = scala.collection.mutable.Map[Uri,GroupSubscription]()
-    val groupSubscriptionById = TrieMap[String, Uri]()
+    val groupSubscriptionById = TrieMap[ActorRef, Uri]()
 
-    case class ClientSubscriptionData(subscriptionId: String, uri: Uri, clientActor: ActorRef, correlationId: String)
+    case class ClientSubscriptionData(clientActorRef: ActorRef, uri: Uri, correlationId: String)
 
     class GroupSubscription(groupUri: Uri, initialSubscription: ClientSubscriptionData) {
       val clientSubscriptions = new ConcurrentLinkedQueue[ClientSubscriptionData]()
@@ -50,12 +49,12 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
           for (consumer: ClientSubscriptionData ← clientSubscriptions) {
             try {
               val matched = consumer.uri.matchUri(eventRequest.uri)
-              log.debug(s"Event #(${eventRequest.messageId}) ${if (matched) "forwarded" else "NOT matched"} to ${consumer.clientActor}/${consumer.correlationId}")
+              log.debug(s"Event #(${eventRequest.messageId}) ${if (matched) "forwarded" else "NOT matched"} to ${consumer.clientActorRef}/${consumer.correlationId}")
               if (matched) {
                 val request = eventRequest.copy(
                   headers = Headers.plain(eventRequest.headers + (Header.CORRELATION_ID → Seq(consumer.correlationId)))
                 )
-                consumer.clientActor ! request
+                consumer.clientActorRef ! request
               }
             }
             catch {
@@ -69,10 +68,10 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       }
 
       def addClient(subscription: ClientSubscriptionData) = clientSubscriptions.add(subscription)
-      def removeClient(subscriptionId: String): Boolean = {
+      def removeClient(clientActorRef: ActorRef): Boolean = {
         import scala.collection.JavaConversions._
         for (consumer: ClientSubscriptionData ← clientSubscriptions) {
-          if (consumer.subscriptionId == subscriptionId)
+          if (consumer.clientActorRef == clientActorRef)
             clientSubscriptions.remove(consumer)
         }
         clientSubscriptions.isEmpty
@@ -86,11 +85,11 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       }
     }
 
-    def subscribe(uri: Uri, clientActor: ActorRef, correlationId: String): String = {
-      val subscriptionId = idCounter.incrementAndGet().toHexString
-      val subscriptionData = ClientSubscriptionData(subscriptionId, uri, clientActor, correlationId)
+    def subscribe(clientActorRef: ActorRef, uri: Uri, correlationId: String): Unit = {
+      watchRef ! NewSubscriber(clientActorRef)
+      val subscriptionData = ClientSubscriptionData(clientActorRef, uri, correlationId)
       val groupUri = uri
-      groupSubscriptionById += subscriptionId → groupUri
+      groupSubscriptionById += clientActorRef → groupUri
       groupSubscriptions.synchronized {
         groupSubscriptions.get(groupUri).map { list ⇒
           list.addClient(subscriptionData)
@@ -99,15 +98,14 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
           groupSubscriptions += groupUri → groupSubscription
         }
       }
-      subscriptionId
     }
 
-    def off(subscriptionId: String) = {
-      groupSubscriptionById.get(subscriptionId).foreach { groupUri ⇒
-        groupSubscriptionById -= subscriptionId
+    def off(clientActorRef: ActorRef) = {
+      groupSubscriptionById.get(clientActorRef).foreach { groupUri ⇒
+        groupSubscriptionById -= clientActorRef
         groupSubscriptions.synchronized {
           groupSubscriptions.get(groupUri).foreach { groupSubscription ⇒
-            if (groupSubscription.removeClient(subscriptionId)) {
+            if (groupSubscription.removeClient(clientActorRef)) {
               groupSubscription.off()
               groupSubscriptions -= groupUri
             }
@@ -115,5 +113,19 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
         }
       }
     }
+  }
+}
+
+case class NewSubscriber(actorRef: ActorRef)
+
+class SubscriptionWatch(subscriptionManager: SubscriptionsManager) extends Actor with ActorLogging {
+  override def receive: Receive = {
+    case NewSubscriber(actorRef) ⇒
+      log.debug(s"Watching new subscriber $actorRef")
+      context.watch(actorRef)
+
+    case Terminated(actorRef) ⇒
+      log.debug(s"Actor $actorRef is died. Terminating subscription")
+      subscriptionManager.off(actorRef)
   }
 }

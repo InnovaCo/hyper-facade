@@ -20,7 +20,6 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   with RequestProcessor {
 
   val maxResubscriptionsCount = inject[Config].getInt("inn.facade.maxResubscriptionsCount")
-  var subscriptionId: Option[String] = None
   val log = LoggerFactory.getLogger(getClass)
   implicit def executionContext = context.dispatcher
 
@@ -69,8 +68,6 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def stopSubScriptionOrUpdate: Receive = {
     case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
       context.stop(self)
-    case UpdateSubscriptionId(newSubscriptionId) ⇒
-      subscriptionId = Some(newSubscriptionId)
   }
 
   def startSubscription(originalRequest: FacadeRequest, subscriptionSyncTries: Int): Unit = {
@@ -81,25 +78,23 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       log.error(s"Subscription sync attempts ($subscriptionSyncTries) has exceeded allowed limit ($maxResubscriptionsCount) for $originalRequest")
       context.stop(self)
     }
-    subscriptionId.foreach(subscriptionManager.off)
-    subscriptionId = None
+    subscriptionManager.off(self)
     context.become(subscribing(originalRequest, subscriptionSyncTries) orElse stopSubScriptionOrUpdate)
 
     beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
       processRequestWithRaml(originalRequest, r, 0) map { filteredRequest ⇒
         val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
           filteredRequest.headers(Header.MESSAGE_ID)).head
-        val newSubscriptionId = subscriptionManager.subscribe(filteredRequest.uri, self, correlationId)
+        val newSubscriptionId = subscriptionManager.subscribe(self, filteredRequest.uri, correlationId)
         implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
         hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
           handleHyperbusExceptions(originalRequest)
         } pipeTo self
-        UpdateSubscriptionId(newSubscriptionId)
       }
     } recover handleFilterExceptions(originalRequest) { response ⇒
       websocketWorker ! response
-      PoisonPill
-    } pipeTo self
+      self ! PoisonPill
+    }
   }
 
   def processEventWhileSubscribing(originalRequest: FacadeRequest, event: DynamicRequest): Unit = {
@@ -194,14 +189,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         log.error(s"Received event: $event without revisionId for reliable feed: $originalRequest")
     }
   }
-
-  override def postStop(): Unit = {
-    subscriptionId.foreach(subscriptionManager.off)
-    subscriptionId = None
-  }
 }
 
-case class UpdateSubscriptionId(subscriptionId: String)
 case class BecomeReliable(lastRevision: Long)
 case object BecomeUnreliable
 case object RestartSubscription
