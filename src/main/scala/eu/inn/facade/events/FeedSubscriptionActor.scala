@@ -213,5 +213,5 @@ object FeedSubscriptionActor {
            (implicit inj: Injector) = Props(new FeedSubscriptionActor(
     websocketWorker,
     hyperbus,
-    subscriptionManager)).withDispatcher("deque-dispatcher")
+    subscriptionManager))
 }
