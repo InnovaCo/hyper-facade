@@ -36,9 +36,6 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def subscribing(originalRequest: FacadeRequest, subscriptionSyncTries: Int): Receive = {
-    case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
-      context.stop(self)
-
     case event: DynamicRequest ⇒
       processEventWhileSubscribing(originalRequest, event)
 
@@ -46,40 +43,32 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       processResourceState(originalRequest, resourceState, subscriptionSyncTries)
 
     case BecomeReliable(lastRevision: Long) ⇒
-      context.become(subscribedReliable(originalRequest, lastRevision, subscriptionSyncTries))
+      context.become(subscribedReliable(originalRequest, lastRevision, subscriptionSyncTries) orElse stopSubScriptionOrUpdate)
       unstashAll()
       log.debug(s"Reliable subscription started for $originalRequest with revision $lastRevision")
 
     case BecomeUnreliable ⇒
-      context.become(subscribedUnreliable(originalRequest))
+      context.become(subscribedUnreliable(originalRequest) orElse stopSubScriptionOrUpdate)
       unstashAll()
       log.debug(s"Unreliable subscription started for $originalRequest")
-
-    case UpdateSubscriptionId(newSubscriptionId) ⇒
-      subscriptionId = Some(newSubscriptionId)
   }
 
   def subscribedReliable(originalRequest: FacadeRequest, lastRevisionId: Long, subscriptionSyncTries: Int): Receive = {
-    case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
-      context.stop(self)
-
     case event: DynamicRequest ⇒
       processReliableEvent(originalRequest, event, lastRevisionId, subscriptionSyncTries)
-
-    case UpdateSubscriptionId(newSubscriptionId) ⇒
-      subscriptionId = Some(newSubscriptionId)
 
     case RestartSubscription ⇒
       startSubscription(originalRequest, subscriptionSyncTries + 1)
   }
 
   def subscribedUnreliable(request: FacadeRequest): Receive = {
-    case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
-      context.stop(self)
-
     case event: DynamicRequest ⇒
       processUnreliableEvent(request, event)
+  }
 
+  def stopSubScriptionOrUpdate: Receive = {
+    case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
+      context.stop(self)
     case UpdateSubscriptionId(newSubscriptionId) ⇒
       subscriptionId = Some(newSubscriptionId)
   }
@@ -94,7 +83,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
     subscriptionId.foreach(subscriptionManager.off)
     subscriptionId = None
-    context.become(subscribing(originalRequest, subscriptionSyncTries))
+    context.become(subscribing(originalRequest, subscriptionSyncTries) orElse stopSubScriptionOrUpdate)
 
     beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
       processRequestWithRaml(originalRequest, r, 0) map { filteredRequest ⇒
@@ -181,7 +170,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         }
 
         if (revisionId == lastRevisionId + 1) {
-          context.become(subscribedReliable(originalRequest, lastRevisionId + 1, 0))
+          context.become(subscribedReliable(originalRequest, lastRevisionId + 1, 0) orElse stopSubScriptionOrUpdate)
 
           ramlFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
             afterFilterChain.filterEvent(originalRequest, e) map { filteredRequest ⇒
@@ -202,7 +191,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         // if revisionId <= lastRevisionId -- just ignore this event
 
       case _ ⇒
-        processUnreliableEvent(originalRequest, event)
+        log.error(s"Received event: $event without revisionId for reliable feed: $originalRequest")
     }
   }
 
