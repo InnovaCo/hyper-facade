@@ -61,6 +61,8 @@ object Build extends sbt.Build {
           "eu.inn"                         %% "hyperbus-t-distributed-akka" % "0.1.63",
           "eu.inn"                         % "java-raml1-parser"            % "0.0.30",
           "eu.inn"                         % "javascript-module-holders"    % "0.0.30",
+          "eu.inn"                         %% "service-control"             % "0.1.16",
+          "eu.inn"                         %% "service-config"              % "0.1.3",
           "jline"                          % "jline"                        % "2.12.1",
           "io.spray"                       %% "spray-can"                   % "1.3.3",
           "io.spray"                       %% "spray-routing-shapeless2"    % "1.3.3",

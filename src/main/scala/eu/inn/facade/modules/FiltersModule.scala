@@ -16,7 +16,6 @@ class FiltersModule extends Module {
   bind [Seq[RamlFilterFactory]]   identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilterFactory)
   bind [Seq[RamlFilterFactory]]   identifiedBy  "privateField"                        to Seq(new PrivateFieldsFilterFactory)
 
-
   bind [FilterChain]              identifiedBy "beforeFilterChain"                    to new SimpleFilterChain(
     requestFilters            = Seq(new HttpWsRequestFilter(inject[RamlConfig]))
   )

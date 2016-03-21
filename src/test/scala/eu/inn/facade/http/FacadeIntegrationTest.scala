@@ -13,6 +13,7 @@ import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import eu.inn.hyperbus.transport.api.{Subscription, TransportConfigurationLoader, TransportManager}
+import eu.inn.servicecontrol.api.Service
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Seconds, Span}
@@ -40,12 +41,10 @@ import scala.util.Success
 class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with Injectable with BeforeAndAfterEach {
   implicit val injector = Injectors()
   implicit val actorSystem = inject[ActorSystem]
-  val statusMonitorFacade = inject[HttpWorker]
+  val httpWorker = inject[HttpWorker]
 
-  new WsRestServiceApp("localhost", 54321) {
-    start {
-      statusMonitorFacade.restRoutes.routes
-    }
+  inject[Service].asInstanceOf[WsRestServiceApp].start {
+    httpWorker.restRoutes.routes
   }
   val hyperbus = inject[Hyperbus] // initialize hyperbus
   val testService = new TestService(testServiceHyperbus)
