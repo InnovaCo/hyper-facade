@@ -26,14 +26,16 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
 
   def subscribe(uri: Uri, clientActor: ActorRef, correlationId: String): String =
     subscriptionManager.subscribe(uri, clientActor, correlationId)
-  def off(subscriptionId: String) = subscriptionManager.off(subscriptionId)
+
+  def off(clientActor: ActorRef, subscriptionId: Option[String]) = subscriptionManager.off(clientActor, subscriptionId)
+
   private val subscriptionManager = new Manager
 
   class Manager {
     val groupName = HyperbusFactory.defaultHyperbusGroup(inject[Config])
     val idCounter = new AtomicLong(0)
-    val groupSubscriptions = scala.collection.mutable.Map[Uri,GroupSubscription]()
-    val groupSubscriptionById = TrieMap[String, Uri]()
+    val groupSubscriptions = scala.collection.mutable.Map[Uri, GroupSubscription]()
+    val groupSubscriptionById = TrieMap[ActorRef, Map[String, Uri]]()
 
     case class ClientSubscriptionData(subscriptionId: String, uri: Uri, clientActor: ActorRef, correlationId: String)
 
@@ -44,7 +46,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
 
       val methodFilter = Map(Header.METHOD → RegexMatcher("^feed:.*$"))
       hyperbus.onEvent(RequestMatcher(Some(groupUri), methodFilter), groupName) { eventRequest: DynamicRequest ⇒
-        Future{
+        Future {
           log.debug(s"Event received ($groupName): $eventRequest")
           import scala.collection.JavaConversions._
           for (consumer: ClientSubscriptionData ← clientSubscriptions) {
@@ -69,6 +71,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       }
 
       def addClient(subscription: ClientSubscriptionData) = clientSubscriptions.add(subscription)
+
       def removeClient(subscriptionId: String): Boolean = {
         import scala.collection.JavaConversions._
         for (consumer: ClientSubscriptionData ← clientSubscriptions) {
@@ -90,7 +93,12 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       val subscriptionId = idCounter.incrementAndGet().toHexString
       val subscriptionData = ClientSubscriptionData(subscriptionId, uri, clientActor, correlationId)
       val groupUri = uri
-      groupSubscriptionById += subscriptionId → groupUri
+      groupSubscriptionById.synchronized {
+        groupSubscriptionById.get(clientActor) match {
+          case Some(oldClientSubscriptions) ⇒ groupSubscriptionById.update(clientActor, oldClientSubscriptions + (subscriptionId → groupUri))
+          case None ⇒ groupSubscriptionById += clientActor → Map(subscriptionId → groupUri)
+        }
+      }
       groupSubscriptions.synchronized {
         groupSubscriptions.get(groupUri).map { list ⇒
           list.addClient(subscriptionData)
@@ -102,16 +110,36 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       subscriptionId
     }
 
-    def off(subscriptionId: String) = {
-      groupSubscriptionById.get(subscriptionId).foreach { groupUri ⇒
-        groupSubscriptionById -= subscriptionId
-        groupSubscriptions.synchronized {
-          groupSubscriptions.get(groupUri).foreach { groupSubscription ⇒
-            if (groupSubscription.removeClient(subscriptionId)) {
-              groupSubscription.off()
-              groupSubscriptions -= groupUri
-            }
+    def off(clientActor: ActorRef, subscriptionId: Option[String]) = {
+      groupSubscriptionById.get(clientActor).foreach { clientSubscriptions ⇒
+        subscriptionId match {
+          // Certain subscription should be removed
+          case Some(subscrIdToBeRemoved) ⇒ clientSubscriptions foreach {
+            case (clientSubscriptionId, groupUri) if clientSubscriptionId == subscrIdToBeRemoved ⇒
+              groupSubscriptionById.synchronized {
+                val oldClientSubscriptions = groupSubscriptionById(clientActor)
+                groupSubscriptionById.update(clientActor, oldClientSubscriptions - clientSubscriptionId)
+                removeGroupSubscription(clientSubscriptionId, groupUri)
+              }
           }
+
+          // All subscriptions of client actor should be removed
+          case None ⇒
+            groupSubscriptionById.synchronized {
+              groupSubscriptionById -= clientActor
+              clientSubscriptions foreach {
+                case (clientSubscriptionId, groupUri) ⇒ removeGroupSubscription(clientSubscriptionId, groupUri)
+              }
+            }
+        }
+      }
+    }
+
+    def removeGroupSubscription(clientSubscriptionId: String, groupUri: Uri): Unit = {
+      groupSubscriptions.get(groupUri).foreach { groupSubscription ⇒
+        if (groupSubscription.removeClient(clientSubscriptionId)) {
+          groupSubscription.off()
+          groupSubscriptions -= groupUri
         }
       }
     }
