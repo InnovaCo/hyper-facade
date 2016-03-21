@@ -81,7 +81,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       log.error(s"Subscription sync attempts ($subscriptionSyncTries) has exceeded allowed limit ($maxResubscriptionsCount) for $originalRequest")
       context.stop(self)
     }
-    subscriptionId.foreach(id ⇒ subscriptionManager.off(self, Some(id)))
+    subscriptionId.foreach(subscriptionManager.off)
     subscriptionId = None
     context.become(subscribing(originalRequest, subscriptionSyncTries) orElse stopSubScriptionOrUpdate)
 
@@ -196,7 +196,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   override def postStop(): Unit = {
-    subscriptionId.foreach(id ⇒ subscriptionManager.off(self, Some(id)))
+    subscriptionId.foreach(subscriptionManager.off)
     subscriptionId = None
   }
 }

@@ -7,6 +7,7 @@ import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.{FacadeHeaders, FacadeMessage, FacadeRequest, FacadeResponse}
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.{Hyperbus, IdGenerator}
+import eu.inn.hyperbus.model._
 import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
 import spray.can.websocket.frame.Frame
@@ -68,10 +69,6 @@ class WsRestWorker(val serverConnection: ActorRef,
       }
       context.stop(context.self)
       isConnectionTerminated = true
-
-    case Terminated(clientWorker) ⇒
-      log.debug(s"Client worker $clientWorker was terminated. All its subscriptions will be canceled")
-      subscriptionManager.off(clientWorker, None)
   }
 
   def businessLogic: Receive = {
