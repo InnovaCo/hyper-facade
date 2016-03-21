@@ -6,6 +6,7 @@ import akka.pattern.ask
 import akka.util.Timeout
 import eu.inn.facade.StatsReporterFactory
 import eu.inn.facade.events.SubscriptionsManager
+import eu.inn.hyperbus.Hyperbus
 import scaldi.{Injectable, Injector}
 import spray.can.Http
 import spray.can.server.{ServerSettings, UHttp}
@@ -22,6 +23,7 @@ class WsRestServiceApp(implicit inj: Injector)
   private val stats = inject [StatsReporterFactory].createStats("http")
   private val connectionCountStat = stats.counter("connection-count")
   private val rejectedConnectionsMetter = stats.meter("rejected-connects")
+  val hyperbus = inject [Hyperbus]
   val subscriptionsManager = inject [SubscriptionsManager]
 
   override def startServer(interface: String,
@@ -55,7 +57,7 @@ class WsRestServiceApp(implicit inj: Injector)
                 connectionId += 1
                 connectionCount += 1
                 val worker = context.actorOf(
-                  WsRestWorker.props(serverConnection, new WsRestRoutes(route), hyperBus, subscriptionsManager, remoteAddress.toString),
+                  WsRestWorker.props(serverConnection, new WsRestRoutes(route), hyperbus, subscriptionsManager, remoteAddress.toString),
                   "wrkr-" + connectionId.toHexString
                 )
                 context.watch(worker)

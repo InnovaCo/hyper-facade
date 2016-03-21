@@ -3,10 +3,10 @@ package eu.inn.facade.http
 import akka.actor._
 import eu.inn.binders.dynamic.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
-import eu.inn.facade.filter.chain.FilterChainFactory
-import eu.inn.facade.model.ClientRequest
+import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.model.{FacadeHeaders, FacadeMessage, FacadeRequest, FacadeResponse}
 import eu.inn.facade.raml.RamlConfig
-import eu.inn.hyperbus.HyperBus
+import eu.inn.hyperbus.{Hyperbus, IdGenerator}
 import eu.inn.hyperbus.model._
 import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
@@ -17,7 +17,7 @@ import spray.routing.HttpServiceActor
 
 class WsRestWorker(val serverConnection: ActorRef,
                    workerRoutes: WsRestRoutes,
-                   hyperBus: HyperBus,
+                   hyperbus: Hyperbus,
                    subscriptionManager: SubscriptionsManager,
                    clientAddress: String)
                   (implicit inj: Injector)
@@ -30,7 +30,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   var remoteAddress = clientAddress
   var httpRequest: Option[HttpRequest] = None
 
-  val filterChainComposer = inject[FilterChainFactory]
+  val filterChainComposer = inject[FilterChain]
   val ramlConfig = inject[RamlConfig]
 
   override def preStart(): Unit = {
@@ -51,8 +51,8 @@ class WsRestWorker(val serverConnection: ActorRef,
         case wsContext: websocket.HandshakeContext ⇒
           httpRequest = Some(wsContext.request)
 
-          // todo: this is dangerous, network infrastructure should guarantee that http_x_forwarded_for is always overridden at server-side
-          remoteAddress = wsContext.request.headers.find(_.is("http_x_forwarded_for")).map(_.value).getOrElse(clientAddress)
+          // todo: support Forwarded & by RFC 7239
+          remoteAddress = wsContext.request.headers.find(_.is("X-Forwarded-For")).map(_.value).getOrElse(clientAddress)
         case _ ⇒
       }
       handshaking(handshakeRequest)
@@ -74,12 +74,17 @@ class WsRestWorker(val serverConnection: ActorRef,
   def businessLogic: Receive = {
     case message: Frame ⇒
       try {
-        val dynamicRequest = RequestMapper.toDynamicRequest(message)
-        val uriPattern = dynamicRequest.uri.pattern.specific.toString
-        val method = dynamicRequest.method
-        if (isPingRequest(uriPattern, method)) pong(dynamicRequest)
+        val facadeRequest = FacadeRequest(message)
+        val uriPattern = facadeRequest.uri.pattern.specific
+        val method = facadeRequest.method
+        if (isPingRequest(uriPattern, method)) {
+          pong(facadeRequest)
+        }
         else {
-          val requestWithClientIp = RequestMapper.addField("http_x_forwarded_for", remoteAddress, dynamicRequest)
+          val requestWithClientIp = facadeRequest.copy(
+            // todo: support Forwarded by RFC 7239
+            headers = facadeRequest.headers + ("X-Forwarded-For" → Seq(remoteAddress))
+          )
           processRequest(requestWithClientIp)
         }
       }
@@ -95,7 +100,7 @@ class WsRestWorker(val serverConnection: ActorRef,
     case x: FrameCommandFailed =>
       log.error(s"Frame command $x failed from ${sender()}/$remoteAddress")
 
-    case message: Message[Body] ⇒
+    case message: FacadeMessage ⇒
       send(message)
   }
 
@@ -106,13 +111,12 @@ class WsRestWorker(val serverConnection: ActorRef,
     }
   }
 
-  def processRequest(request: DynamicRequest) = {
-    val key = RequestMapper.correlationId(request.headers)
+  def processRequest(facadeRequest: FacadeRequest) = {
+    val key = facadeRequest.clientCorrelationId.get
     val actorName = "Subscr-" + key
-    val clientRequest = ClientRequest(request)
     context.child(actorName) match {
-      case Some(actor) ⇒ actor.forward(clientRequest)
-      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperBus, subscriptionManager), actorName) ! clientRequest
+      case Some(actor) ⇒ actor.forward(facadeRequest)
+      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperbus, subscriptionManager), actorName) ! facadeRequest
     }
   }
 
@@ -120,19 +124,21 @@ class WsRestWorker(val serverConnection: ActorRef,
     uri == "/meta/ping" && method == "ping"
   }
 
-  def pong(dynamicRequest: DynamicRequest) = {
-    val finalCorrelationId = RequestMapper.correlationId(dynamicRequest.headers)
-    implicit val mvx = MessagingContextFactory.withCorrelationId(finalCorrelationId)
-    send(Ok(DynamicBody(Text("pong"))))
+  def pong(facadeRequest: FacadeRequest) = {
+    val headers = Map(
+      FacadeHeaders.CLIENT_CORRELATION_ID → Seq(facadeRequest.clientCorrelationId.get),
+      FacadeHeaders.CLIENT_MESSAGE_ID → Seq(IdGenerator.create())
+    )
+    send(FacadeResponse(eu.inn.hyperbus.model.Status.OK, headers, Text("pong")))
   }
 
-  def send(message: Message[Body]): Unit = {
+  def send(message: FacadeMessage): Unit = {
     if (isConnectionTerminated) {
       log.warning(s"Can't send message $message to $serverConnection/$remoteAddress: connection was terminated")
     }
     else {
       try {
-        send(RequestMapper.toFrame(message))
+        send(message.toFrame)
       } catch {
         case t: Throwable ⇒
           log.error(t, s"Can't serialize $message to $serverConnection/$remoteAddress")
@@ -144,13 +150,13 @@ class WsRestWorker(val serverConnection: ActorRef,
 object WsRestWorker {
   def props(serverConnection: ActorRef,
             workerRoutes: WsRestRoutes,
-            hyperBus: HyperBus,
+            hyperbus: Hyperbus,
             subscriptionManager: SubscriptionsManager,
             clientAddress: String)
            (implicit inj: Injector) = Props(new WsRestWorker(
     serverConnection,
     workerRoutes,
-    hyperBus,
+    hyperbus,
     subscriptionManager,
     clientAddress))
 }

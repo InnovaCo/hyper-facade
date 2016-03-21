@@ -2,19 +2,14 @@ package eu.inn.facade.http
 
 import akka.actor.ActorRef
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.http.RequestMapper._
+import eu.inn.facade.model.FacadeRequest
 import eu.inn.hyperbus.model.DynamicRequest
 import spray.can.websocket.frame.TextFrame
 import spray.can.{Http, websocket}
-import spray.http.HttpRequest
 import spray.routing.HttpServiceActor
 
-import scala.util.Success
-
-abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker {
-
-  import scala.concurrent.ExecutionContext.Implicits.global
-
+abstract class WsTestWorker(filterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker {
+  import context._
   private var _serverConnection: ActorRef = _
 
   def serverConnection = _serverConnection
@@ -28,14 +23,11 @@ abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterC
 
   def businessLogic: Receive = {
     case frame: TextFrame =>
-      toDynamicRequest(frame) match {
-        case DynamicRequest(uri, dynamicBody, requestHeaders) ⇒
-          val headers = extractRequestHeaders(uri, requestHeaders)
-          inputFilterChain.applyFilters(headers, dynamicBody) onComplete {
-            case Success((filteredHeaders, body)) ⇒ exposeDynamicRequest(toDynamicRequest(filteredHeaders, body))
-          }
+      val facadeRequest = FacadeRequest(frame)
+      filterChain.filterRequest(facadeRequest, facadeRequest) map { filteredRequest ⇒
+        exposeFacadeRequest(filteredRequest)
       }
-
+/*  todo: intention isn't clear here
     case request: DynamicRequest =>
       request match {
         case DynamicRequest(uri, dynamicBody, requestHeader) ⇒
@@ -46,10 +38,8 @@ abstract class WsTestWorker(val inputFilterChain: FilterChain, val outputFilterC
           }
       }
 
-    case request: HttpRequest =>
+    case request: HttpRequest =>*/
   }
 
-  def exposeDynamicRequest(dynamicRequest: DynamicRequest): Unit = ???
-
-  def exposeHttpRequest(request: HttpRequest): Unit = ???
+  def exposeFacadeRequest(facadeRequest: FacadeRequest): Unit
 }

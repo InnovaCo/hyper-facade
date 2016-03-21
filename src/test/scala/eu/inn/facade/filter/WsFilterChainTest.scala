@@ -5,12 +5,10 @@ import java.util.concurrent.TimeUnit
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
-import eu.inn.binders.dynamic.Text
-import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model.FacadeHeaders._
-import eu.inn.facade.model.{InputFilter, OutputFilter, TransitionalHeaders}
-import eu.inn.facade.http.RequestMapper._
+import eu.inn.binders.dynamic.{Null, Text}
+import eu.inn.facade.filter.chain.{SimpleFilterChain, FilterChain}
 import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
+import eu.inn.facade.model._
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest, Header, Method}
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -24,32 +22,53 @@ import spray.can.websocket.frame.TextFrame
 import spray.http.{HttpHeaders, HttpMethods, HttpRequest}
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.util.Success
 
 class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
 
   import scala.concurrent.ExecutionContext.Implicits.global
 
-  class TestInputFilter extends InputFilter {
-    override def apply(requestHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
-      if (requestHeaders.headers.nonEmpty) {
-        val filteredHeaders = requestHeaders.headers.filterNot{ _._1 == "toBeFiltered" }
-        Future(TransitionalHeaders(requestHeaders.uri, filteredHeaders, None), body)
+  class TestRequestFilter extends RequestFilter {
+    override def  apply(context: RequestFilterContext, input: FacadeRequest)
+                       (implicit ec: ExecutionContext): Future[FacadeRequest] = {
+      if (input.headers.nonEmpty) {
+        Future(input.copy(
+          headers = input.headers.filterNot{ _._1 == "toBeFiltered" }
+        ))
       }
-      else Future(requestHeaders withStatusCode Some(403), DynamicBody(Text("Forbidden")))
+      else {
+        Future.failed(new FilterInterruptException(
+          response = FacadeResponse(403, Map.empty, Text("Forbidden")),
+          message = "Forbidden by filter"
+        ))
+      }
     }
   }
 
-  class TestOutputFilter extends OutputFilter {
-    override def apply(responseHeaders: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
-      if (responseHeaders.headers.nonEmpty) {
-        val filteredHeaders = responseHeaders.headers.filterNot { _._1 == "toBeFiltered" }
-        Future(TransitionalHeaders(responseHeaders.uri, filteredHeaders, None), body)
+  class TestResponseFilter extends ResponseFilter {
+    override def apply(context: ResponseFilterContext, output: FacadeResponse)
+                      (implicit ec: ExecutionContext): Future[FacadeResponse] = {
+      if (output.headers.nonEmpty) {
+        Future(output.copy(
+          headers = output.headers.filterNot { _._1 == "toBeFiltered" }
+        ))
       }
-      else Future(TransitionalHeaders(responseHeaders.uri, Map("x-http-header" → Seq("Accept-Language")), Some(200)), null)
+      else {
+        Future.failed(new FilterInterruptException(
+          response = FacadeResponse(200, Map("x-http-header" → Seq("Accept-Language")), Null),
+          message = "Interrupted by filter"
+        ))
+      }
     }
   }
+
+  val filterChain = new SimpleFilterChain(
+    requestFilters = Seq(new TestRequestFilter),
+    responseFilters = Seq(new TestResponseFilter)
+  ) // todo: + test eventFilters
+
+  val emptyFilterChain = new SimpleFilterChain()
 
   "WsFilterChain " - {
     "websocket: applyInputFilters empty filterChain, non-empty headers" in {
@@ -71,11 +90,11 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         }
       }), "websocket-client")
 
-      val filteredDynamicRequestPromise = Promise[DynamicRequest]()
-      def exposeDynamicRequest: (DynamicRequest ⇒ Unit) = { filteredDynamicRequest ⇒
-        filteredDynamicRequestPromise.complete(Success(filteredDynamicRequest))
+      val filteredFacadeRequestPromise = Promise[FacadeRequest]()
+      def exposeFacadeRequest: (FacadeRequest ⇒ Unit) = { filteredDynamicRequest ⇒
+        filteredFacadeRequestPromise.complete(Success(filteredDynamicRequest))
       }
-      val server = system.actorOf(Props(wsWorker(FilterChain(), FilterChain(), exposeDynamicRequest)), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(emptyFilterChain, exposeFacadeRequest)), "websocket-worker")
       try {
         val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
           case b: Http.Bound ⇒
@@ -85,23 +104,19 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
           client ! Connect()
 
           whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-            client ! DynamicRequest(
-              RequestHeader(
-                Uri("/test"),
-                Map(Header.METHOD → Seq(Method.GET),
-                    Header.MESSAGE_ID → Seq("messageId"),
-                    Header.CORRELATION_ID → Seq("correlationId"),
-                    "toBeFiltered" → Seq("This header should be dropped by filter"))
-              ),
-              DynamicBody(Text("haha")))
+            client ! FacadeRequest(
+                Uri("/test"), Method.GET,
+                Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+                  FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId"),
+                  "toBeFiltered" → Seq("This header should be dropped by filter")
+                ),Text("haha"))
 
-            whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
-              case DynamicRequest(uri, body, headers) ⇒
+            whenReady(filteredFacadeRequestPromise.future, Timeout(Span(5, Seconds))) {
+              case FacadeRequest(uri, method, headers, body) ⇒
                 uri shouldBe Uri("/test")
-                headers(Header.METHOD) shouldBe Seq(Method.GET)
-                headers(Header.MESSAGE_ID) shouldBe Seq("messageId")
-                headers(Header.CORRELATION_ID) shouldBe Seq("correlationId")
-                body shouldBe DynamicBody(Text("haha"))
+                headers(FacadeHeaders.CLIENT_MESSAGE_ID) shouldBe Seq("messageId")
+                headers(FacadeHeaders.CLIENT_CORRELATION_ID) shouldBe Seq("correlationId")
+                body shouldBe Text("haha")
             }
           }
         }
@@ -132,11 +147,11 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         }
       }), "websocket-client")
 
-      val filteredDynamicRequestPromise = Promise[DynamicRequest]()
-      def exposeDynamicRequest: (DynamicRequest ⇒ Unit) = { filteredDynamicRequest ⇒
-        filteredDynamicRequestPromise.complete(Success(filteredDynamicRequest))
+      val filteredFacadeRequestPromise = Promise[FacadeRequest]()
+      def exposeFacadeRequest: (FacadeRequest ⇒ Unit) = { filteredFacadeRequest ⇒
+        filteredFacadeRequestPromise.complete(Success(filteredFacadeRequest))
       }
-      val server = system.actorOf(Props(wsWorker(FilterChain(Seq(new TestInputFilter)), FilterChain(), exposeDynamicRequest)), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(filterChain, exposeFacadeRequest)), "websocket-worker")
 
       val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
         case b: Http.Bound ⇒
@@ -146,23 +161,18 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         client ! Connect()
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
-          client ! DynamicRequest(
-            RequestHeader(
-              Uri("/test"),
-              Map(Header.METHOD → Seq(Method.GET),
-                Header.MESSAGE_ID → Seq("messageId"),
-                Header.CORRELATION_ID → Seq("correlationId"))
-            ),
-            DynamicBody(Text("haha")))
+          client ! FacadeRequest(Uri("/test"), Method.GET,
+                Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+                FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Text("haha"))
 
           try {
-            whenReady(filteredDynamicRequestPromise.future, Timeout(Span(5, Seconds))) {
-              case DynamicRequest(uri, body, headers) ⇒
+            whenReady(filteredFacadeRequestPromise.future, Timeout(Span(5, Seconds))) {
+              case FacadeRequest(uri, method, headers, body) ⇒
                 uri shouldBe Uri("/test")
-                headers(Header.METHOD) shouldBe Seq(Method.GET)
-                headers(Header.MESSAGE_ID) shouldBe Seq("messageId")
-                headers(Header.CORRELATION_ID) shouldBe Seq("correlationId")
-                body shouldBe DynamicBody(Text("haha"))
+                method shouldBe Method.GET
+                headers(FacadeHeaders.CLIENT_MESSAGE_ID) shouldBe Seq("messageId")
+                headers(FacadeHeaders.CLIENT_CORRELATION_ID) shouldBe Seq("correlationId")
+                body shouldBe Text("haha")
             }
           } catch {
             case ex: Throwable ⇒ fail(ex)
@@ -173,6 +183,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       }
     }
 
+      /* todo: what we're testing here?
     "websocket: applyOutputFilters empty filterChain, non-empty headers" in {
       implicit val system = ActorSystem()
 
@@ -195,7 +206,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         }
       }), "websocket-client")
 
-      val server = system.actorOf(Props(wsWorker(FilterChain(), FilterChain())), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(RequestFilterChain(), ResponseFilterChain())), "websocket-worker")
 
       val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
         case b: Http.Bound ⇒
@@ -255,7 +266,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         }
       }), "websocket-client")
 
-      val server = system.actorOf(Props(wsWorker(FilterChain(), FilterChain(Seq(new TestOutputFilter)))), "websocket-worker")
+      val server = system.actorOf(Props(wsWorker(RequestFilterChain(), ResponseFilterChain(Seq(new TestOutputFilter)))), "websocket-worker")
 
       val binding = IO(UHttp).ask(Http.Bind(server, host, port))(akka.util.Timeout(10, TimeUnit.SECONDS)) flatMap {
         case b: Http.Bound ⇒
@@ -290,17 +301,13 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
           }
         }
       }
-    }
+    }*/
   }
 
-  def wsWorker(inputFilterChain: FilterChain,
-               outputFilterChain: FilterChain,
-               exposeDynamicRequestFunction: (DynamicRequest ⇒ Unit) = _ => (),
-               exposeHttpRequestFunction: (HttpRequest ⇒ Unit) = _ => ()): Actor = {
-    new WsTestWorker(inputFilterChain, outputFilterChain) {
-      override def exposeDynamicRequest(dynamicRequest: DynamicRequest) = exposeDynamicRequestFunction(dynamicRequest)
-
-      override def exposeHttpRequest(request: HttpRequest) = exposeHttpRequest(request)
+  def wsWorker(filterChain: FilterChain,
+               exposeFacadeRequestFunction: (FacadeRequest ⇒ Unit) = _ => ()): Actor = {
+    new WsTestWorker(filterChain) {
+      override def exposeFacadeRequest(facadeRequest: FacadeRequest) = exposeFacadeRequestFunction(facadeRequest)
     }
   }
 

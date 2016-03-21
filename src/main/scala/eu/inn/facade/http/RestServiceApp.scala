@@ -7,10 +7,11 @@ import akka.event.Logging._
 import akka.util.Timeout
 import com.typesafe.config.Config
 import eu.inn.config.ConfigExtenders._
-import eu.inn.hyperbus.HyperBus
+import eu.inn.hyperbus.Hyperbus
 import eu.inn.servicecontrol.api.Service
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
+import spray.can.server.ServerSettings
 import spray.http._
 import spray.routing._
 import spray.routing.directives.LogEntry
@@ -28,6 +29,7 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   implicit val actorSystem = inject [ActorSystem]
   implicit val executionContext = inject [ExecutionContext]
 
+  private val rootConf = inject [Config]
   private val ErrorHandlerHeader = "X-Errors-Handled"
   val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
 
@@ -35,13 +37,15 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   val restConfig = config.getConfig("inn.util.http.rest-service")
   val handleErrorsDirectives = inject [HandleErrorsDirectives]
   val shutdownTimeout = config.getFiniteDuration("inn.facade.shutdown-timeout")
-  val hyperBus = inject [HyperBus]  // it's time to initialize hyperbus
+
+  val hyperBus = inject [Hyperbus]  // it's time to initialize hyperbus
   log.info("hyperbus is starting...: {}", hyperBus)
+
   val interface = config.getString("inn.facade.rest-api.host")
   val port = config.getInt("inn.facade.rest-api.port")
 
   def start(initRoutes: ⇒ Route) {
-    startServer(interface, port) {
+    startServer(interface, port, settings = Some(ServerSettings(rootConf))) {
       startWithDirectives(initRoutes)
     } onComplete {
       case Success(_) ⇒

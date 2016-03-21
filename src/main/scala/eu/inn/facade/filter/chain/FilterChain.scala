@@ -1,39 +1,67 @@
 package eu.inn.facade.filter.chain
 
-import eu.inn.facade.model.{Filter, TransitionalHeaders}
-import eu.inn.hyperbus.model.DynamicBody
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Future, Promise}
-import scala.language.postfixOps
+import eu.inn.facade.model._
+import eu.inn.facade.utils.FutureUtils
 
-class FilterChain(val filters: Seq[Filter]) {
+import scala.concurrent.{ExecutionContext, Future}
 
-  def applyFilters(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
-    val accumulator: Future[(TransitionalHeaders, DynamicBody)] = Future {
-      (headers, body)
-    }
-    val promisedResult = Promise[(TransitionalHeaders, DynamicBody)]()
-    if (filters nonEmpty) {
-      filters.foldLeft(accumulator) { (previousResult, filter) ⇒
-        previousResult.flatMap { result ⇒
-          val (resultHeaders, resultBody) = result
-          filter.apply(resultHeaders, resultBody)
-        }
-      } onComplete { filteredResult ⇒ promisedResult.complete(filteredResult) }
-    } else {
-      promisedResult.completeWith(Future((headers, body)))
-    }
-    promisedResult.future
+trait FilterChain {
+  def filterRequest(originalRequest: FacadeRequest, request: FacadeRequest)
+                   (implicit ec: ExecutionContext): Future[FacadeRequest] = {
+    val context = createRequestFilterContext(originalRequest)
+    FutureUtils.chain(request, findRequestFilters(context, request).map(f ⇒ f.apply(context, _ : FacadeRequest)))
   }
+
+  def filterResponse(originalRequest: FacadeRequest, response: FacadeResponse)
+                    (implicit ec: ExecutionContext): Future[FacadeResponse] = {
+
+    val context = createResponseFilterContext(originalRequest, response)
+    FutureUtils.chain(response, findResponseFilters(context, response).map(f ⇒ f.apply(context, _ : FacadeResponse)))
+  }
+
+  def filterEvent(originalRequest: FacadeRequest, event: FacadeRequest)
+                 (implicit ec: ExecutionContext): Future[FacadeRequest] = {
+    val context = createEventFilterContext(originalRequest, event)
+    FutureUtils.chain(event, findEventFilters(context, event).map(f ⇒ f.apply(context, _ : FacadeRequest)))
+  }
+
+  def createRequestFilterContext(request: FacadeRequest) = {
+    RequestFilterContext(
+      request.uri,
+      request.method,
+      request.headers,
+      request.body
+    )
+  }
+
+  def createResponseFilterContext(request: FacadeRequest, response: FacadeResponse) = {
+    ResponseFilterContext(
+      request.uri,
+      request.method,
+      request.headers,
+      request.body,
+      response.headers,
+      response.body
+    )
+  }
+
+  def createEventFilterContext(request: FacadeRequest, event: FacadeRequest) = {
+    EventFilterContext(
+      request.uri,
+      request.headers,
+      request.body,
+      event.method,
+      event.headers,
+      event.body
+    )
+  }
+
+  def findRequestFilters(context: RequestFilterContext, request: FacadeRequest): Seq[RequestFilter]
+  def findResponseFilters(context: ResponseFilterContext, response: FacadeResponse): Seq[ResponseFilter]
+  def findEventFilters(context: EventFilterContext, event: FacadeRequest): Seq[EventFilter]
 }
 
 object FilterChain {
-  def apply(filters: Seq[Filter]) = {
-    new FilterChain(filters)
-  }
-
-  def apply() = {
-    new FilterChain(Seq())
-  }
+  val empty = SimpleFilterChain(Seq.empty,Seq.empty,Seq.empty)
 }

@@ -1,12 +1,19 @@
 package eu.inn.facade.model
 
-import eu.inn.hyperbus.model.DynamicBody
+import eu.inn.facade.filter.chain.SimpleFilterChain
+import eu.inn.facade.raml.Field
 
-import scala.concurrent.Future
+trait Filter
 
-trait Filter {
-
-  def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)]
-  def isInputFilter: Boolean = false
-  def isOutputFilter: Boolean = false
+trait RamlFilterFactory {
+  def createFilterChain(target: RamlTarget): SimpleFilterChain
 }
+
+sealed trait RamlTarget
+case class TargetResource(uri: String) extends RamlTarget
+case class TargetMethod(uri: String, method: String) extends RamlTarget
+//case class TargetResponse(uri: String, code: Int) extends RamlTarget
+//RequestBody
+//ResponseBody
+// todo: inner fields!
+case class TargetFields(typeName: String, fields: Seq[Field]) extends RamlTarget

@@ -1,12 +1,12 @@
 package eu.inn.facade.raml
 
-import eu.inn.hyperbus.transport.api
+import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.hyperbus.transport.api.uri._
 
 class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
 
   def traitNames(uriPattern: String, method: String): Seq[String] = {
-    traits(uriPattern, method) map (foundTrait ⇒ foundTrait.name)
+    traits(uriPattern, method).map(foundTrait ⇒ foundTrait.name).distinct
   }
 
   def resourceUri(requestUriString: String): Uri = {
@@ -28,41 +28,11 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
     foundUri
   }
 
-  def requestDataStructure(uriPattern: String, method: String, contentType: Option[String]): Option[DataStructure] = {
-    resourcesByUri.get(uriPattern) match {
-      case Some(resourceConfig) ⇒ resourceConfig.requests.dataStructures.get(Method(method), getContentType(contentType))
-      case None ⇒ None
-    }
-  }
-
-  def responseDataStructure(uriPattern: String, method: String, statusCode: Int): Option[DataStructure] = {
-    resourcesByUri.get(uriPattern) match {
-      case Some(resourceConfig) ⇒ resourceConfig.responses.dataStructures.get(Method(method), statusCode)
-      case None ⇒ None
-    }
-  }
-
-  def responseDataStructures(uri: api.uri.Uri, method: String): Seq[DataStructure] = {
-    resourcesByUri.get(uri.pattern.specific) match {
-      case Some(resourceConfig) ⇒
-        resourceConfig.responses.dataStructures.foldLeft(Seq.newBuilder[DataStructure]) { (structuresByMethod, kv) ⇒
-          val (httpMethod, _) = kv._1
-          val structure = kv._2
-          if (httpMethod == Method(method)) structuresByMethod += structure
-          else structuresByMethod
-        }.result()
-
-      case None ⇒ Seq()
-    }
-  }
-
   private def traits(uriPattern: String, method: String): Seq[Trait] = {
     resourcesByUri.get(uriPattern) match {
       case Some(config) ⇒
         val traits = config.traits
-        traits.methodSpecificTraits
-          .getOrElse(Method(method), traits.commonTraits)
-
+        traits.methodSpecificTraits.getOrElse(Method(method), Seq.empty) ++ traits.commonTraits
       case None ⇒ Seq()
     }
   }
@@ -75,18 +45,23 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
   }
 }
 
-case class ResourceConfig(traits: Traits, requests: Requests, responses: Responses)
-object ResourceConfig {
-  def apply(traits: Traits): ResourceConfig = {
-    ResourceConfig(traits, Requests(Map()), Responses(Map()))
-  }
-}
+case class ResourceConfig(
+                           traits: Traits,
+                           annotations: Seq[Annotation],
+                           methods: Map[Method, ResourceMethod],
+                           filters: SimpleFilterChain
+                         )
+
+case class ResourceMethod(method: Method,
+                          requests: Requests,
+                          responses: Map[Int, Responses],
+                          filters: SimpleFilterChain)
+
+case class Requests(dataStructures: Map[Option[ContentType], DataStructure])
+
+case class Responses(dataStructures: Map[Option[ContentType], DataStructure])
 
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
-
-case class Requests(dataStructures: Map[(Method, Option[ContentType]), DataStructure])
-
-case class Responses(dataStructures: Map[(Method, Int), DataStructure])
 
 case class Trait(name: String, parameters: Map[String, String])
 object Trait {
@@ -110,7 +85,7 @@ object Method {
 
 case class ContentType(mediaType: String)
 
-case class DataStructure(headers: Seq[Header], body: Option[Body])
+case class DataStructure(headers: Seq[Header], body: Option[Body], filters: SimpleFilterChain)
 
 case class Header(name: String)
 
@@ -124,13 +99,14 @@ object DataType {
 
 case class Body(dataType: DataType)
 
-case class Field(name: String, dataType: DataType) {
-  def isPrivate: Boolean = dataType.annotations.contains(Annotation(Annotation.PRIVATE))
-}
+case class Field(name: String, dataType: DataType)
 
-case class Annotation(name: String)
+case class Annotation(name: String, value: Option[RamlAnnotation])
+
 object Annotation {
   val PRIVATE = "privateField"
   val CLIENT_LANGUAGE = "x-client-language"
   val CLIENT_IP = "x-client-ip"
+
+  def apply(name: String): Annotation = Annotation(name, None)
 }

@@ -5,10 +5,9 @@ import java.util.concurrent.atomic.AtomicLong
 
 import akka.actor.{ActorRef, ActorSystem}
 import com.typesafe.config.Config
-import eu.inn.facade.HyperBusFactory
-import eu.inn.hyperbus.HyperBus
-import eu.inn.hyperbus.model.{DynamicRequest, Header}
-import eu.inn.hyperbus.serialization.RequestHeader
+import eu.inn.facade.HyperbusFactory
+import eu.inn.hyperbus.Hyperbus
+import eu.inn.hyperbus.model.{DynamicRequest, Header, Headers}
 import eu.inn.hyperbus.transport.api.Subscription
 import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, RequestMatcher}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -20,7 +19,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class SubscriptionsManager(implicit inj: Injector) extends Injectable {
 
-  val hyperBus = inject[HyperBus]
+  val hyperbus = inject[Hyperbus]
   val log = LoggerFactory.getLogger(SubscriptionsManager.this.getClass.getName)
   implicit val actorSystem = inject[ActorSystem]
   implicit val executionContext = inject[ExecutionContext]
@@ -31,7 +30,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
   private val subscriptionManager = new Manager
 
   class Manager {
-    val groupName = HyperBusFactory.defaultHyperBusGroup(inject[Config])
+    val groupName = HyperbusFactory.defaultHyperbusGroup(inject[Config])
     val idCounter = new AtomicLong(0)
     val groupSubscriptions = scala.collection.mutable.Map[Uri,GroupSubscription]()
     val groupSubscriptionById = TrieMap[String, Uri]()
@@ -40,11 +39,11 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
 
     class GroupSubscription(groupUri: Uri, initialSubscription: ClientSubscriptionData) {
       val clientSubscriptions = new ConcurrentLinkedQueue[ClientSubscriptionData]()
-      var hyperBusSubscription: Option[Subscription] = None
+      var hyperbusSubscription: Option[Subscription] = None
       addClient(initialSubscription)
 
-      val methodFilter = Map(Header.METHOD → RegexMatcher("feed:.*"))
-      hyperBus.onEvent(RequestMatcher(Some(groupUri), methodFilter), groupName) { eventRequest: DynamicRequest ⇒
+      val methodFilter = Map(Header.METHOD → RegexMatcher("^feed:.*$"))
+      hyperbus.onEvent(RequestMatcher(Some(groupUri), methodFilter), groupName) { eventRequest: DynamicRequest ⇒
         Future{
           log.debug(s"Event received ($groupName): $eventRequest")
           import scala.collection.JavaConversions._
@@ -53,12 +52,8 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
               val matched = consumer.uri.matchUri(eventRequest.uri)
               log.debug(s"Event #(${eventRequest.messageId}) ${if (matched) "forwarded" else "NOT matched"} to ${consumer.clientActor}/${consumer.correlationId}")
               if (matched) {
-                val request = DynamicRequest(
-                  RequestHeader(
-                    eventRequest.uri,
-                    eventRequest.headers + (Header.CORRELATION_ID → Seq(consumer.correlationId))
-                  ),
-                  eventRequest.body
+                val request = eventRequest.copy(
+                  headers = Headers.plain(eventRequest.headers + (Header.CORRELATION_ID → Seq(consumer.correlationId)))
                 )
                 consumer.clientActor ! request
               }
@@ -70,7 +65,7 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
           }
         }
       } onSuccess {
-        case subscription: Subscription ⇒ hyperBusSubscription = Some(subscription)
+        case subscription: Subscription ⇒ hyperbusSubscription = Some(subscription)
       }
 
       def addClient(subscription: ClientSubscriptionData) = clientSubscriptions.add(subscription)
@@ -84,8 +79,8 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       }
 
       def off() = {
-        hyperBusSubscription match {
-          case Some(subscription) ⇒ hyperBus.off(subscription)
+        hyperbusSubscription match {
+          case Some(subscription) ⇒ hyperbus.off(subscription)
           case None ⇒ log.warn("You cannot unsubscribe because you are not subscribed yet!")
         }
       }

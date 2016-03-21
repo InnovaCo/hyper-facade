@@ -6,7 +6,7 @@ import akka.actor.ActorSystem
 import akka.cluster.Cluster
 import com.typesafe.config.Config
 import eu.inn.binders.dynamic.{Obj, Text}
-import eu.inn.hyperbus.HyperBus
+import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.annotations.{body, request}
 import eu.inn.hyperbus.transport.api._
@@ -16,7 +16,7 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
-@body("application/vnd+test-1.json")
+@body("feed-test")
 case class FeedTestBody(content: String) extends Body
 
 @request(Method.FEED_POST, "/test-service/reliable")
@@ -29,8 +29,8 @@ case class UnreliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Se
 
 object TestService extends App {
   val config = new ConfigsFactory().config
-  val hyperBus = new HyperBusFactory(config).hyperBus
-  val testService = new TestService(hyperBus)
+  val hyperbus = new HyperbusFactory(config).hyperbus
+  val testService = new TestService(hyperbus)
   startSeedNode(config)
   testService.onCommand(RequestMatcher(Some(Uri("/aaa")), Map(Header.METHOD → Specific(Method.GET))),
     Ok(DynamicBody(Text("response"))))
@@ -45,19 +45,19 @@ object TestService extends App {
 
 /**
   * NOT THREAD SAFE
-  * This class is just a test stuff for publishing events to HyperBus.
+  * This class is just a test stuff for publishing events to Hyperbus.
   */
-class TestService(hyperBus: HyperBus) {
+class TestService(hyperbus: Hyperbus) {
   def publish(request: ReliableFeedTestRequest): Future[PublishResult] = {
-    hyperBus <| request
+    hyperbus <| request
   }
 
   def publish(request: UnreliableFeedTestRequest): Future[PublishResult] = {
-    hyperBus <| request
+    hyperbus <| request
   }
 
   def onCommand(matcher: RequestMatcher, response: Response[Body], optionalTestCallback: (DynamicRequest ⇒ Unit) = _ ⇒ ()) = {
-    hyperBus.onCommand(matcher) { request: DynamicRequest ⇒
+    hyperbus.onCommand(matcher) { request: DynamicRequest ⇒
       Future {
         optionalTestCallback(request)
         response
@@ -66,15 +66,15 @@ class TestService(hyperBus: HyperBus) {
   }
 
   def unsubscribe(subscription: Subscription) = {
-    hyperBus.off(subscription)
+    hyperbus.off(subscription)
   }
 }
 
 object TestService4WebsocketPerf extends App {
 
   val config = new ConfigsFactory().config
-  val hyperBus = new HyperBusFactory(config).hyperBus
-  val testService = new TestService(hyperBus)
+  val hyperbus = new HyperbusFactory(config).hyperbus
+  val testService = new TestService(hyperbus)
   val eventsPerSecond = config.getInt("perf-test.events-per-second")
   var canStart = new AtomicBoolean(false)
   TestService.startSeedNode(config)
@@ -100,8 +100,8 @@ object TestService4WebsocketPerf extends App {
 
 object TestService4HttpPerf extends App {
   val config = new ConfigsFactory().config
-  val hyperBus = new HyperBusFactory(config).hyperBus
-  val testService = new TestService(hyperBus)
+  val hyperbus = new HyperbusFactory(config).hyperbus
+  val testService = new TestService(hyperbus)
   TestService.startSeedNode(config)
   testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
     Ok(DynamicBody(Text("response"))))

@@ -61,17 +61,18 @@ annotationTypes:
   x-client-ip:
   x-client-language:
   privateField:
+  privateResource:
+  paged:
 
 traits:
   secured:
-  paged:
   rateLimited:
-  privateResource:
 
 /users:
   is: [ secured ]
   get:
-    is: [ paged, rateLimited ]
+    is: [ rateLimited ]
+    (paged):
     body:
       type: StatusRequest
     headers:
@@ -88,7 +89,7 @@ traits:
     is: [ rateLimited ]
   /test-service:
     get:
-      is: [ paged ]
+      (paged):
       body:
         type: TestRequest
       headers:
@@ -104,7 +105,7 @@ traits:
             type: string
 
 /private:
-  is: [ privateResource ]
+  (privateResource):
 
 /unreliable-feed/{content}:
   post:
@@ -136,3 +137,13 @@ traits:
 /revault/content/{path:*}:
   uriParameters:
     path:*: string
+
+/test-rewrite/some-service
+  (forward):
+    uri: /revault/content/some-service
+
+/test-rewrite-method/some-service
+  get:
+  put:
+    (forward):
+      uri: /revault/content/some-service

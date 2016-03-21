@@ -3,9 +3,10 @@ package eu.inn.facade.perf
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import eu.inn.binders.dynamic.Obj
+import eu.inn.binders.dynamic.{Null, Obj}
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.http.{Connect, Disconnect, WsTestClient}
+import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
 import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest, Header}
 import eu.inn.hyperbus.serialization.RequestHeader
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -74,15 +75,12 @@ object WsLoadGenerator extends App {
 
   def startLoad(clients: Seq[ActorRef]): Unit = {
     clients foreach { client ⇒
-      client ! DynamicRequest(
-        RequestHeader(
-          Uri(uriPattern),
-          Map(Header.METHOD → Seq("subscribe"),
-              Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
-              Header.MESSAGE_ID → Seq(client.path.name),
-              Header.CORRELATION_ID → Seq(client.path.name))
-        ),
-        DynamicBody(Obj(Map())))
+      client ! FacadeRequest(Uri(uriPattern), "subscribe",
+        Map(Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq(client.path.name),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq(client.path.name)),
+        Null
+      )
     }
   }
 

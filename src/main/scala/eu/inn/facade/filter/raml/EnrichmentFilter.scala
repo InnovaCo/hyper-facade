@@ -1,23 +1,28 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.raml
 
-import eu.inn.binders.dynamic.{Obj, Text}
+import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model._
-import eu.inn.facade.raml.Annotation._
-import eu.inn.facade.raml.{Annotation, RamlConfig}
-import eu.inn.hyperbus.model.DynamicBody
+import eu.inn.facade.raml.Field
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
-class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
-
-  override def apply(headers: TransitionalHeaders, body: DynamicBody): Future[(TransitionalHeaders, DynamicBody)] = {
-    Future {
-      val enrichedBody = enrichBody(headers, body)
-      (headers, enrichedBody)
+class EnrichmentFilterFactory extends RamlFilterFactory {
+  def createFilterChain(target: RamlTarget): SimpleFilterChain = {
+    target match {
+      case TargetFields(typeName, fields) ⇒
+        SimpleFilterChain(
+          requestFilters = Seq(new EnrichRequestFilter(fields)),
+          responseFilters = Seq.empty,
+          eventFilters = Seq.empty
+        )
+      case _ ⇒ FilterChain.empty // log warning
     }
   }
+}
 
+class EnrichRequestFilter(val privateFields: Seq[Field]) extends RequestFilter {
+
+  /*
   def enrichBody(headers: TransitionalHeaders, body: DynamicBody): DynamicBody = {
     var enrichedBody = body
     val dataStructure = getDataStructure(headers)
@@ -26,7 +31,7 @@ class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
         structure.body match {
           case Some(httpBody) ⇒
             val fields = httpBody.dataType.fields
-            fields.filter(_.dataType.annotations.contains(Annotation(CLIENT_LANGUAGE)))
+            fields.filter(_.dataType.annotations.exists(_.name == CLIENT_LANGUAGE))
               .foreach { field ⇒
                 val clientLanguage = headers.headerOption("Accept-Language")
                 enrichedBody = clientLanguage match {
@@ -37,7 +42,7 @@ class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
                   case None ⇒ body
                 }
               }
-            fields.filter(_.dataType.annotations.contains(Annotation(CLIENT_IP)))
+            fields.filter(_.dataType.annotations.exists(_.name == CLIENT_IP))
               .foreach { field ⇒
                 val clientIp = headers.headerOption("http_x_forwarded_for")
                 enrichedBody = clientIp match {
@@ -54,5 +59,13 @@ class EnrichmentFilter(val ramlConfig: RamlConfig) extends RamlAwareFilter {
     }
 
     enrichedBody
+  }
+*/
+
+  override def apply(context: RequestFilterContext, request: FacadeRequest)
+                    (implicit ec: ExecutionContext): Future[FacadeRequest] = {
+    Future {
+      request
+    }
   }
 }
