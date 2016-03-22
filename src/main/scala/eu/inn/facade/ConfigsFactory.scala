@@ -5,6 +5,7 @@ import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.typesafe.config.{Config, ConfigFactory}
 import eu.inn.facade.raml.{RamlConfig, RamlConfigParser}
 import org.slf4j.LoggerFactory
+import scaldi.Injector
 
 import scala.collection.JavaConversions._
 
@@ -48,7 +49,7 @@ class ConfigsFactory {
     conf
   }
 
-  def ramlConfig(appConfig: Config): RamlConfig = {
+  def ramlConfig(appConfig: Config)(implicit inj: Injector): RamlConfig = {
     val factory = new JavaNodeFactory
     val ramlConfigPath = ramlFilePath(appConfig)
     RamlConfigParser(factory.createApi(ramlConfigPath)).parseRaml

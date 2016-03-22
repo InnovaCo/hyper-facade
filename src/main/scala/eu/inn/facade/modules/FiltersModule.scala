@@ -1,23 +1,30 @@
 package eu.inn.facade.modules
 
-import com.typesafe.config.Config
 import eu.inn.facade.ConfigsFactory
-import eu.inn.facade.filter._
-import eu.inn.facade.filter.chain.{FilterChainFactory, FilterChainRamlFactory}
-import eu.inn.facade.filter.model.{Filter, InputFilter, OutputFilter}
+import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain, SimpleFilterChain}
+import eu.inn.facade.filter.http.{HttpWsRequestFilter, HttpWsResponseFilter, WsEventFilter}
+import eu.inn.facade.filter.raml.{EnrichmentFilterFactory, PrivateFieldsFilterFactory, PrivateResourceFilterFactory}
+import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
-import scaldi.{OpenInjectable, Module}
-
+import scaldi.Module
 import scala.collection.JavaConversions._
+
 
 class FiltersModule extends Module {
 
-  bind [Seq[Filter]]        identifiedBy "privateResource"                      to Seq(new PrivateResourceFilter)
-  bind [Seq[Filter]]        identifiedBy "privateField"                         to Seq(new PrivateFieldsFilter(inject [RamlConfig] ) with InputFilter,
-                                                                                       new PrivateFieldsFilter(inject [RamlConfig] ) with OutputFilter)
-  bind [Seq[Filter]]        identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilter(inject [RamlConfig] ) with InputFilter,
-                                                                                       new EnrichmentFilter(inject [RamlConfig] ) with OutputFilter)
-  bind [FilterChainFactory] identifiedBy 'ramlFilterChain                       to new FilterChainRamlFactory
+  bind [Seq[RamlFilterFactory]]   identifiedBy "privateResource"                      to Seq(new PrivateResourceFilterFactory)
+  bind [Seq[RamlFilterFactory]]   identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilterFactory)
+  bind [Seq[RamlFilterFactory]]   identifiedBy  "privateField"                        to Seq(new PrivateFieldsFilterFactory)
+
+  bind [FilterChain]              identifiedBy "beforeFilterChain"                    to new SimpleFilterChain(
+    requestFilters            = Seq(new HttpWsRequestFilter(inject[RamlConfig]))
+  )
+  bind [FilterChain]              identifiedBy "afterFilterChain"                     to new SimpleFilterChain(
+    responseFilters           = Seq(new HttpWsResponseFilter),
+    eventFilters              = Seq(new WsEventFilter)
+  )
+  bind [FilterChain]              identifiedBy "ramlFilterChain"                      to new RamlFilterChain(inject[RamlConfig])
+
   initOuterBindings()
 
   def initOuterBindings(): Unit = {
@@ -27,8 +34,8 @@ class FiltersModule extends Module {
       declaredRamlFilters.entrySet.foreach { filterConfigEntry ⇒
         val filterName = filterConfigEntry.getKey
         val filterClass: String = filterConfigEntry.getValue.unwrapped.asInstanceOf[String]
-        val filter = Class.forName(filterClass).newInstance().asInstanceOf[Filter]
-        bind[Seq[Filter]] identifiedBy filterName to Seq(filter)
+        val filter = Class.forName(filterClass).newInstance().asInstanceOf[RamlFilterFactory]
+        bind[Seq[RamlFilterFactory]] identifiedBy filterName to Seq(filter)
       }
     }
   }
