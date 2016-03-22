@@ -39,7 +39,7 @@ class EnrichRequestFilter(val targetFields: Seq[Field]) extends RequestFilter {
                 bodyFields += targetRamlField.name → Text(headerValue)
                 headers -= headerName
 
-              case None ⇒
+              case _ ⇒
             }
           }
         }
