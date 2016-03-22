@@ -1,6 +1,7 @@
 package eu.inn.facade.filter.http
 
 import eu.inn.facade.model._
+import eu.inn.facade.utils.NamingUtils
 import eu.inn.hyperbus.model.Header
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -13,7 +14,7 @@ class HttpWsResponseFilter extends ResponseFilter {
       val headersBuilder = Map.newBuilder[String, Seq[String]]
       response.headers.foreach {
         case (Header.CONTENT_TYPE, value :: tail) ⇒
-          headersBuilder += Header.CONTENT_TYPE → Seq(
+          headersBuilder += FacadeHeaders.CONTENT_TYPE → Seq(
             FacadeHeaders.CERTAIN_CONTENT_TYPE_START + value + FacadeHeaders.CERTAIN_CONTENT_TYPE_END
           )
 

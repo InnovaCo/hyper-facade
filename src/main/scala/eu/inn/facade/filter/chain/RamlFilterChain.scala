@@ -19,7 +19,7 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
       case Right(resourceMethod) ⇒
         resourceMethod.responses.get(response.status) match {
           case Some(responseDataStructures) ⇒
-            responseDataStructures.dataStructures.get(response.contentType.map(ContentType)) match {
+            responseDataStructures.dataStructures.get(response.clientContentType.map(ContentType)) match { // todo: test this!
               case Some(responseDataStructure) ⇒
                 responseDataStructure.filters
               case None ⇒

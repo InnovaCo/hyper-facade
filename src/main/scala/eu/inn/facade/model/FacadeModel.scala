@@ -3,7 +3,7 @@ package eu.inn.facade.model
 import eu.inn.binders.core.{ImplicitDeserializer, ImplicitSerializer}
 import eu.inn.binders.dynamic.{Null, Value}
 import eu.inn.binders.json._
-import eu.inn.binders.naming.{CamelCaseToDashCaseConverter, DashCaseToCamelCaseConverter}
+import eu.inn.facade.utils.NamingUtils
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.serialization.{ResponseHeader, StringDeserializer}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -56,19 +56,15 @@ case class FacadeRequest(uri: Uri, method: String, headers: Map[String, Seq[Stri
   }
 }
 
-// todo: converters make explicit
-
 object FacadeRequest {
-  val dashCaseToCamelCase = new DashCaseToCamelCaseConverter
-
   def apply(request: HttpRequest, remoteAddress: String): FacadeRequest = {
     val headers: Map[String,Seq[String]] = request.headers.groupBy(_.name).map { kv ⇒
-      dashCaseToCamelCase.convert(kv._1) → kv._2.map(_.value)
+      kv._1 → kv._2.map(_.value)
     }
 
     FacadeRequest(Uri(request.uri.toString),
       request.method.name,
-      headers + (dashCaseToCamelCase.convert("X-Forwarded-For") → Seq(remoteAddress)),
+      headers + (NamingUtils.httpToFacade.convert("X-Forwarded-For") → Seq(remoteAddress)),
       if (request.entity.nonEmpty){
         StringDeserializer.dynamicBody(Some(request.entity.asString)).content
       }
@@ -105,9 +101,9 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
   def toHttpResponse: HttpResponse = {
     val statusCode = StatusCode.int2StatusCode(status)
     val jsonBody = body.toJson
-    HttpResponse(statusCode, HttpEntity(contentTypeToSpray(contentType), jsonBody), headers.flatMap{ case (name, values) ⇒
+    HttpResponse(statusCode, HttpEntity(contentTypeToSpray(clientContentType), jsonBody), headers.flatMap{ case (name, values) ⇒
       values.map { value ⇒
-        RawHeader(FacadeResponse.camelCaseToDashCase.convert(name), value)
+        RawHeader(name, value)
       }
     }.toList)
   }
@@ -120,8 +116,12 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
     s"FacadeResponse(${this.toJson})"
   }
 
-  def contentType: Option[String] = {
+  /*def contentType: Option[String] = {
     headers.get(Header.CONTENT_TYPE).flatMap(_.headOption)
+  }*/
+
+  def clientContentType: Option[String] = {
+    headers.get(FacadeHeaders.CONTENT_TYPE).flatMap(_.headOption)
   }
 
   private def contentTypeToSpray(contentType: Option[String]): spray.http.ContentType = {
@@ -145,7 +145,6 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
 }
 
 object FacadeResponse {
-  val camelCaseToDashCase = new CamelCaseToDashCaseConverter
   def apply(response: Response[DynamicBody]): FacadeResponse = {
     FacadeResponse(response.status, response.headers, response.body.content)
   }
