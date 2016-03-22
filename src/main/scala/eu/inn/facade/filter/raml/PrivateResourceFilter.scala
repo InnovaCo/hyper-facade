@@ -9,7 +9,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class PrivateResourceFilterFactory extends RamlFilterFactory {
   override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
     target match {
-      case TargetResource(_) | TargetMethod(_, _) ⇒ SimpleFilterChain(
+      case TargetResource(_,_) | TargetMethod(_, _, _) ⇒ SimpleFilterChain(
         requestFilters = Seq(new PrivateResourceFilter),
         responseFilters = Seq.empty,
         eventFilters = Seq.empty
