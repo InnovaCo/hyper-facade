@@ -3,6 +3,7 @@ package eu.inn.facade.filter.http
 import eu.inn.binders.dynamic.Null
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
+import eu.inn.facade.utils.NamingUtils
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.{Header, Method, QueryBody}
 
@@ -21,7 +22,7 @@ class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
       var messageIdFound = false
 
       request.headers.foreach {
-        case (Header.CONTENT_TYPE, value :: tail)
+        case (FacadeHeaders.CONTENT_TYPE, value :: tail)
           if value.startsWith(FacadeHeaders.CERTAIN_CONTENT_TYPE_START)
             && value.endsWith(FacadeHeaders.CERTAIN_CONTENT_TYPE_END) ⇒
 

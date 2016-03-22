@@ -11,6 +11,8 @@ import eu.inn.hyperbus.model._
 import org.slf4j.LoggerFactory
 import scaldi.Injector
 
+import scala.concurrent.{ExecutionContext, Future}
+
 class FeedSubscriptionActor(websocketWorker: ActorRef,
                             hyperbus: Hyperbus,
                             subscriptionManager: SubscriptionsManager)
@@ -21,7 +23,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
   val maxResubscriptionsCount = inject[Config].getInt("inn.facade.maxResubscriptionsCount")
   val log = LoggerFactory.getLogger(getClass)
-  implicit def executionContext = context.dispatcher
+  val executionContext = inject[ExecutionContext] // don't make this implicit
 
   def receive: Receive = {
     case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
@@ -30,8 +32,10 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     case request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _) ⇒
       startSubscription(request, 0)
 
-    case request : FacadeRequest ⇒
+    case request : FacadeRequest ⇒ {
+      implicit val ec = executionContext
       processRequestToFacade(request) pipeTo websocketWorker
+    }
   }
 
   def subscribing(originalRequest: FacadeRequest, subscriptionSyncTries: Int): Receive = {
@@ -81,6 +85,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     subscriptionManager.off(self)
     context.become(subscribing(originalRequest, subscriptionSyncTries) orElse stopSubScriptionOrUpdate)
 
+    implicit val ec = executionContext
     beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
       processRequestWithRaml(originalRequest, r, 0) map { filteredRequest ⇒
         val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
@@ -120,6 +125,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       log.trace(s"Processing resource state $resourceState for ${originalRequest.uri}")
     }
 
+    implicit val ec = executionContext
     ramlFilterChain.filterResponse(originalRequest, facadeResponse) flatMap { filteredResponse ⇒
       afterFilterChain.filterResponse(originalRequest, filteredResponse) map { finalResponse ⇒
         websocketWorker ! finalResponse
@@ -143,6 +149,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     if (log.isTraceEnabled) {
       log.trace(s"Processing unreliable event $event for ${originalRequest.uri}")
     }
+    implicit val ec = executionContext
     ramlFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
       afterFilterChain.filterEvent(originalRequest, e) map { filteredRequest ⇒
         websocketWorker ! filteredRequest
@@ -167,6 +174,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         if (revisionId == lastRevisionId + 1) {
           context.become(subscribedReliable(originalRequest, lastRevisionId + 1, 0) orElse stopSubScriptionOrUpdate)
 
+          implicit val ec = executionContext
           ramlFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
             afterFilterChain.filterEvent(originalRequest, e) map { filteredRequest ⇒
               websocketWorker ! filteredRequest
