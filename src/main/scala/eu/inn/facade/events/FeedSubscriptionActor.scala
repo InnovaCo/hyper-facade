@@ -8,6 +8,8 @@ import eu.inn.facade.model._
 import eu.inn.facade.raml.Method
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
+import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, TextMatcher}
+import eu.inn.hyperbus.transport.api.uri._
 import org.slf4j.LoggerFactory
 import scaldi.Injector
 
@@ -25,13 +27,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   val log = LoggerFactory.getLogger(getClass)
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
-  def receive: Receive = {
-    case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
-      context.stop(self)
-
-    case request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _) ⇒
-      startSubscription(request, 0)
-
+  def receive: Receive = stopStartSubscription orElse {
     case request : FacadeRequest ⇒ {
       implicit val ec = executionContext
       processRequestToFacade(request) pipeTo websocketWorker
@@ -93,7 +89,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       processRequestWithRaml(originalRequest, r, 0) map { filteredRequest ⇒
         val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
           filteredRequest.headers(Header.MESSAGE_ID)).head
-        val newSubscriptionId = subscriptionManager.subscribe(self, filteredRequest.uri, correlationId)
+        val subscriptionUri = getSubscriptionuri(filteredRequest)
+        val newSubscriptionId = subscriptionManager.subscribe(self, subscriptionUri, correlationId)
         implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
         hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
           handleHyperbusExceptions(originalRequest)
@@ -198,6 +195,27 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
       case _ ⇒
         log.error(s"Received event: $event without revisionId for reliable feed: $originalRequest")
+    }
+  }
+
+  //  todo: this method is hacky and revault specific, elaborate more (move to revault filter?)
+  //  in this case we allow regular expression in URL
+  def getSubscriptionuri(filteredRequest: FacadeRequest): Uri = {
+    val uri = filteredRequest.uri
+    if (filteredRequest.body.asMap.contains("page.from")) {
+      val newArgs: Map[String, TextMatcher] = UriParser.tokens(uri.pattern.specific).flatMap {
+        case ParameterToken(name, PathMatchType) ⇒
+          Some(name → RegexMatcher(uri.args(name).specific + "/.*"))
+
+        case ParameterToken(name, RegularMatchType) ⇒
+          Some(name → uri.args(name))
+
+        case _ ⇒ None
+      }.toMap
+      Uri(uri.pattern, newArgs)
+    }
+    else {
+      uri
     }
   }
 }
