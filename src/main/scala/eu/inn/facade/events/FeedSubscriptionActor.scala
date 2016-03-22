@@ -132,14 +132,19 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     ramlFilterChain.filterResponse(originalRequest, facadeResponse) flatMap { filteredResponse ⇒
       afterFilterChain.filterResponse(originalRequest, filteredResponse) map { finalResponse ⇒
         websocketWorker ! finalResponse
-        finalResponse.headers.get(FacadeHeaders.CLIENT_REVISION) match {
-          // reliable feed
-          case Some(revision :: tail) ⇒
-            BecomeReliable(revision.toLong)
+        if (finalResponse.status > 399) { // failed
+          PoisonPill
+        }
+        else {
+          finalResponse.headers.get(FacadeHeaders.CLIENT_REVISION) match {
+            // reliable feed
+            case Some(revision :: tail) ⇒
+              BecomeReliable(revision.toLong)
 
-          // unreliable feed
-          case _ ⇒
-            BecomeUnreliable
+            // unreliable feed
+            case _ ⇒
+              BecomeUnreliable
+          }
         }
       }
     } recover handleFilterExceptions(originalRequest) { response ⇒
