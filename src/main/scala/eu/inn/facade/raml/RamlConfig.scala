@@ -81,6 +81,9 @@ case class Method(name: String)
 object Method {
   val POST = "post"
   val GET = "get"
+  val PUT = "put"
+  val DELETE = "delete"
+  val PATCH = "patch"
 }
 
 case class ContentType(mediaType: String)

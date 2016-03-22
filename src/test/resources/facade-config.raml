@@ -63,6 +63,7 @@ annotationTypes:
   privateField:
   privateResource:
   paged:
+  rewrite:
 
 traits:
   secured:
@@ -138,12 +139,12 @@ traits:
   uriParameters:
     path:*: string
 
-/test-rewrite/some-service
-  (forward):
-    uri: /revault/content/some-service
+/test-rewrite/some-service:
+  (rewrite):
+    uri: /status/test-service
 
-/test-rewrite-method/some-service
+/test-rewrite-method/some-service:
   get:
   put:
-    (forward):
+    (rewrite):
       uri: /revault/content/some-service
