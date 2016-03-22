@@ -92,7 +92,7 @@ case class Header(name: String)
 case class DataType(typeName: String, fields: Seq[Field], annotations: Seq[Annotation])
 object DataType {
   def apply(): DataType = {
-    DataType(DEFAULT_TYPE_NAME, Seq(), Seq())
+    DataType(DEFAULT_TYPE_NAME, Seq.empty, Seq.empty)
   }
   val DEFAULT_TYPE_NAME = "string"
 }
