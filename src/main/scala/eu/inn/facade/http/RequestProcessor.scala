@@ -2,10 +2,10 @@ package eu.inn.facade.http
 
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
-import eu.inn.facade.raml.{Body, RamlConfig}
-import eu.inn.hyperbus.{Hyperbus, IdGenerator, model}
+import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.NoTransportRouteException
+import eu.inn.hyperbus.{Hyperbus, IdGenerator, model}
 import org.slf4j.Logger
 import scaldi.{Injectable, Injector}
 
@@ -62,7 +62,8 @@ trait RequestProcessor extends Injectable {
 
     case noRoute: NoTransportRouteException ⇒
       implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))
-      model.NotFound(ErrorBody("not_found", Some(s"'${originalRequest.uri.pattern.specific}' is not found.")))
+      val uri = spray.http.Uri(originalRequest.uri.pattern.specific)
+      model.NotFound(ErrorBody("not_found", Some(s"'${uri.path}' is not found.")))
 
     case NonFatal(nonFatal) ⇒
       handleInternalError(nonFatal, originalRequest)

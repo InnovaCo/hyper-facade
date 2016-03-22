@@ -11,7 +11,7 @@ import eu.inn.hyperbus.model._
 import org.slf4j.LoggerFactory
 import scaldi.Injector
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class FeedSubscriptionActor(websocketWorker: ActorRef,
                             hyperbus: Hyperbus,
@@ -46,12 +46,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       processResourceState(originalRequest, resourceState, subscriptionSyncTries)
 
     case BecomeReliable(lastRevision: Long) ⇒
-      context.become(subscribedReliable(originalRequest, lastRevision, subscriptionSyncTries) orElse stopSubScriptionOrUpdate)
+      context.become(subscribedReliable(originalRequest, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
       unstashAll()
       log.debug(s"Reliable subscription started for $originalRequest with revision $lastRevision")
 
     case BecomeUnreliable ⇒
-      context.become(subscribedUnreliable(originalRequest) orElse stopSubScriptionOrUpdate)
+      context.become(subscribedUnreliable(originalRequest) orElse stopStartSubscription)
       unstashAll()
       log.debug(s"Unreliable subscription started for $originalRequest")
   }
@@ -69,7 +69,10 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       processUnreliableEvent(request, event)
   }
 
-  def stopSubScriptionOrUpdate: Receive = {
+  def stopStartSubscription: Receive = {
+    case request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _) ⇒
+      startSubscription(request, 0)
+
     case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
       context.stop(self)
   }
@@ -83,7 +86,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       context.stop(self)
     }
     subscriptionManager.off(self)
-    context.become(subscribing(originalRequest, subscriptionSyncTries) orElse stopSubScriptionOrUpdate)
+    context.become(subscribing(originalRequest, subscriptionSyncTries) orElse stopStartSubscription)
 
     implicit val ec = executionContext
     beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
@@ -172,7 +175,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         }
 
         if (revisionId == lastRevisionId + 1) {
-          context.become(subscribedReliable(originalRequest, lastRevisionId + 1, 0) orElse stopSubScriptionOrUpdate)
+          context.become(subscribedReliable(originalRequest, lastRevisionId + 1, 0) orElse stopStartSubscription)
 
           implicit val ec = executionContext
           ramlFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
