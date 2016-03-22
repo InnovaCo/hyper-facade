@@ -8,7 +8,7 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement
-public class forward extends CustomType implements RamlAnnotation {
+public class rewrite extends CustomType implements RamlAnnotation {
 
     private String uri;
 

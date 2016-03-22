@@ -5,7 +5,7 @@ import java.nio.file.Paths
 import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.typesafe.config.ConfigFactory
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.filter.raml.{PrivateFieldsEventFilter, PrivateFieldsResponseFilter, EnrichRequestFilter}
+import eu.inn.facade.filter.raml.{EnrichRequestFilter, PrivateFieldsEventFilter, PrivateFieldsResponseFilter, RewriteRequestFilter}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml.Annotation._
 import eu.inn.facade.raml.DataType._
@@ -123,6 +123,17 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
 
       val parameterPathMatch = ramlConfig.resourceUri("/reliable-feed/someContent/someDetails")
       parameterPathMatch shouldBe Uri("/reliable-feed/{content:*}", Map("content" → "someContent/someDetails"))
+    }
+
+    "filter (annotation) with arguments" in {
+      val rs0 = ramlConfig.resourcesByUri("/test-rewrite/some-service")
+      rs0.filters.requestFilters.head shouldBe a[RewriteRequestFilter]
+
+      val rs1 = ramlConfig.resourcesByUri("/test-rewrite-method/some-service")
+      rs1.filters.requestFilters shouldBe empty
+
+      val rs2 = ramlConfig.resourcesByUri("/test-rewrite-method/some-service").methods(Method(PUT))
+      rs2.filters.requestFilters.head shouldBe a[RewriteRequestFilter]
     }
   }
 }

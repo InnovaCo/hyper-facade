@@ -540,6 +540,18 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         } else fail("Full resource state wasn't sent to the client")
       }
     }
+
+    "http get with rewrite" in {
+      testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
+        Ok(DynamicBody(Text("response"))), { request ⇒
+          request.uri shouldBe Uri("/status/test-service")
+        }
+      ) onSuccess {
+        case subscr ⇒ register(subscr)
+      }
+
+      Source.fromURL("http://localhost:54321/test-rewrite/some-service", "UTF-8").mkString shouldBe """"response""""
+    }
   }
 
   def upgradeHeaders(host: String, port: Int) = List(

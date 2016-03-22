@@ -32,7 +32,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     val traits = extractResourceTraits(resource) // todo: eliminate?
 
     val resourceAnnotations = extractAnnotations(resource)
-    val resourceFilters = createFilters(TargetResource(currentUri), resourceAnnotations)
+    val resourceFilters = createFilters(currentUri, None, resourceAnnotations)
     val resourceMethods = extractResourceMethods(currentUri, resource, resourceFilters)
 
     val resourceConfig = ResourceConfig(traits, resourceAnnotations, resourceMethods, resourceFilters)
@@ -45,8 +45,13 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     }.result()
   }
 
-  private def createFilters(target: RamlTarget, annotations: Seq[Annotation]) = {
+  private def createFilters(uri: String, method: Option[String], annotations: Seq[Annotation]) = {
     annotations.foldLeft(FilterChain.empty) { (filterChain, annotation) ⇒
+      val target = method match {
+        case Some(m) ⇒ TargetMethod(uri, m, annotation)
+        case None ⇒ TargetResource(uri, annotation)
+      }
+
       try {
         val ident = StringIdentifier(annotation.name)
         inj.getBinding(List(ident)) match {
@@ -57,7 +62,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             }
 
           case None ⇒
-            log.warn(s"Annotation ${annotation.name} has no bound filter to create")
+            log.warn(s"Annotation '${annotation.name}' has no bound filter to create")
             filterChain
         }
       }
@@ -80,7 +85,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   def extractResourceMethod(currentUri: String, ramlMethod: methodsAndResources.Method, resource: Resource, parentFilters: SimpleFilterChain): ResourceMethod = {
     val method = Method(ramlMethod.method())
     val methodAnnotations = extractAnnotations(ramlMethod)
-    val methodFilters = parentFilters ++ createFilters(TargetMethod(currentUri, method.name), methodAnnotations)
+    val methodFilters = parentFilters ++ createFilters(currentUri, Some(method.name), methodAnnotations)
 
     val requests = Requests(extractTypeDefinitions(RamlRequestResponseWrapper(ramlMethod), methodFilters))
 
@@ -181,13 +186,15 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   }
 
   private def extractAnnotations(ramlField: RAMLLanguageElement): Seq[Annotation] = {
-    ramlField.annotations.foldLeft(Seq.newBuilder[Annotation]) { (annotations, annotation) ⇒
+    val builder = Seq.newBuilder[Annotation]
+    ramlField.annotations.foreach{ annotation ⇒
       val value = annotation.value() match {
         case x: RamlAnnotation ⇒ Some(x)
         case _ ⇒ None
       }
-      annotations += Annotation(annotation.value.getRAMLValueName, value)
-    }.result()
+      builder += Annotation(annotation.value.getRAMLValueName, value)
+    }
+    builder.result()
   }
 
   private def extractResourceTraits(resource: Resource): Traits = {
