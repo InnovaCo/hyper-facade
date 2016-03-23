@@ -8,10 +8,12 @@ import eu.inn.facade.model._
 import eu.inn.facade.raml.Method
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
+import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, TextMatcher}
+import eu.inn.hyperbus.transport.api.uri._
 import org.slf4j.LoggerFactory
 import scaldi.Injector
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class FeedSubscriptionActor(websocketWorker: ActorRef,
                             hyperbus: Hyperbus,
@@ -25,13 +27,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   val log = LoggerFactory.getLogger(getClass)
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
-  def receive: Receive = {
-    case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
-      context.stop(self)
-
-    case request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _) ⇒
-      startSubscription(request, 0)
-
+  def receive: Receive = stopStartSubscription orElse {
     case request : FacadeRequest ⇒ {
       implicit val ec = executionContext
       processRequestToFacade(request) pipeTo websocketWorker
@@ -46,12 +42,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       processResourceState(originalRequest, resourceState, subscriptionSyncTries)
 
     case BecomeReliable(lastRevision: Long) ⇒
-      context.become(subscribedReliable(originalRequest, lastRevision, subscriptionSyncTries) orElse stopSubScriptionOrUpdate)
+      context.become(subscribedReliable(originalRequest, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
       unstashAll()
       log.debug(s"Reliable subscription started for $originalRequest with revision $lastRevision")
 
     case BecomeUnreliable ⇒
-      context.become(subscribedUnreliable(originalRequest) orElse stopSubScriptionOrUpdate)
+      context.become(subscribedUnreliable(originalRequest) orElse stopStartSubscription)
       unstashAll()
       log.debug(s"Unreliable subscription started for $originalRequest")
   }
@@ -69,7 +65,10 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       processUnreliableEvent(request, event)
   }
 
-  def stopSubScriptionOrUpdate: Receive = {
+  def stopStartSubscription: Receive = {
+    case request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _) ⇒
+      startSubscription(request, 0)
+
     case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
       context.stop(self)
   }
@@ -83,14 +82,15 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       context.stop(self)
     }
     subscriptionManager.off(self)
-    context.become(subscribing(originalRequest, subscriptionSyncTries) orElse stopSubScriptionOrUpdate)
+    context.become(subscribing(originalRequest, subscriptionSyncTries) orElse stopStartSubscription)
 
     implicit val ec = executionContext
     beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
       processRequestWithRaml(originalRequest, r, 0) map { filteredRequest ⇒
         val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
           filteredRequest.headers(Header.MESSAGE_ID)).head
-        val newSubscriptionId = subscriptionManager.subscribe(self, filteredRequest.uri, correlationId)
+        val subscriptionUri = getSubscriptionuri(filteredRequest)
+        val newSubscriptionId = subscriptionManager.subscribe(self, subscriptionUri, correlationId)
         implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
         hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
           handleHyperbusExceptions(originalRequest)
@@ -129,14 +129,19 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     ramlFilterChain.filterResponse(originalRequest, facadeResponse) flatMap { filteredResponse ⇒
       afterFilterChain.filterResponse(originalRequest, filteredResponse) map { finalResponse ⇒
         websocketWorker ! finalResponse
-        finalResponse.headers.get(FacadeHeaders.CLIENT_REVISION) match {
-          // reliable feed
-          case Some(revision :: tail) ⇒
-            BecomeReliable(revision.toLong)
+        if (finalResponse.status > 399) { // failed
+          PoisonPill
+        }
+        else {
+          finalResponse.headers.get(FacadeHeaders.CLIENT_REVISION) match {
+            // reliable feed
+            case Some(revision :: tail) ⇒
+              BecomeReliable(revision.toLong)
 
-          // unreliable feed
-          case _ ⇒
-            BecomeUnreliable
+            // unreliable feed
+            case _ ⇒
+              BecomeUnreliable
+          }
         }
       }
     } recover handleFilterExceptions(originalRequest) { response ⇒
@@ -172,7 +177,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         }
 
         if (revisionId == lastRevisionId + 1) {
-          context.become(subscribedReliable(originalRequest, lastRevisionId + 1, 0) orElse stopSubScriptionOrUpdate)
+          context.become(subscribedReliable(originalRequest, lastRevisionId + 1, 0) orElse stopStartSubscription)
 
           implicit val ec = executionContext
           ramlFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
@@ -195,6 +200,27 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
       case _ ⇒
         log.error(s"Received event: $event without revisionId for reliable feed: $originalRequest")
+    }
+  }
+
+  //  todo: this method is hacky and revault specific, elaborate more (move to revault filter?)
+  //  in this case we allow regular expression in URL
+  def getSubscriptionuri(filteredRequest: FacadeRequest): Uri = {
+    val uri = filteredRequest.uri
+    if (filteredRequest.body.asMap.contains("page.from")) {
+      val newArgs: Map[String, TextMatcher] = UriParser.tokens(uri.pattern.specific).flatMap {
+        case ParameterToken(name, PathMatchType) ⇒
+          Some(name → RegexMatcher(uri.args(name).specific + "/.*"))
+
+        case ParameterToken(name, RegularMatchType) ⇒
+          Some(name → uri.args(name))
+
+        case _ ⇒ None
+      }.toMap
+      Uri(uri.pattern, newArgs)
+    }
+    else {
+      uri
     }
   }
 }

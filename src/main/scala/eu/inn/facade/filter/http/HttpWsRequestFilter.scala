@@ -3,7 +3,6 @@ package eu.inn.facade.filter.http
 import eu.inn.binders.dynamic.Null
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
-import eu.inn.facade.utils.NamingUtils
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.{Header, Method, QueryBody}
 
@@ -15,7 +14,6 @@ class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val httpUri = spray.http.Uri(request.uri.pattern.specific)
-      val newMethod = request.method.toLowerCase
       val newUri = ramlConfig.resourceUri(httpUri.path.toString)
 
       val headersBuilder = Map.newBuilder[String, Seq[String]]
@@ -45,13 +43,13 @@ class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
         headersBuilder += Header.MESSAGE_ID → Seq(IdGenerator.create())
       }
 
-      val newBody = newMethod match {
-        case Method.GET ⇒
-          QueryBody.fromQueryString(httpUri.query.toMap).content
+      val (newBody, newMethod) = request.method.toLowerCase match {
+        case Method.GET | ClientSpecificMethod.SUBSCRIBE ⇒
+          (QueryBody.fromQueryString(httpUri.query.toMap).content, Method.GET)
         case Method.DELETE ⇒
-          Null
-        case _ ⇒
-          request.body
+          (Null, Method.DELETE)
+        case other ⇒
+          (request.body, other)
       }
 
       FacadeRequest(newUri, newMethod, headersBuilder.result(), newBody)

@@ -1,8 +1,8 @@
 package eu.inn.facade.filter.http
 
 import eu.inn.facade.model._
-import eu.inn.facade.utils.NamingUtils
 import eu.inn.hyperbus.model.Header
+import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -24,6 +24,7 @@ class WsEventFilter extends EventFilter {
       }
 
       request.copy(
+        uri = Uri(request.uri.formatted),
         headers = headersBuilder.result()
       )
     }
