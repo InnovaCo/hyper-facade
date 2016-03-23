@@ -3,12 +3,11 @@ package eu.inn.facade.perf
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import eu.inn.binders.dynamic.{Null, Obj}
+import eu.inn.binders.dynamic.Null
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.http.{Connect, Disconnect, WsTestClient}
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
-import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest, Header}
-import eu.inn.hyperbus.serialization.RequestHeader
+import eu.inn.hyperbus.model.Header
 import eu.inn.hyperbus.transport.api.uri.Uri
 import spray.can.Http
 import spray.http.{HttpHeaders, HttpMethods, HttpRequest}
