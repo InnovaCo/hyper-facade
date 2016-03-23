@@ -15,6 +15,12 @@ class UriMatcherTest extends FreeSpec with Matchers {
 
       val parameterShortPathMatch = UriMatcher.matchUri("/revault/content/{path:*}", Uri("/revault/content/abc"))
       parameterShortPathMatch shouldBe Some(Uri("/revault/content/{path:*}", Map("path" → "abc")))
+
+      val doubleSlashRequest = UriMatcher.matchUri("/revault/content/{path:*}", Uri("/revault//content/abc"))
+      doubleSlashRequest shouldBe Some(Uri("/revault/content/{path:*}", Map("path" → "abc")))
+
+      val tripleSlashRequest = UriMatcher.matchUri("/revault/content/{path:*}", Uri("/revault///content/abc"))
+      tripleSlashRequest shouldBe Some(Uri("/revault/content/{path:*}", Map("path" → "abc")))
     }
   }
 }
