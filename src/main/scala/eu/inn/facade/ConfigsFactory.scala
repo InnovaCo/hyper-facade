@@ -12,12 +12,12 @@ import scala.collection.JavaConversions._
 class ConfigsFactory {
 
   /**
-   * Parse and merge local configs specified in system property -Dconfig.localfile
-   * You can specify multiple files, separated by semicolon
-   *
-   * For example:
-   * -Dconfig.localfile=/etc/global-inn.conf;/home/app/my-local-priority.conf
-   */
+    * Parse and merge local configs specified in system property -Dconfig.localfile
+    * You can specify multiple files, separated by semicolon
+    *
+    * For example:
+    * -Dconfig.localfile=/etc/global-inn.conf;/home/app/my-local-priority.conf
+    */
   def config: Config = {
     val conf = System.getProperty("config.localfile", "")
       .split(';')
@@ -33,8 +33,8 @@ class ConfigsFactory {
       .resolve()
 
     /**
-     * Reconfigure log level
-     */
+      * Reconfigure log level
+      */
     if (conf.hasPath("inn.util.loggers")) {
       conf.getObject("inn.util.loggers").toMap foreach { case (name, obj) ⇒
         val level = obj.atPath("/").getString("/")
@@ -56,19 +56,15 @@ class ConfigsFactory {
   }
 
   private def ramlFilePath(config: Config): String = {
-    val absoluteFilePath = System.getProperty(ConfigsFactory.RAML_CONFIG_RELATIVE_PATH)
-    if (absoluteFilePath != null) absoluteFilePath
-    else {
-      val filePath = config.getString("inn.facade.raml.file")
+    val filePath = config.getString("inn.facade.raml.file")
 
-      // it means that config contains absolute file path
-      if (filePath.startsWith("/")) filePath
-      // otherwise treat it as relative file path
-      else Thread.currentThread().getContextClassLoader.getResource(filePath).getFile
-    }
+    // it means that config contains absolute file path
+    if (filePath.startsWith("/")) filePath
+    // otherwise treat it as relative file path
+    else Thread.currentThread().getContextClassLoader.getResource(filePath).getFile
   }
 }
 
 object ConfigsFactory {
-  val RAML_CONFIG_RELATIVE_PATH = "raml.config.relative-path"
+  val RAML_CONFIG_FILE_PATH = "raml.config.file-path"
 }
