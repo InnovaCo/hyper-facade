@@ -99,9 +99,8 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
   }
 
   def toHttpResponse: HttpResponse = {
-    val statusCode = StatusCode.int2StatusCode(status)
     val jsonBody = body.toJson
-    HttpResponse(statusCode, HttpEntity(contentTypeToSpray(clientContentType), jsonBody), headers.flatMap{ case (name, values) ⇒
+    HttpResponse(StatusCode.int2StatusCode(status), HttpEntity(contentTypeToSpray(clientContentType), jsonBody), headers.flatMap{ case (name, values) ⇒
       values.map { value ⇒
         RawHeader(name, value)
       }
@@ -146,7 +145,7 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
 
 object FacadeResponse {
   def apply(response: Response[DynamicBody]): FacadeResponse = {
-    FacadeResponse(response.status, response.headers, response.body.content)
+    FacadeResponse(response.statusCode, response.headers, response.body.content)
   }
   def apply(frame: Frame): FacadeResponse = {
     frame.payload.utf8String.parseJson[FacadeResponse]
