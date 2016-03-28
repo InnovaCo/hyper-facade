@@ -74,7 +74,7 @@ object FacadeConfig {
   val HYPERBUS_GROUP = ROOT + "hyperbus.group-name"
   val GRAPHITE = ROOT + "graphite"
   val FILTERS = ROOT + "filters"
-  val REST = ROOT + "rest"
+  val HTTP = ROOT + "http-transport"
   val SHUTDOWN_TIMEOUT = ROOT + "shutdown-timeout"
   val MAX_RESUBSCRIPTIONS = ROOT + "max-resubscriptions"
 }

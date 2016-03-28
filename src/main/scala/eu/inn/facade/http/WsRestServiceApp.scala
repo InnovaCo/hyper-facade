@@ -34,7 +34,7 @@ class WsRestServiceApp(implicit inj: Injector)
                            settings: Option[ServerSettings])(route: ⇒ Route)(implicit system: ActorSystem, sslEngineProvider: ServerSSLEngineProvider,
                                                                              bindingTimeout: Timeout): Future[Http.Bound] = {
 
-    val maxConnectionCount = config.getInt(s"${FacadeConfig.REST}.max-connections")
+    val maxConnectionCount = config.getInt(s"${FacadeConfig.HTTP}.max-connections")
 
     val serviceActor = system.actorOf(
       props = Props {

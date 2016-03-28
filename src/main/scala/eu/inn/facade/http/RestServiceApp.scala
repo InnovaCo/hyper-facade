@@ -35,7 +35,7 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
 
   val config = inject [Config]
-  val restConfig = config.getConfig(FacadeConfig.REST)
+  val restConfig = config.getConfig(FacadeConfig.HTTP)
   val handleErrorsDirectives = inject [HandleErrorsDirectives]
   val shutdownTimeout = config.getFiniteDuration(FacadeConfig.SHUTDOWN_TIMEOUT)
 

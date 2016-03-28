@@ -29,7 +29,7 @@ class PrivateFilterFactory(config: Config) extends RamlFilterFactory {
       )
 
       case unknownTarget ⇒
-        log.warn(s"Empty filter chain for target $unknownTarget will be created")
+        log.warn(s"Annotation (private) is not supported for target $unknownTarget. Empty filter chain will be created")
         FilterChain.empty
     }
   }
