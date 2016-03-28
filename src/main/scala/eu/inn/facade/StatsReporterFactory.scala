@@ -16,7 +16,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
 class StatsReporterFactory(val config: Config) {
-  val conf = config.getConfig("inn.util.graphite")
+  val conf = config.getConfig(FacadeConfig.GRAPHITE)
 
   def createStats(prefix: String*): StatsReporter#StatsWrapper =
     startReporter.createStats(prefix: _*)

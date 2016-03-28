@@ -23,11 +23,9 @@ class HyperbusFactory(val config: Config) {
 }
 
 object HyperbusFactory {
-  val HYPERBUS_GROUP_NAME = "hyperbus.facade.group-name"
-
   def defaultHyperbusGroup(config: Config) = {
-    if (config.hasPath(HyperbusFactory.HYPERBUS_GROUP_NAME))
-      Some(config.getString(HyperbusFactory.HYPERBUS_GROUP_NAME))
+    if (config.hasPath(FacadeConfig.HYPERBUS_GROUP))
+      Some(config.getString(FacadeConfig.HYPERBUS_GROUP))
     else None
   }
 }

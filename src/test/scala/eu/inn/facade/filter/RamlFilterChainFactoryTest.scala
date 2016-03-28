@@ -1,8 +1,8 @@
 package eu.inn.facade.filter
 
 import eu.inn.binders.dynamic.Null
-import eu.inn.facade.filter.chain.{RamlFilterChain, FilterChain}
-import eu.inn.facade.filter.raml.{EnrichRequestFilter, PrivateResourceFilter, PrivateFieldsFilter}
+import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain}
+import eu.inn.facade.filter.raml.{EnrichRequestFilter, PrivateFilter, RequestPrivateFilter, ResponsePrivateFilter}
 import eu.inn.facade.model._
 import eu.inn.facade.modules.{ConfigModule, FiltersModule}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -24,7 +24,7 @@ class RamlFilterChainFactoryTest extends FreeSpec with Matchers with Injectable 
       val context = filterChain.createRequestFilterContext(request)
       val filters = filterChain.findRequestFilters(context, request)
       filters.length should equal(1)
-      filters.head shouldBe a[PrivateResourceFilter]
+      filters.head shouldBe a[RequestPrivateFilter]
     }
 
     "annotation based filter chain" in {
@@ -41,7 +41,7 @@ class RamlFilterChainFactoryTest extends FreeSpec with Matchers with Injectable 
       val context = filterChain.createResponseFilterContext(request, response)
       val filters = filterChain.findResponseFilters(context, response)
 
-      filters.head shouldBe a[PrivateFieldsFilter]
+      filters.head shouldBe a[ResponsePrivateFilter]
       filters.tail.head shouldBe a[NoOpFilter]
     }
   }

@@ -7,6 +7,7 @@ import akka.event.Logging._
 import akka.util.Timeout
 import com.typesafe.config.Config
 import eu.inn.config.ConfigExtenders._
+import eu.inn.facade.FacadeConfig
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.servicecontrol.api.Service
 import org.slf4j.LoggerFactory
@@ -34,15 +35,15 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
 
   val config = inject [Config]
-  val restConfig = config.getConfig("inn.util.http.rest-service")
+  val restConfig = config.getConfig(FacadeConfig.HTTP)
   val handleErrorsDirectives = inject [HandleErrorsDirectives]
-  val shutdownTimeout = config.getFiniteDuration("inn.facade.shutdown-timeout")
+  val shutdownTimeout = config.getFiniteDuration(FacadeConfig.SHUTDOWN_TIMEOUT)
 
   val hyperBus = inject [Hyperbus]  // it's time to initialize hyperbus
   log.info("hyperbus is starting...: {}", hyperBus)
 
-  val interface = config.getString("inn.facade.rest-api.host")
-  val port = config.getInt("inn.facade.rest-api.port")
+  val interface = restConfig.getString("host")
+  val port = restConfig.getInt("port")
 
   def start(initRoutes: ⇒ Route) {
     startServer(interface, port, settings = Some(ServerSettings(rootConf))) {

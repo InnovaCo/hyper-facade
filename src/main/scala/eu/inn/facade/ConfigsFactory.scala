@@ -35,8 +35,8 @@ class ConfigsFactory {
     /**
       * Reconfigure log level
       */
-    if (conf.hasPath("inn.util.loggers")) {
-      conf.getObject("inn.util.loggers").toMap foreach { case (name, obj) ⇒
+    if (conf.hasPath(FacadeConfig.LOGGERS)) {
+      conf.getObject(FacadeConfig.LOGGERS).toMap foreach { case (name, obj) ⇒
         val level = obj.atPath("/").getString("/")
 
         LoggerFactory.getLogger(name) match {
@@ -56,7 +56,7 @@ class ConfigsFactory {
   }
 
   private def ramlFilePath(config: Config): String = {
-    val filePath = config.getString("inn.facade.raml.file")
+    val filePath = config.getString(FacadeConfig.RAML_FILE)
 
     // it means that config contains absolute file path
     if (filePath.startsWith("/")) filePath
@@ -65,6 +65,16 @@ class ConfigsFactory {
   }
 }
 
-object ConfigsFactory {
-  val RAML_CONFIG_FILE_PATH = "raml.config.file-path"
+object FacadeConfig {
+  val ROOT = "hyperbus-facade."
+  val PRIVATE_ADDRESSES = ROOT + "private.addresses"
+  val PRIVATE_NETWORKS = ROOT + "private.networks"
+  val LOGGERS = ROOT + "loggers"
+  val RAML_FILE = ROOT + "raml-file"
+  val HYPERBUS_GROUP = ROOT + "hyperbus.group-name"
+  val GRAPHITE = ROOT + "graphite"
+  val FILTERS = ROOT + "filters"
+  val HTTP = ROOT + "http-transport"
+  val SHUTDOWN_TIMEOUT = ROOT + "shutdown-timeout"
+  val MAX_RESUBSCRIPTIONS = ROOT + "max-resubscriptions"
 }
