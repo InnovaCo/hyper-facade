@@ -5,7 +5,7 @@ import java.nio.file.Paths
 import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.typesafe.config.ConfigFactory
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.filter.raml.{EnrichRequestFilter, PrivateFieldsEventFilter, PrivateFieldsResponseFilter, RewriteRequestFilter}
+import eu.inn.facade.filter.raml.{EnrichRequestFilter, PrivateFilter, RewriteRequestFilter}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml.Annotation._
 import eu.inn.facade.raml.DataType._
@@ -66,8 +66,8 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
           Seq()))
       val dsUsers = ramlConfig.resourcesByUri("/users").methods(Method(GET)).responses(200).dataStructures(None)
       dsUsers.copy(filters = FilterChain.empty) shouldBe DataStructure(usersHeaders, Some(usersBody), FilterChain.empty)
-      dsUsers.filters.responseFilters.head shouldBe a[PrivateFieldsResponseFilter]
-      dsUsers.filters.eventFilters.head shouldBe a[PrivateFieldsEventFilter]
+      dsUsers.filters.responseFilters.head shouldBe a[PrivateFilter]
+      dsUsers.filters.eventFilters.head shouldBe a[PrivateFilter]
 
       val testServiceHeaders = Seq(Header("content-type"))
       val testServiceBody = Body(

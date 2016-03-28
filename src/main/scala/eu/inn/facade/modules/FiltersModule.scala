@@ -1,9 +1,10 @@
 package eu.inn.facade.modules
 
+import com.typesafe.config.Config
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.http.{HttpWsRequestFilter, HttpWsResponseFilter, WsEventFilter}
-import eu.inn.facade.filter.raml.{EnrichmentFilterFactory, PrivateFieldsFilterFactory, PrivateResourceFilterFactory, RewriteFilterFactory}
+import eu.inn.facade.filter.raml._
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import scaldi.Module
@@ -13,13 +14,13 @@ import scala.collection.JavaConversions._
 
 class FiltersModule extends Module {
 
-  bind [Seq[RamlFilterFactory]]   identifiedBy "privateResource"                      to Seq(new PrivateResourceFilterFactory)
+  bind [Seq[RamlFilterFactory]]   identifiedBy "private"                              to Seq(new PrivateFilterFactory)
   bind [Seq[RamlFilterFactory]]   identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilterFactory)
-  bind [Seq[RamlFilterFactory]]   identifiedBy  "privateField"                        to Seq(new PrivateFieldsFilterFactory)
   bind [Seq[RamlFilterFactory]]   identifiedBy  "rewrite"                             to Seq(new RewriteFilterFactory)
 
   bind [FilterChain]              identifiedBy "beforeFilterChain"                    to new SimpleFilterChain(
-    requestFilters            = Seq(new HttpWsRequestFilter(inject[RamlConfig]))
+    requestFilters            = Seq(new HttpWsRequestFilter(inject[RamlConfig]),
+                                    new PrivateAddressFilter(inject[Config]))
   )
   bind [FilterChain]              identifiedBy "afterFilterChain"                     to new SimpleFilterChain(
     responseFilters           = Seq(new HttpWsResponseFilter),
