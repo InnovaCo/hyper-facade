@@ -5,6 +5,8 @@ import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.{Header, Method, QueryBody}
+import eu.inn.hyperbus.transport.api.matchers.Specific
+import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -14,7 +16,7 @@ class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val httpUri = spray.http.Uri(request.uri.pattern.specific)
-      val newUri = ramlConfig.resourceUri(httpUri.path.toString)
+      val path = httpUri.path.toString
 
       val headersBuilder = Map.newBuilder[String, Seq[String]]
       var messageIdFound = false
@@ -52,7 +54,7 @@ class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
           (request.body, other)
       }
 
-      FacadeRequest(newUri, newMethod, headersBuilder.result(), newBody)
+      FacadeRequest(Uri(Specific(path)), newMethod, headersBuilder.result(), newBody)
     }
   }
 }

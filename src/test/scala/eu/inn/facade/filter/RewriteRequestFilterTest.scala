@@ -1,15 +1,15 @@
 package eu.inn.facade.filter
 
 import eu.inn.binders.dynamic.{Null, ObjV, Text}
-import eu.inn.facade.filter.raml.{EnrichRequestFilter, RewriteRequestFilter}
+import eu.inn.facade.filter.raml.RewriteRequestFilter
 import eu.inn.facade.model.{FacadeRequest, FilterRestartException, RequestFilterContext}
+import eu.inn.facade.modules.{ConfigModule, FiltersModule}
+import eu.inn.facade.raml._
 import eu.inn.facade.raml.annotationtypes.rewrite
-import eu.inn.facade.raml.{Annotation, DataType, Field, Method}
 import eu.inn.hyperbus.transport.api.uri.Uri
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{FreeSpec, Matchers}
+import scaldi.{Injectable, Module}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -19,11 +19,11 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
   "RewriteFilter" - {
     "simple rewrite" in {
       val args = new rewrite()
-      args.setUri("/new-resource")
+      args.setUri("/rewritten/some-service")
       val filter = new RewriteRequestFilter(args)
 
       val request = FacadeRequest(
-        Uri("/resource"),
+        Uri("/test-rewrite/some-service"),
         Method.GET,
         Map.empty,
         ObjV("field" → "value")
@@ -36,7 +36,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       }
 
       val expectedRequest = FacadeRequest(
-        Uri("/new-resource"),
+        Uri("/rewritten/some-service"),
         Method.GET,
         Map.empty,
         Map("field" → Text("value")))
@@ -46,11 +46,11 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
 
     "rewrite with arguments" in {
       val args = new rewrite()
-      args.setUri("/users/{userId}/new-resource")
+      args.setUri("/test-rewrite/some-service/{serviceId}")
       val filter = new RewriteRequestFilter(args)
 
       val request = FacadeRequest(
-        Uri("/resource/{userId}", Map("userId" → "100500")),
+        Uri("/rewritten/some-service/{serviceId}", Map("serviceId" → "100500")),
         Method.GET,
         Map.empty,
         ObjV("field" → "value")
@@ -63,7 +63,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       }
 
       val expectedRequest = FacadeRequest(
-        Uri("/users/{userId}/new-resource", Map("userId" → "100500")),
+        Uri("/test-rewrite/some-service/100500"),
         Method.GET,
         Map.empty,
         ObjV("field" → "value")

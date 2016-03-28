@@ -2,7 +2,7 @@ package eu.inn.facade.filter.raml
 
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model.{FacadeResponse, _}
-import eu.inn.facade.raml.Annotation
+import eu.inn.facade.raml.{Annotation, RamlConfig}
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.hyperbus.model.{ErrorBody, NotFound}
 import eu.inn.hyperbus.transport.api.matchers.Specific
@@ -46,7 +46,7 @@ class RewriteRequestFilter(args: rewrite) extends RequestFilter {
     }
 
     if (failures.isEmpty) {
-      val newUri = Uri(Specific(args.getUri), newArgs.toMap)
+      val newUri = Uri(Uri(Specific(args.getUri), newArgs.toMap).formatted)
       val rewrittenRequest = request.copy(
         uri = newUri
       )
