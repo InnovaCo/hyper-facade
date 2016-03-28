@@ -75,7 +75,7 @@ object WsLoadGenerator extends App {
   def startLoad(clients: Seq[ActorRef]): Unit = {
     clients foreach { client ⇒
       client ! FacadeRequest(Uri(uriPattern), "subscribe",
-        Map(Header.CONTENT_TYPE → Seq("application/vnd+test-1.json"),
+        Map(Header.CONTENT_TYPE → Seq("application/vnd.test-1+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq(client.path.name),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq(client.path.name)),
         Null

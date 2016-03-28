@@ -110,9 +110,9 @@ traits:
 /unreliable-feed/{content}:
   post:
     body:
-      application/vnd+app-server-status.json:
+      application/vnd.app-server-status+json:
         type: ResourceState
-      application/vnd+app-server-status-update.json:
+      application/vnd.app-server-status-update+json:
         type: ResourceUpdate
 
 /reliable-feed/{content:*}:
@@ -120,9 +120,9 @@ traits:
     body:
       none:
         type: TestRequest
-      application/vnd+app-server-status.json:
+      application/vnd.app-server-status+json:
         type: ReliableResourceState
-      application/vnd+app-server-status-update.json:
+      application/vnd.app-server-status-update+json:
         type: ReliableResourceUpdate
 
 /test-service/reliable:

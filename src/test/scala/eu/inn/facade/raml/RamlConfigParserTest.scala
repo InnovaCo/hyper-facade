@@ -104,8 +104,8 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
               Field("clientIP", DataType("string", Seq(), Seq(Annotation(CLIENT_IP)))),
               Field("clientLanguage", DataType("string", Seq(), Seq(Annotation(CLIENT_LANGUAGE))))),
         Seq()))
-      val resourceStateContentType = Some("application/vnd+app-server-status.json")
-      val resourceUpdateContentType = Some("application/vnd+app-server-status-update.json")
+      val resourceStateContentType = Some("application/vnd.app-server-status+json")
+      val resourceUpdateContentType = Some("application/vnd.app-server-status-update+json")
 
       val dsState = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.dataStructures(resourceStateContentType.map(ContentType))
       dsState shouldBe DataStructure(feedHeaders, Some(reliableResourceStateBody), FilterChain.empty)
