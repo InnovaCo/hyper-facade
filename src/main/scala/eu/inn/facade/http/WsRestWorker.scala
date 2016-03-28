@@ -83,7 +83,7 @@ class WsRestWorker(val serverConnection: ActorRef,
         else {
           val requestWithClientIp = facadeRequest.copy(
             // todo: support Forwarded by RFC 7239
-            headers = facadeRequest.headers + ("X-Forwarded-For" → Seq(remoteAddress))
+            headers = facadeRequest.headers + (FacadeHeaders.CLIENT_ADDRESS → Seq(remoteAddress))
           )
           processRequest(requestWithClientIp)
         }

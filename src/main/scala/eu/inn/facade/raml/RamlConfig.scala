@@ -107,7 +107,7 @@ case class Field(name: String, dataType: DataType)
 case class Annotation(name: String, value: Option[RamlAnnotation])
 
 object Annotation {
-  val PRIVATE = "privateField"
+  val PRIVATE = "private"
   val CLIENT_LANGUAGE = "x-client-language"
   val CLIENT_IP = "x-client-ip"
 

@@ -7,6 +7,7 @@ object FacadeHeaders {
   val CLIENT_REVISION         = "Hyperbus-Revision"
   val CLIENT_MESSAGE_ID       = "Hyperbus-Message-Id"
   val CLIENT_CORRELATION_ID   = "Hyperbus-Correlation-Id"
+  val CLIENT_ADDRESS          = "X-Forwarded-For"
 
   val CERTAIN_CONTENT_TYPE_START  = "application/vnd."
   val CERTAIN_CONTENT_TYPE_END    = "+json"

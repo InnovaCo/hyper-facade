@@ -14,13 +14,12 @@ import scala.collection.JavaConversions._
 
 class FiltersModule extends Module {
 
-  bind [Seq[RamlFilterFactory]]   identifiedBy "private"                              to Seq(new PrivateFilterFactory)
+  bind [Seq[RamlFilterFactory]]   identifiedBy "private"                              to Seq(new PrivateFilterFactory(inject[Config]))
   bind [Seq[RamlFilterFactory]]   identifiedBy "x-client-ip" and "x-client-language"  to Seq(new EnrichmentFilterFactory)
   bind [Seq[RamlFilterFactory]]   identifiedBy  "rewrite"                             to Seq(new RewriteFilterFactory)
 
   bind [FilterChain]              identifiedBy "beforeFilterChain"                    to new SimpleFilterChain(
-    requestFilters            = Seq(new HttpWsRequestFilter(inject[RamlConfig]),
-                                    new PrivateAddressFilter(inject[Config]))
+    requestFilters            = Seq(new HttpWsRequestFilter(inject[RamlConfig]))
   )
   bind [FilterChain]              identifiedBy "afterFilterChain"                     to new SimpleFilterChain(
     responseFilters           = Seq(new HttpWsResponseFilter),
