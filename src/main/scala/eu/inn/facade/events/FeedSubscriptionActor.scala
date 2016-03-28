@@ -3,6 +3,7 @@ package eu.inn.facade.events
 import akka.actor._
 import akka.pattern.pipe
 import com.typesafe.config.Config
+import eu.inn.facade.FacadeConfig
 import eu.inn.facade.http.RequestProcessor
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Method
@@ -23,7 +24,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   with Stash
   with RequestProcessor {
 
-  val maxResubscriptionsCount = inject[Config].getInt("inn.facade.maxResubscriptionsCount")
+  val maxResubscriptionsCount = inject[Config].getInt(FacadeConfig.MAX_RESUBSCRIPTIONS)
   val log = LoggerFactory.getLogger(getClass)
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
@@ -89,7 +90,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       processRequestWithRaml(originalRequest, r, 0) map { filteredRequest ⇒
         val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
           filteredRequest.headers(Header.MESSAGE_ID)).head
-        val subscriptionUri = getSubscriptionuri(filteredRequest)
+        val subscriptionUri = getSubscriptionUri(filteredRequest)
         val newSubscriptionId = subscriptionManager.subscribe(self, subscriptionUri, correlationId)
         implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
         hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
@@ -205,7 +206,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
   //  todo: this method is hacky and revault specific, elaborate more (move to revault filter?)
   //  in this case we allow regular expression in URL
-  def getSubscriptionuri(filteredRequest: FacadeRequest): Uri = {
+  def getSubscriptionUri(filteredRequest: FacadeRequest): Uri = {
     val uri = filteredRequest.uri
     if (filteredRequest.body.asMap.contains("page.from")) {
       val newArgs: Map[String, TextMatcher] = UriParser.tokens(uri.pattern.specific).flatMap {

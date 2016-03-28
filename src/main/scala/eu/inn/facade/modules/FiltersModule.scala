@@ -1,7 +1,7 @@
 package eu.inn.facade.modules
 
 import com.typesafe.config.Config
-import eu.inn.facade.ConfigsFactory
+import eu.inn.facade.{ConfigsFactory, FacadeConfig}
 import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.http.{HttpWsRequestFilter, HttpWsResponseFilter, WsEventFilter}
 import eu.inn.facade.filter.raml._
@@ -31,8 +31,8 @@ class FiltersModule extends Module {
 
   def initOuterBindings(): Unit = {
     val config = new ConfigsFactory().config
-    if (config.hasPath("inn.facade.filters")) {
-      val declaredRamlFilters = config.getConfig("inn.facade.filters")
+    if (config.hasPath(FacadeConfig.FILTERS)) {
+      val declaredRamlFilters = config.getConfig(FacadeConfig.FILTERS)
       declaredRamlFilters.entrySet.foreach { filterConfigEntry ⇒
         val filterName = filterConfigEntry.getKey
         val filterClass: String = filterConfigEntry.getValue.unwrapped.asInstanceOf[String]

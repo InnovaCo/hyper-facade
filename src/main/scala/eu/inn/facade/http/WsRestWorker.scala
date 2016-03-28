@@ -52,7 +52,7 @@ class WsRestWorker(val serverConnection: ActorRef,
           httpRequest = Some(wsContext.request)
 
           // todo: support Forwarded & by RFC 7239
-          remoteAddress = wsContext.request.headers.find(_.is("X-Forwarded-For")).map(_.value).getOrElse(clientAddress)
+          remoteAddress = wsContext.request.headers.find(_.is(FacadeHeaders.CLIENT_IP)).map(_.value).getOrElse(clientAddress)
         case _ ⇒
       }
       handshaking(handshakeRequest)
@@ -83,7 +83,7 @@ class WsRestWorker(val serverConnection: ActorRef,
         else {
           val requestWithClientIp = facadeRequest.copy(
             // todo: support Forwarded by RFC 7239
-            headers = facadeRequest.headers + (FacadeHeaders.CLIENT_ADDRESS → Seq(remoteAddress))
+            headers = facadeRequest.headers + (FacadeHeaders.CLIENT_IP → Seq(remoteAddress))
           )
           processRequest(requestWithClientIp)
         }

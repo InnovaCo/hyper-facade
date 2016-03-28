@@ -51,7 +51,7 @@ class EnrichRequestFilter(val targetFields: Seq[Field]) extends RequestFilter {
 
 object EnrichRequestFilter {
   val annotationsToHeaders = Map(
-    Annotation.CLIENT_LANGUAGE → "Accept-Language",
-    Annotation.CLIENT_IP → "X-Forwarded-For"
+    Annotation.CLIENT_LANGUAGE → FacadeHeaders.CLIENT_LANGUAGE,
+    Annotation.CLIENT_IP → FacadeHeaders.CLIENT_IP
   )
 }

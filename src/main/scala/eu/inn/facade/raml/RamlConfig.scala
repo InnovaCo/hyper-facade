@@ -65,13 +65,6 @@ case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Se
 
 case class Trait(name: String, parameters: Map[String, String])
 object Trait {
-  val STREAMED_RELIABLE = "streamed-reliable"
-  val STREAMED_UNRELIABLE = "streamed-unreliable"
-  val PLAIN_RESOURCE = "plain-resource"
-
-  val EVENT_FEED_URI = "eventFeedUri"
-  val RESOURCE_STATE_URI = "resourceStateUri"
-
   def apply(name: String): Trait = {
     Trait(name, Map())
   }
