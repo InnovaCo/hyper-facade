@@ -84,7 +84,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
     }
 
     "http get. Error response" in {
-      testService.onCommand(RequestMatcher(Some(Uri("/failedResource")), Map(Header.METHOD → Specific(Method.GET))),
+      testService.onCommand(RequestMatcher(Some(Uri("/failed-resource")), Map(Header.METHOD → Specific(Method.GET))),
         ServiceUnavailable(ErrorBody("service_is_not_available", Some("No connection to DB")))) onSuccess {
         case subscr ⇒ register(subscr)
       }
@@ -98,7 +98,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         response.status.intValue shouldBe 404
       }
 
-      val uri503 = "http://localhost:54321/failedResource"
+      val uri503 = "http://localhost:54321/failed-resource"
       val responseFuture503 = pipeline(Get(http.Uri(uri503)))
       whenReady(responseFuture503, Timeout(Span(5, Seconds))) { response ⇒
         response.entity.asString should include (""""code":"service_is_not_available"""")

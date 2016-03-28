@@ -46,10 +46,12 @@ trait RequestProcessor extends Injectable {
       )
     }
     else {
-      ramlFilterChain.filterRequest(originalRequest, facadeRequest) recoverWith {
+      val ramlParsedUri = ramlConfig.resourceUri(facadeRequest.uri.pattern.specific)
+      val facadeRequestWithRamlUri = facadeRequest.copy(uri = ramlParsedUri)
+      ramlFilterChain.filterRequest(originalRequest, facadeRequestWithRamlUri) recoverWith {
         case e : FilterRestartException ⇒
           if (log.isDebugEnabled) {
-            log.debug(s"Request $originalRequest is restarted from $facadeRequest to ${e.request}")
+            log.debug(s"Request $originalRequest is restarted from $facadeRequestWithRamlUri to ${e.request}")
           }
           processRequestWithRaml(originalRequest, e.request, tryNum + 1)
       }
