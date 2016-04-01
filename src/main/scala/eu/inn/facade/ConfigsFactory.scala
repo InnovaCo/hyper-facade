@@ -1,29 +1,44 @@
 package eu.inn.facade
 
-import ch.qos.logback.classic.{Level, Logger}
-import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
-import com.typesafe.config.{Config, ConfigFactory}
-import eu.inn.facade.raml.{RamlConfig, RamlConfigParser}
-import org.slf4j.LoggerFactory
-import scaldi.Injector
+import java.io.{File, IOException}
 
-import scala.collection.JavaConversions._
+import com.mulesoft.raml.webpack.holders.JSConsole
+import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
+import com.typesafe.config.Config
+import eu.inn.facade.raml.{RamlConfig, RamlConfigParser}
+import eu.inn.facade.utils.raml.JsToLogConsole
+import scaldi.Injector
 
 class ConfigsFactory {
 
   def ramlConfig(appConfig: Config)(implicit inj: Injector): RamlConfig = {
-    val factory = new JavaNodeFactory
+    val ramlFactory = new JavaNodeFactory()
+    val existingConsole = ramlFactory.getBindings.get("console").asInstanceOf[JSConsole]
+    ramlFactory.getBindings.put("console", new JsToLogConsole(existingConsole.engine))
+
     val ramlConfigPath = ramlFilePath(appConfig)
-    RamlConfigParser(factory.createApi(ramlConfigPath)).parseRaml
+    val apiFile = new File(ramlConfigPath)
+    if (!apiFile.exists()) {
+      throw new IOException(s"File ${apiFile.getAbsolutePath} doesn't exists")
+    }
+    val api = ramlFactory.createApi(apiFile.getAbsolutePath)
+    RamlConfigParser(api).parseRaml
   }
 
   private def ramlFilePath(config: Config): String = {
     val filePath = config.getString(FacadeConfig.RAML_FILE)
 
     // it means that config contains absolute file path
-    if (filePath.startsWith("/")) filePath
+    if (filePath.startsWith("/"))
+      filePath
     // otherwise treat it as relative file path
-    else Thread.currentThread().getContextClassLoader.getResource(filePath).getFile
+    else {
+      val r = Thread.currentThread().getContextClassLoader.getResource(filePath)
+      if (r != null)
+        r.getFile
+      else
+        filePath
+    }
   }
 }
 

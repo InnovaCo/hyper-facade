@@ -58,8 +58,8 @@ object PrivateFilter {
 
   def isAllowedAddress(requestHeaders: Map[String, Seq[String]], privateAddresses: PrivateAddresses): Boolean = {
     requestHeaders.get(FacadeHeaders.CLIENT_IP) match {
-      case None ⇒ false
       case Some(ip :: tail) ⇒ privateAddresses.isAllowedAddress(ip)
+      case _ ⇒ false
     }
   }
 }
