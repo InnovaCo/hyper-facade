@@ -85,7 +85,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "http get. Error response" in {
       testService.onCommand(RequestMatcher(Some(Uri("/failed-resource")), Map(Header.METHOD → Specific(Method.GET))),
-        ServiceUnavailable(ErrorBody("service-is-not_available", Some("No connection to DB")))) onSuccess {
+        ServiceUnavailable(ErrorBody("service-is-not-available", Some("No connection to DB")))) onSuccess {
         case subscr ⇒ register(subscr)
       }
 
