@@ -94,14 +94,14 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       val uri404 = "http://localhost:54321/test-service/reliable"
       val responseFuture404 = pipeline(Get(http.Uri(uri404)))
       whenReady(responseFuture404, Timeout(Span(5, Seconds))) { response ⇒
-        response.entity.asString should include (""""code":"not_found"""")
+        response.entity.asString should include (""""code":"not-found"""")
         response.status.intValue shouldBe 404
       }
 
       val uri503 = "http://localhost:54321/failed-resource"
       val responseFuture503 = pipeline(Get(http.Uri(uri503)))
       whenReady(responseFuture503, Timeout(Span(5, Seconds))) { response ⇒
-        response.entity.asString should include (""""code":"service_is_not_available"""")
+        response.entity.asString should include (""""code":"service-is-not-available"""")
         response.status.intValue shouldBe 503
 
         subscriptions.foreach(hyperbus.off)
@@ -253,7 +253,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
           resourceState should startWith ("""{"status":500,"headers":""")
-          resourceState should include (""""code":"unhandled_exception"""")
+          resourceState should include (""""code":"unhandled-exception"""")
         } else fail("Full resource state wasn't sent to the client")
       }
     }
