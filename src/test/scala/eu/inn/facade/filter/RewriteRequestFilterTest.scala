@@ -1,6 +1,6 @@
 package eu.inn.facade.filter
 
-import eu.inn.binders.dynamic.{Null, ObjV, Text}
+import eu.inn.binders.value.{Null, ObjV, Text}
 import eu.inn.facade.filter.raml.RewriteRequestFilter
 import eu.inn.facade.model.{FacadeRequest, FilterRestartException, RequestFilterContext}
 import eu.inn.facade.modules.{ConfigModule, FiltersModule}

@@ -1,7 +1,7 @@
 package eu.inn.facade.http
 
 import akka.actor._
-import eu.inn.binders.dynamic.Text
+import eu.inn.binders.value.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.{FacadeHeaders, FacadeMessage, FacadeRequest, FacadeResponse}

@@ -4,7 +4,7 @@ import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, Tim
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.Config
-import eu.inn.binders.dynamic.{Null, Obj, ObjV, Text}
+import eu.inn.binders.value.{Null, Obj, ObjV, Text}
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}

@@ -1,6 +1,6 @@
 package eu.inn.facade.filter
 
-import eu.inn.binders.dynamic.{LstV, Null, ObjV}
+import eu.inn.binders.value._
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
@@ -39,7 +39,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       )
 
       val filteredResponse = afterFilters.filterResponse(request, response).futureValue
-      val linksMap = filteredResponse.body.__links[LinksMap] // binders deserialization magic
+      val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/test/1"))
       linksMap("some-other1") shouldBe Left(Link(href="/test/abc"))
       linksMap("some-other2") shouldBe Left(Link(href="/test/xyz"))
@@ -64,7 +64,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       val filteredResponse = afterFilters.filterResponse(request, response).futureValue
 
       filteredResponse.headers("Location") shouldBe Seq("/test-factory/100500")
-      val linksMap = filteredResponse.body.__links[LinksMap] // binders deserialization magic
+      val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/test/1"))
       linksMap("location") shouldBe Left(Link(href="/test-factory/100500"))
     }
@@ -104,12 +104,12 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       )
 
       val filteredResponse = afterFilters.filterResponse(request, response).futureValue
-      val linksMap = filteredResponse.body.__links[LinksMap] // binders deserialization magic
+      val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/test/1"))
 
       val e = filteredResponse.body.asMap("_embedded")
       val x = e.asMap("x")
-      val innerLinksMap = x.__links[LinksMap]
+      val innerLinksMap = x.__links.fromValue[LinksMap]
       innerLinksMap("self") shouldBe Left(Link(href="/inner-test/9"))
 
       val y = e.asMap("y")

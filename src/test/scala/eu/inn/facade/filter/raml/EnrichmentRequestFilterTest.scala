@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.binders.dynamic.{Null, Text}
+import eu.inn.binders.value.{Null, Text}
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest, RequestFilterContext}
 import eu.inn.facade.raml.{Annotation, DataType, Field, Method}
 import eu.inn.hyperbus.transport.api.uri.Uri

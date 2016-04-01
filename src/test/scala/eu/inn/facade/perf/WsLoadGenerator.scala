@@ -3,7 +3,7 @@ package eu.inn.facade.perf
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import eu.inn.binders.dynamic.Null
+import eu.inn.binders.value.Null
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.http.{Connect, Disconnect, WsTestClient}
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}

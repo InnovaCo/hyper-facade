@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.http
 
-import eu.inn.binders.dynamic.{Lst, Obj, ObjV, Value}
+import eu.inn.binders.value._
 import eu.inn.facade.model._
 import eu.inn.hyperbus.model.Links.LinksMap
 import eu.inn.hyperbus.model.{DefLink, Header}
@@ -29,7 +29,7 @@ class HttpWsResponseFilter extends ResponseFilter {
 
       val newBody = transformEmbeddedObject(response.body)
       if (newBody.isInstanceOf[Obj]/* && response.status == 201*/) { // Created, set header value
-        val link = newBody.__links[Option[LinksMap]].flatMap(_.get(DefLink.LOCATION)) match {
+        val link = newBody.__links.fromValue[Option[LinksMap]].flatMap(_.get(DefLink.LOCATION)) match {
           case Some(Left(l)) ⇒
             headersBuilder += (HttpHeaders.Location.name → Seq(l.href))
           case Some(Right(la)) ⇒
@@ -68,8 +68,8 @@ class HttpWsResponseFilter extends ResponseFilter {
   }
 
   def transformLink(linkValue: Value, body: Value): Value = {
-    if (linkValue.templated[Option[Boolean]].contains(true)) { // templated link, have to format
-    val href = linkValue.href[String]
+    if (linkValue.templated.fromValue[Option[Boolean]].contains(true)) { // templated link, have to format
+    val href = linkValue.href.asString
       val tokens = UriParser.extractParameters(href)
       val args = tokens.map { arg ⇒
         arg → body.asMap(arg).asString             // todo: support inner fields + handle exception if not exists?

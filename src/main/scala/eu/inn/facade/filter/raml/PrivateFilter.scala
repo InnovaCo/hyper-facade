@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.binders.dynamic.{Obj, Value}
+import eu.inn.binders.value.{Obj, Value}
 import eu.inn.facade.model.{EventFilter, EventFilterContext, ResponseFilter, ResponseFilterContext, _}
 import eu.inn.facade.filter.raml.PrivateFilter._
 import eu.inn.facade.raml.Field

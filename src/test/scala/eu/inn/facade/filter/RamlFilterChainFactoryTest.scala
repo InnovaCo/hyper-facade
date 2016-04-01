@@ -1,6 +1,6 @@
 package eu.inn.facade.filter
 
-import eu.inn.binders.dynamic.Null
+import eu.inn.binders.value.Null
 import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain}
 import eu.inn.facade.filter.raml.{EnrichRequestFilter, PrivateFilter, RequestPrivateFilter, ResponsePrivateFilter}
 import eu.inn.facade.model._

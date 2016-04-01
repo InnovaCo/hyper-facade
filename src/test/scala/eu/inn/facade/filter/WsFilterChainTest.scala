@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 import akka.actor.{Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
-import eu.inn.binders.dynamic.{Null, Text}
+import eu.inn.binders.value.{Null, Text}
 import eu.inn.facade.filter.chain.{SimpleFilterChain, FilterChain}
 import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
 import eu.inn.facade.model._

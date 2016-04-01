@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.ActorSystem
 import akka.cluster.Cluster
 import com.typesafe.config.Config
-import eu.inn.binders.dynamic.{Obj, Text}
+import eu.inn.binders.value.{Obj, Text}
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.annotations.{body, request}
