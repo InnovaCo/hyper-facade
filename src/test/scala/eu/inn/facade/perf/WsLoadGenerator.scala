@@ -3,7 +3,8 @@ package eu.inn.facade.perf
 import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.{ActorRef, ActorSystem, Props}
-import eu.inn.binders.dynamic.Null
+import eu.inn.binders.value.Null
+import eu.inn.config.ConfigLoader
 import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.http.{Connect, Disconnect, WsTestClient}
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
@@ -19,7 +20,7 @@ object WsLoadGenerator extends App {
 
   implicit val actorSystem = ActorSystem()
 
-  val config = new ConfigsFactory().config.getConfig("perf-test")
+  val config = ConfigLoader().getConfig("perf-test")
   val host = config.getString("host")
   val port = config.getInt("port")
   val uriPattern = config.getString("ws.endpoint")

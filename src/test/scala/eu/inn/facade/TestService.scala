@@ -5,7 +5,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import akka.actor.ActorSystem
 import akka.cluster.Cluster
 import com.typesafe.config.Config
-import eu.inn.binders.dynamic.{Obj, Text}
+import eu.inn.binders.value.{Obj, Text}
+import eu.inn.config.ConfigLoader
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.model.annotations.{body, request}
@@ -28,7 +29,7 @@ case class UnreliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Se
   with DefinedResponse[Ok[DynamicBody]]
 
 object TestService extends App {
-  val config = new ConfigsFactory().config
+  val config = ConfigLoader()
   val hyperbus = new HyperbusFactory(config).hyperbus
   val testService = new TestService(hyperbus)
   startSeedNode(config)
@@ -72,7 +73,7 @@ class TestService(hyperbus: Hyperbus) {
 
 object TestService4WebsocketPerf extends App {
 
-  val config = new ConfigsFactory().config
+  val config = ConfigLoader()
   val hyperbus = new HyperbusFactory(config).hyperbus
   val testService = new TestService(hyperbus)
   val eventsPerSecond = config.getInt("perf-test.events-per-second")
@@ -99,7 +100,7 @@ object TestService4WebsocketPerf extends App {
 }
 
 object TestService4HttpPerf extends App {
-  val config = new ConfigsFactory().config
+  val config = ConfigLoader()
   val hyperbus = new HyperbusFactory(config).hyperbus
   val testService = new TestService(hyperbus)
   TestService.startSeedNode(config)

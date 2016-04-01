@@ -1,6 +1,6 @@
 package eu.inn.facade.model
 
-import eu.inn.binders.dynamic.Value
+import eu.inn.binders.value.Value
 import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.{ExecutionContext, Future}

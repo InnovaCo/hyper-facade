@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.binders.dynamic.{Obj, Text}
+import eu.inn.binders.value.{Obj, Text}
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.raml.EnrichRequestFilter._
 import eu.inn.facade.model._

@@ -1,6 +1,6 @@
 package eu.inn.facade.filter
 
-import eu.inn.binders.dynamic.{Null, Text}
+import eu.inn.binders.value.{Null, Text}
 import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.facade.model._
 import eu.inn.hyperbus.transport.api.uri.Uri

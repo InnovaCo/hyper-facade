@@ -4,7 +4,7 @@ import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, Tim
 
 import akka.actor.{ActorSystem, Props}
 import com.typesafe.config.Config
-import eu.inn.binders.dynamic.{Null, Obj, ObjV, Text}
+import eu.inn.binders.value.{Null, Obj, ObjV, Text}
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
@@ -85,7 +85,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "http get. Error response" in {
       testService.onCommand(RequestMatcher(Some(Uri("/failed-resource")), Map(Header.METHOD → Specific(Method.GET))),
-        ServiceUnavailable(ErrorBody("service_is_not_available", Some("No connection to DB")))) onSuccess {
+        ServiceUnavailable(ErrorBody("service-is-not-available", Some("No connection to DB")))) onSuccess {
         case subscr ⇒ register(subscr)
       }
 
@@ -94,14 +94,14 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       val uri404 = "http://localhost:54321/test-service/reliable"
       val responseFuture404 = pipeline(Get(http.Uri(uri404)))
       whenReady(responseFuture404, Timeout(Span(5, Seconds))) { response ⇒
-        response.entity.asString should include (""""code":"not_found"""")
+        response.entity.asString should include (""""code":"not-found"""")
         response.status.intValue shouldBe 404
       }
 
       val uri503 = "http://localhost:54321/failed-resource"
       val responseFuture503 = pipeline(Get(http.Uri(uri503)))
       whenReady(responseFuture503, Timeout(Span(5, Seconds))) { response ⇒
-        response.entity.asString should include (""""code":"service_is_not_available"""")
+        response.entity.asString should include (""""code":"service-is-not-available"""")
         response.status.intValue shouldBe 503
 
         subscriptions.foreach(hyperbus.off)
@@ -238,7 +238,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       client ! Connect() // init websocket connection
 
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
-        eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled_exception", Some("Internal server error"), errorId = "123")))
+        eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled-exception", Some("Internal server error"), errorId = "123")))
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
         client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
@@ -253,7 +253,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         if (resourceStateMessage.isDefined) {
           val resourceState = resourceStateMessage.get.payload.utf8String
           resourceState should startWith ("""{"status":500,"headers":""")
-          resourceState should include (""""code":"unhandled_exception"""")
+          resourceState should include (""""code":"unhandled-exception"""")
         } else fail("Full resource state wasn't sent to the client")
       }
     }

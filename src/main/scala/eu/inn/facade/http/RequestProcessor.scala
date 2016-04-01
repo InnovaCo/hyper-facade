@@ -1,5 +1,6 @@
 package eu.inn.facade.http
 
+import akka.pattern.AskTimeoutException
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
@@ -65,7 +66,14 @@ trait RequestProcessor extends Injectable {
     case noRoute: NoTransportRouteException ⇒
       implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))
       val uri = spray.http.Uri(originalRequest.uri.pattern.specific)
-      model.NotFound(ErrorBody("not_found", Some(s"'${uri.path}' is not found.")))
+      model.NotFound(ErrorBody("not-found", Some(s"'${uri.path}' is not found.")))
+
+    case askTimeout: AskTimeoutException ⇒
+      implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))
+      val uri = spray.http.Uri(originalRequest.uri.pattern.specific)
+      val errorId = IdGenerator.create()
+      log.error(s"Timeout #$errorId while handling $originalRequest")
+      model.GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${uri.path}'"), errorId = errorId))
 
     case NonFatal(nonFatal) ⇒
       handleInternalError(nonFatal, originalRequest)
@@ -85,8 +93,8 @@ trait RequestProcessor extends Injectable {
 
   def handleInternalError(exception: Throwable, originalRequest: FacadeRequest): Response[ErrorBody] = {
     implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))
-    log.error(s"Exception while handling $originalRequest", exception)
     val errorId = IdGenerator.create()
-    model.InternalServerError(ErrorBody("internal_server_error", Some(exception.getMessage), errorId = errorId))
+    log.error(s"Exception #$errorId while handling $originalRequest", exception)
+    model.InternalServerError(ErrorBody("internal-server-error", Some(exception.getMessage), errorId = errorId))
   }
 }

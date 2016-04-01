@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.http
 
-import eu.inn.binders.dynamic.Null
+import eu.inn.binders.value.Null
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.IdGenerator

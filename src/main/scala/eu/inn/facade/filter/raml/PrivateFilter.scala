@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.binders.dynamic.{Obj, Value}
+import eu.inn.binders.value.{Obj, Value}
 import eu.inn.facade.model.{EventFilter, EventFilterContext, ResponseFilter, ResponseFilterContext, _}
 import eu.inn.facade.filter.raml.PrivateFilter._
 import eu.inn.facade.raml.Field
@@ -12,7 +12,7 @@ class RequestPrivateFilter(val privateAddresses: PrivateAddresses) extends Reque
   override def apply(context: RequestFilterContext, request: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
     if (isAllowedAddress(context.headers, privateAddresses)) Future.successful(request)
     else {
-      val error = NotFound(ErrorBody("not_found")) // todo: + messagingContext!!!
+      val error = NotFound(ErrorBody("not-found")) // todo: + messagingContext!!!
       Future.failed(
         new FilterInterruptException(
           FacadeResponse(error),

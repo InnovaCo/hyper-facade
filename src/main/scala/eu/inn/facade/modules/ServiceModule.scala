@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import eu.inn.facade.{HyperbusFactory, StatsReporterFactory}
 import eu.inn.facade.events.SubscriptionsManager
-import eu.inn.facade.http.{HandleErrorsDirectives, HttpWorker, WsRestServiceApp}
+import eu.inn.facade.http.{HttpWorker, WsRestServiceApp}
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.servicecontrol.api.{Console, Service, ServiceController, ShutdownMonitor}
 import eu.inn.servicecontrol.{ConsoleServiceController, RuntimeShutdownMonitor, StdConsole}
@@ -18,7 +18,6 @@ class ServiceModule extends Module {
   bind [StatsReporterFactory]   identifiedBy 'statsFactory         to new StatsReporterFactory(inject [Config])
   bind [ActorSystem]            identifiedBy 'actorSystem          to ActorSystem("facade", inject [Config])
   bind [ExecutionContext]       identifiedBy 'executionContext     to inject [ActorSystem].dispatcher
-  bind [HandleErrorsDirectives] identifiedBy 'errorsDirectives     to new HandleErrorsDirectives
   bind [HttpWorker]             identifiedBy 'httpWorker           to new HttpWorker
   bind [SubscriptionsManager]   identifiedBy 'subscriptionsManager to new SubscriptionsManager
   bind [Service]                identifiedBy 'restApp              to new WsRestServiceApp

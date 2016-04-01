@@ -1,7 +1,7 @@
 package eu.inn.facade.model
 
 import eu.inn.binders.core.{ImplicitDeserializer, ImplicitSerializer}
-import eu.inn.binders.dynamic.{Null, Value}
+import eu.inn.binders.value.{Null, Value}
 import eu.inn.binders.json._
 import eu.inn.facade.utils.NamingUtils
 import eu.inn.hyperbus.model._

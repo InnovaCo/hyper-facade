@@ -36,7 +36,7 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
 
   val config = inject [Config]
   val restConfig = config.getConfig(FacadeConfig.HTTP)
-  val handleErrorsDirectives = inject [HandleErrorsDirectives]
+  //val handleErrorsDirectives = inject [HandleErrorsDirectives]
   val shutdownTimeout = config.getFiniteDuration(FacadeConfig.SHUTDOWN_TIMEOUT)
 
   val hyperBus = inject [Hyperbus]  // it's time to initialize hyperbus
@@ -62,12 +62,8 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
     enableAccessLogIf(restConfig.getBoolean("access-log.enabled")) {
       addJsonMediaTypeIfNotExists {
         respondWithCORSHeaders(restConfig.getStringList("cors.allowed-origins"), restConfig.getStringList("cors.allowed-paths").map(Pattern.compile)) {
-          mapHttpResponseHeaders(_.filterNot(_.name == ErrorHandlerHeader)) {
-            handleErrorsDirectives.handleErrors(handleErrorsDirectives.DefaultErrorFormatter) {
-              pathSuffix(Slash.?) {
-                initRoutes
-              }
-            }
+          pathSuffix(Slash.?) {
+            initRoutes
           }
         }
       }
