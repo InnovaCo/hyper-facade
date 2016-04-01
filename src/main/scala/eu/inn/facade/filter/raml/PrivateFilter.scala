@@ -12,7 +12,7 @@ class RequestPrivateFilter(val privateAddresses: PrivateAddresses) extends Reque
   override def apply(context: RequestFilterContext, request: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
     if (isAllowedAddress(context.headers, privateAddresses)) Future.successful(request)
     else {
-      val error = NotFound(ErrorBody("not_found")) // todo: + messagingContext!!!
+      val error = NotFound(ErrorBody("not-found")) // todo: + messagingContext!!!
       Future.failed(
         new FilterInterruptException(
           FacadeResponse(error),

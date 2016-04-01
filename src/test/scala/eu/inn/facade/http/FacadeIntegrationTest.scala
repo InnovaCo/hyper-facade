@@ -85,7 +85,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "http get. Error response" in {
       testService.onCommand(RequestMatcher(Some(Uri("/failed-resource")), Map(Header.METHOD → Specific(Method.GET))),
-        ServiceUnavailable(ErrorBody("service_is_not_available", Some("No connection to DB")))) onSuccess {
+        ServiceUnavailable(ErrorBody("service-is-not_available", Some("No connection to DB")))) onSuccess {
         case subscr ⇒ register(subscr)
       }
 
@@ -238,7 +238,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       client ! Connect() // init websocket connection
 
       testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
-        eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled_exception", Some("Internal server error"), errorId = "123")))
+        eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled-exception", Some("Internal server error"), errorId = "123")))
 
       whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
         client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
