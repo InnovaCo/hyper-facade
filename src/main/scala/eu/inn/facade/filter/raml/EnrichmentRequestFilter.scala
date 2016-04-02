@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{Obj, Text}
-import eu.inn.facade.filter.FilterContext
+import eu.inn.facade.filter.RequestContext
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.raml.EnrichRequestFilter._
 import eu.inn.facade.model._
@@ -25,7 +25,7 @@ class EnrichmentFilterFactory extends RamlFilterFactory {
 
 
 class EnrichRequestFilter(val targetFields: Seq[Field]) extends RequestFilter {
-  override def apply(context: FilterContext, request: FacadeRequest)
+  override def apply(context: RequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       var bodyFields = request.body.asMap

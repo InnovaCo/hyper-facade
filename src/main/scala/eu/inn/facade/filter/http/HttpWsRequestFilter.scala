@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.http
 
 import eu.inn.binders.value.Null
-import eu.inn.facade.filter.FilterContext
+import eu.inn.facade.filter.RequestContext
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.IdGenerator
@@ -13,7 +13,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
 
-  override def apply(context: FilterContext, request: FacadeRequest)
+  override def apply(context: RequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val httpUri = spray.http.Uri(request.uri.pattern.specific)
@@ -23,14 +23,8 @@ class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
       var messageIdFound = false
 
       request.headers.foreach {
-        case (FacadeHeaders.CONTENT_TYPE, value :: tail)
-          if value.startsWith(FacadeHeaders.CERTAIN_CONTENT_TYPE_START)
-            && value.endsWith(FacadeHeaders.CERTAIN_CONTENT_TYPE_END) ⇒
-
-          val beginIndex = FacadeHeaders.CERTAIN_CONTENT_TYPE_START.length
-          val endIndex = value.length - FacadeHeaders.CERTAIN_CONTENT_TYPE_END.length
-
-          headersBuilder += Header.CONTENT_TYPE → Seq(value.substring(beginIndex, endIndex))
+        case (FacadeHeaders.CONTENT_TYPE, value :: tail) ⇒
+          headersBuilder += Header.CONTENT_TYPE →  FacadeHeaders.httpContentTypeToGeneric(Some(value)).toSeq
 
         case (FacadeHeaders.CLIENT_MESSAGE_ID, value :: tail) if value.nonEmpty ⇒
           headersBuilder += Header.MESSAGE_ID → Seq(value)

@@ -19,4 +19,27 @@ object FacadeHeaders {
     CLIENT_MESSAGE_ID → Header.MESSAGE_ID,
     CLIENT_REVISION → Header.REVISION
   )
+
+  def httpContentTypeToGeneric(httpContentType: Option[String]): Option[String] = {
+    httpContentType.map(_.toLowerCase) match {
+      case Some(v) if (v.startsWith(FacadeHeaders.CERTAIN_CONTENT_TYPE_START)
+        && v.endsWith(FacadeHeaders.CERTAIN_CONTENT_TYPE_END)) ⇒
+        val beginIndex = FacadeHeaders.CERTAIN_CONTENT_TYPE_START.length
+        val endIndex = v.length - FacadeHeaders.CERTAIN_CONTENT_TYPE_END.length
+        val r = v.substring(beginIndex, endIndex)
+        if (r.isEmpty)
+          None
+        else
+          Some(r)
+
+      case _ ⇒ None // application/json is also empty contentType for hyperbus
+    }
+  }
+
+  def genericContentTypeToHttp(contentType: Option[String]): Option[String] = {
+    contentType.map{ value ⇒
+      FacadeHeaders.CERTAIN_CONTENT_TYPE_START + value + FacadeHeaders.CERTAIN_CONTENT_TYPE_END
+      // case None ⇒ Some("application/json") // todo: do we need this?
+    }
+  }
 }

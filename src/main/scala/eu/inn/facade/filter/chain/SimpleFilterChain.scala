@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.chain
 
 
-import eu.inn.facade.filter.FilterContext
+import eu.inn.facade.filter.RequestContext
 import eu.inn.facade.model._
 import scaldi.Injectable
 
@@ -12,9 +12,9 @@ case class SimpleFilterChain(
                               eventFilters: Seq[EventFilter] = Seq.empty
                        ) extends FilterChain with Injectable {
 
-  def findRequestFilters(context: FilterContext, request: FacadeRequest): Seq[RequestFilter] = requestFilters
-  def findResponseFilters(context: FilterContext, response: FacadeResponse): Seq[ResponseFilter] = responseFilters
-  def findEventFilters(context: FilterContext, event: FacadeRequest): Seq[EventFilter] = eventFilters
+  def findRequestFilters(context: RequestContext, request: FacadeRequest): Seq[RequestFilter] = requestFilters
+  def findResponseFilters(context: RequestContext, response: FacadeResponse): Seq[ResponseFilter] = responseFilters
+  def findEventFilters(context: RequestContext, event: FacadeRequest): Seq[EventFilter] = eventFilters
 
   def ++ (other: SimpleFilterChain): SimpleFilterChain = {
     SimpleFilterChain(

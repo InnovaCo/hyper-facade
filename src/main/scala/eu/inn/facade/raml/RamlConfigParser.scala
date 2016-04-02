@@ -167,7 +167,10 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
       Map(None → None)
     else {
       ramlReqRspWrapper.body.foldLeft(Map.newBuilder[Option[String], Option[String]]) { (typeNames, body) ⇒
-        val contentType = if (body.name == null || body.name == "body" || body.name.equalsIgnoreCase("none")) None else Some(body.name)
+        val contentType = Option(body.name).map(_.toLowerCase) match {
+          case None | Some("body") | Some("none") ⇒ None
+          case other ⇒ FacadeHeaders.httpContentTypeToGeneric(other)
+        }
         val typeName = body.`type`.get(0)
         typeNames += (contentType → Option(typeName))
       }

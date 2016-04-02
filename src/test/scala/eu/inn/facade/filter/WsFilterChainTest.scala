@@ -29,7 +29,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   class TestRequestFilter extends RequestFilter {
-    override def  apply(context: FilterContext, input: FacadeRequest)
+    override def  apply(context: RequestContext, input: FacadeRequest)
                        (implicit ec: ExecutionContext): Future[FacadeRequest] = {
       if (input.headers.nonEmpty) {
         Future(input.copy(
@@ -46,7 +46,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   }
 
   class TestResponseFilter extends ResponseFilter {
-    override def apply(context: FilterContext, output: FacadeResponse)
+    override def apply(context: RequestContext, output: FacadeResponse)
                       (implicit ec: ExecutionContext): Future[FacadeResponse] = {
       if (output.headers.nonEmpty) {
         Future(output.copy(

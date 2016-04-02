@@ -402,7 +402,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         testService.publish(eventBadRev5)
       }
 
-      whenReady(refreshedResourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
+      whenReady(refreshedResourceStatePromise.future, Timeout(Span(10, Seconds))) { b ⇒
         val resourceUpdatedStateMessage = clientMessageQueue.get(3)
         if (resourceUpdatedStateMessage.isDefined) {
           val resourceUpdatedState = resourceUpdatedStateMessage.get.payload.utf8String

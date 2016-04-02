@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.facade.filter.FilterContext
+import eu.inn.facade.filter.RequestContext
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Annotation
@@ -33,7 +33,7 @@ class RewriteFilterFactory extends RamlFilterFactory {
 class RewriteRequestFilter(args: rewrite) extends RequestFilter {
   val uriParameters = UriParser.extractParameters(args.getUri)
 
-  override def apply(context: FilterContext, request: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
+  override def apply(context: RequestContext, request: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
     var failures = mutable.ArrayBuffer[Throwable]()
     val newArgs = uriParameters flatMap { uriParameter ⇒
       request.uri.args.get(uriParameter) match {

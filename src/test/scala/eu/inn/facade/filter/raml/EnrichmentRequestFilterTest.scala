@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.Text
-import eu.inn.facade.filter.FilterContext
+import eu.inn.facade.filter.RequestContext
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
 import eu.inn.facade.raml.{Annotation, DataType, Field, Method}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -26,11 +26,9 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
         Map("Accept-Language" → Seq("ru"), FacadeHeaders.CLIENT_IP → Seq("127.0.0.1")),
         Map("field" → Text("value"))
       )
-      val filterContext = FilterContext(request.uri.formatted, request.method, Map.empty,
-        request.uri, request.method, Map.empty
-      )
+      val requestContext = RequestContext(request.uri.formatted, request.method, Map.empty, None)
 
-      whenReady(filter.apply(filterContext, request), Timeout(Span(10, Seconds))) { filteredRequest ⇒
+      whenReady(filter.apply(requestContext, request), Timeout(Span(10, Seconds))) { filteredRequest ⇒
         val expectedRequest = FacadeRequest(
           Uri("/resource"),
           Method.POST,
@@ -53,11 +51,9 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
         Map.empty,
         Map("field" → Text("value"))
       )
-      val filterContext = FilterContext(initialRequest.uri.formatted, initialRequest.method, Map.empty,
-        initialRequest.uri, initialRequest.method, Map.empty
-      )
+      val requestContext = RequestContext(initialRequest.uri.formatted, initialRequest.method, Map.empty, None)
 
-      whenReady(filter.apply(filterContext, initialRequest), Timeout(Span(10, Seconds))) { filteredRequest ⇒
+      whenReady(filter.apply(requestContext, initialRequest), Timeout(Span(10, Seconds))) { filteredRequest ⇒
         filteredRequest shouldBe initialRequest
       }
     }

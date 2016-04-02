@@ -57,6 +57,15 @@ types:
       revisionId: number
       update: string
 
+  User:
+    type: object
+    properties:
+      fullName: string
+      userName: string
+      password:
+        (private):
+        type: string
+
 annotationTypes:
   x-client-ip:
   x-client-language:
@@ -73,6 +82,32 @@ traits:
   get:
     is: [ rateLimited ]
     (paged):
+    headers:
+      authToken:
+    responses:
+      200:
+        body:
+          type: User
+        headers:
+          content-type:
+  put:
+    body:
+      application/json:
+        type: User
+
+/status:
+  get:
+    headers:
+      authToken:
+    responses:
+      200:
+        body:
+          type: Status
+        headers:
+          content-type:
+  post:
+    is: [ rateLimited ]
+    (paged):
     body:
       type: StatusRequest
     headers:
@@ -84,7 +119,6 @@ traits:
         headers:
           content-type:
 
-/status:
   post:
     is: [ rateLimited ]
   /test-service:
@@ -118,7 +152,7 @@ traits:
 /reliable-feed/{content:*}:
   post:
     body:
-      none:
+      application/json:
         type: TestRequest
       application/vnd.app-server-status+json:
         type: ReliableResourceState

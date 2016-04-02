@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.http
 
 import eu.inn.binders.value._
-import eu.inn.facade.filter.FilterContext
+import eu.inn.facade.filter.RequestContext
 import eu.inn.facade.model._
 import eu.inn.hyperbus.model.Links.LinksMap
 import eu.inn.hyperbus.model.{DefLink, Header}
@@ -12,15 +12,14 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class HttpWsResponseFilter extends ResponseFilter {
 
-  override def apply(context: FilterContext, response: FacadeResponse)
+  override def apply(context: RequestContext, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       val headersBuilder = Map.newBuilder[String, Seq[String]]
       response.headers.foreach {
         case (Header.CONTENT_TYPE, value :: tail) ⇒
-          headersBuilder += FacadeHeaders.CONTENT_TYPE → Seq(
-            FacadeHeaders.CERTAIN_CONTENT_TYPE_START + value + FacadeHeaders.CERTAIN_CONTENT_TYPE_END
-          )
+          headersBuilder += FacadeHeaders.CONTENT_TYPE →
+            FacadeHeaders.genericContentTypeToHttp(Some(value)).toSeq
 
         case (k, v) ⇒
           if (HttpWsResponseFilter.directHyperbusToFacade.contains(k)) {
