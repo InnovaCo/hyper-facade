@@ -1,11 +1,10 @@
-package eu.inn.facade.filter
+package eu.inn.facade.model
 
-import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.MessagingContextFactory
 import eu.inn.hyperbus.transport.api.uri.Uri
 
-case class RequestContext(
+case class FacadeRequestContext(
                           originalPath: String,
                           originalMethod: String,
                           originalRequestHeaders: Map[String, Seq[String]],
@@ -27,9 +26,9 @@ case class RequestContext(
   )
 }
 
-object RequestContext {
+object FacadeRequestContext {
   def create(originalRequest: FacadeRequest) = {
-    RequestContext(
+    FacadeRequestContext(
       originalRequest.uri.pattern.specific,
       originalRequest.method,
       originalRequest.headers,

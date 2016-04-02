@@ -4,9 +4,8 @@ import akka.actor._
 import akka.pattern.pipe
 import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfig
-import eu.inn.facade.filter.RequestContext
-import eu.inn.facade.http.RequestProcessor
-import eu.inn.facade.model._
+import eu.inn.facade.http.{FacadeRequestWithContext, RequestProcessor}
+import eu.inn.facade.model.{FacadeRequestContext$, _}
 import eu.inn.facade.raml.Method
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
@@ -30,9 +29,9 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
   def receive: Receive = stopStartSubscription orElse {
-    case request : FacadeRequest ⇒ {
+    case FacadeRequestWithContext(request, requestContext) ⇒ {
       implicit val ec = executionContext
-      processRequestToFacade(request) pipeTo websocketWorker
+      processRequestToFacade(request, requestContext) pipeTo websocketWorker
     }
   }
 
@@ -41,7 +40,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       continueSubscription(originalRequest, requestContext, facadeRequest, subscriptionSyncTries)
   }
 
-  def subscribing(originalRequest: FacadeRequest, requestContext: RequestContext, subscriptionSyncTries: Int): Receive = {
+  def subscribing(originalRequest: FacadeRequest, requestContext: FacadeRequestContext, subscriptionSyncTries: Int): Receive = {
     case event: DynamicRequest ⇒
       processEventWhileSubscribing(requestContext, event)
 
@@ -59,28 +58,28 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       log.debug(s"Unreliable subscription started for $originalRequest")
   }
 
-  def subscribedReliable(requestContext: RequestContext, originalRequest: FacadeRequest, lastRevisionId: Long, subscriptionSyncTries: Int): Receive = {
+  def subscribedReliable(requestContext: FacadeRequestContext, originalRequest: FacadeRequest, lastRevisionId: Long, subscriptionSyncTries: Int): Receive = {
     case event: DynamicRequest ⇒
       processReliableEvent(requestContext, originalRequest, event, lastRevisionId, subscriptionSyncTries)
 
     case RestartSubscription ⇒
-      startSubscription(originalRequest, subscriptionSyncTries + 1)
+      startSubscription(requestContext, originalRequest, subscriptionSyncTries + 1)
   }
 
-  def subscribedUnreliable(requestContext: RequestContext): Receive = {
+  def subscribedUnreliable(requestContext: FacadeRequestContext): Receive = {
     case event: DynamicRequest ⇒
       processUnreliableEvent(requestContext, event)
   }
 
   def stopStartSubscription: Receive = {
-    case request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _) ⇒
-      startSubscription(request, 0)
+    case FacadeRequestWithContext(request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _), requestContext) ⇒
+      startSubscription(requestContext, request, 0)
 
-    case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
+    case FacadeRequestWithContext(FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _), _) ⇒
       context.stop(self)
   }
 
-  def startSubscription(originalRequest: FacadeRequest, subscriptionSyncTries: Int): Unit = {
+  def startSubscription(requestContext: FacadeRequestContext, originalRequest: FacadeRequest, subscriptionSyncTries: Int): Unit = {
     if (log.isTraceEnabled) {
       log.trace(s"Starting subscription #$subscriptionSyncTries for ${originalRequest.uri}")
     }
@@ -91,8 +90,6 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     subscriptionManager.off(self)
 
     context.become(filtering(originalRequest, subscriptionSyncTries) orElse stopStartSubscription)
-
-    val requestContext = RequestContext.create(originalRequest)
 
     implicit val ec = executionContext
     beforeFilterChain.filterRequest(requestContext, originalRequest) map { r ⇒
@@ -105,7 +102,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def continueSubscription(originalRequest: FacadeRequest,
-                           requestContext: RequestContext,
+                           requestContext: FacadeRequestContext,
                            facadeRequest: FacadeRequest,
                            subscriptionSyncTries: Int): Unit = {
 
@@ -125,7 +122,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
   }
 
-  def processEventWhileSubscribing(requestContext: RequestContext, event: DynamicRequest): Unit = {
+  def processEventWhileSubscribing(requestContext: FacadeRequestContext, event: DynamicRequest): Unit = {
     if (log.isTraceEnabled) {
       log.trace(s"Processing event while subscribing $event for ${requestContext.originalPath}")
     }
@@ -142,7 +139,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
   }
 
-  def processResourceState(requestContext: RequestContext, resourceState: Response[DynamicBody], subscriptionSyncTries: Int) = {
+  def processResourceState(requestContext: FacadeRequestContext, resourceState: Response[DynamicBody], subscriptionSyncTries: Int) = {
     val facadeResponse = FacadeResponse(resourceState)
     if (log.isTraceEnabled) {
       log.trace(s"Processing resource state $resourceState for ${requestContext.originalPath}")
@@ -173,7 +170,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     } pipeTo self
   }
 
-  def processUnreliableEvent(requestContext: RequestContext, event: DynamicRequest): Unit = {
+  def processUnreliableEvent(requestContext: FacadeRequestContext, event: DynamicRequest): Unit = {
     if (log.isTraceEnabled) {
       log.trace(s"Processing unreliable event $event for ${requestContext.originalPath}")
     }
@@ -189,7 +186,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
   }
 
-  def processReliableEvent(requestContext: RequestContext,
+  def processReliableEvent(requestContext: FacadeRequestContext,
                            originalRequest: FacadeRequest,
                            event: DynamicRequest,
                            lastRevisionId: Long,
@@ -253,7 +250,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 case class BecomeReliable(lastRevision: Long)
 case object BecomeUnreliable
 case object RestartSubscription
-case class BeforeFilterComplete(requestContext: RequestContext, facadeRequest: FacadeRequest)
+case class BeforeFilterComplete(requestContext: FacadeRequestContext, facadeRequest: FacadeRequest)
 
 object FeedSubscriptionActor {
   def props(websocketWorker: ActorRef,

@@ -1,8 +1,7 @@
 package eu.inn.facade.filter.http
 
 import eu.inn.binders.value.Null
-import eu.inn.facade.filter.RequestContext
-import eu.inn.facade.model._
+import eu.inn.facade.model.{FacadeRequestContext$, _}
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.{Header, Method, QueryBody}
@@ -13,7 +12,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
 
-  override def apply(context: RequestContext, request: FacadeRequest)
+  override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val httpUri = spray.http.Uri(request.uri.pattern.specific)

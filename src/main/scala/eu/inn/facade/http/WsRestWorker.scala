@@ -4,7 +4,7 @@ import akka.actor._
 import eu.inn.binders.value.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model.{FacadeHeaders, FacadeMessage, FacadeRequest, FacadeResponse}
+import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.{Hyperbus, IdGenerator}
 import scaldi.{Injectable, Injector}
@@ -74,6 +74,7 @@ class WsRestWorker(val serverConnection: ActorRef,
     case message: Frame ⇒
       try {
         val facadeRequest = FacadeRequest(message)
+        val requestContext = FacadeRequestContext.create(facadeRequest)
         // todo: add uri validation (for example this isn't valid uri here: https://ya.ru only path is allowed
         // todo: + headers for host & port
         // todo: same for http requests
@@ -87,7 +88,7 @@ class WsRestWorker(val serverConnection: ActorRef,
             // todo: support Forwarded by RFC 7239
             headers = facadeRequest.headers + (FacadeHeaders.CLIENT_IP → Seq(remoteAddress))
           )
-          processRequest(requestWithClientIp)
+          processRequest(requestWithClientIp, requestContext)
         }
       }
       catch {
@@ -113,12 +114,13 @@ class WsRestWorker(val serverConnection: ActorRef,
     }
   }
 
-  def processRequest(facadeRequest: FacadeRequest) = {
+  def processRequest(facadeRequest: FacadeRequest, requestContext: FacadeRequestContext) = {
     val key = facadeRequest.clientCorrelationId.get
     val actorName = "Subscr-" + key
+    val requestWithContext = FacadeRequestWithContext(facadeRequest, requestContext)
     context.child(actorName) match {
-      case Some(actor) ⇒ actor.forward(facadeRequest)
-      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperbus, subscriptionManager), actorName) ! facadeRequest
+      case Some(actor) ⇒ actor.forward(requestWithContext)
+      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperbus, subscriptionManager), actorName) ! requestWithContext
     }
   }
 

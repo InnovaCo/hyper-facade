@@ -1,16 +1,15 @@
 package eu.inn.facade.filter.chain
 
-import eu.inn.facade.filter.RequestContext
-import eu.inn.facade.model._
+import eu.inn.facade.model.{FacadeRequestContext$, _}
 import eu.inn.facade.raml.{ContentType, Method, RamlConfig, ResourceMethod}
 
 class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
 
-  def findRequestFilters(context: RequestContext, request: FacadeRequest): Seq[RequestFilter] = {
+  def findRequestFilters(context: FacadeRequestContext, request: FacadeRequest): Seq[RequestFilter] = {
     requestOrEventFilters(request.uri.formatted, request.method, request.contentType).requestFilters
   }
 
-  def findResponseFilters(context: RequestContext, response: FacadeResponse): Seq[ResponseFilter] = {
+  def findResponseFilters(context: FacadeRequestContext, response: FacadeResponse): Seq[ResponseFilter] = {
     context.prepared match {
       case Some(r) ⇒
         val uri = r.requestUri.formatted
@@ -38,7 +37,7 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
     }
   }
 
-  def findEventFilters(context: RequestContext, event: FacadeRequest): Seq[EventFilter] = {
+  def findEventFilters(context: FacadeRequestContext, event: FacadeRequest): Seq[EventFilter] = {
     context.prepared match {
       case Some(r) ⇒
         val uri = r.requestUri.formatted

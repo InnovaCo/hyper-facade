@@ -1,14 +1,13 @@
 package eu.inn.facade.filter.http
 
-import eu.inn.facade.filter.RequestContext
-import eu.inn.facade.model._
+import eu.inn.facade.model.{FacadeRequestContext$, _}
 import eu.inn.hyperbus.model.Header
 import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class WsEventFilter extends EventFilter {
-  override def apply(context: RequestContext, request: FacadeRequest)
+  override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val headersBuilder = Map.newBuilder[String, Seq[String]]

@@ -16,7 +16,7 @@ class NoOpFilterFactory extends RamlFilterFactory {
 }
 
 class NoOpFilter(target: RamlTarget) extends ResponseFilter {
-  override def apply(context: RequestContext, output: FacadeResponse)
+  override def apply(context: FacadeRequestContext, output: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future.successful(output)
   }

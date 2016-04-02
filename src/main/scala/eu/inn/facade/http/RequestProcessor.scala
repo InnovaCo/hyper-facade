@@ -1,9 +1,8 @@
 package eu.inn.facade.http
 
 import akka.pattern.AskTimeoutException
-import eu.inn.facade.filter.RequestContext
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model._
+import eu.inn.facade.model.{FacadeRequestContext$, _}
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.NoTransportRouteException
@@ -13,6 +12,11 @@ import scaldi.{Injectable, Injector}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
+
+case class FacadeRequestWithContext(
+                                   request: FacadeRequest,
+                                   context: FacadeRequestContext
+                                   )
 
 trait RequestProcessor extends Injectable {
   def log: Logger
@@ -25,10 +29,9 @@ trait RequestProcessor extends Injectable {
   val afterFilterChain = inject[FilterChain]("afterFilterChain")
   val maxRestarts = 5 // todo: move to config
 
-  def processRequestToFacade(originalRequest: FacadeRequest): Future[FacadeResponse] = {
-    val requestContext = RequestContext.create(originalRequest)
-    beforeFilterChain.filterRequest(requestContext, originalRequest) flatMap { r ⇒
-      val preparedContext = requestContext.prepare(r)
+  def processRequestToFacade(request: FacadeRequest, context: FacadeRequestContext): Future[FacadeResponse] = {
+    beforeFilterChain.filterRequest(context, request) flatMap { r ⇒
+      val preparedContext = context.prepare(r)
 
       processRequestWithRaml(preparedContext, r, 0) flatMap { filteredRequest ⇒
         hyperbus <~ filteredRequest.toDynamicRequest recover {
@@ -39,12 +42,12 @@ trait RequestProcessor extends Injectable {
           }
         }
       }
-    } recover handleFilterExceptions(requestContext) { response ⇒
+    } recover handleFilterExceptions(context) { response ⇒
       response
     }
   }
 
-  def processRequestWithRaml(requestContext: RequestContext, facadeRequest: FacadeRequest, tryNum: Int): Future[FacadeRequest] = {
+  def processRequestWithRaml(requestContext: FacadeRequestContext, facadeRequest: FacadeRequest, tryNum: Int): Future[FacadeRequest] = {
     if (tryNum > maxRestarts) {
       Future.failed(
         new RestartLimitReachedException(tryNum, maxRestarts)
@@ -63,7 +66,7 @@ trait RequestProcessor extends Injectable {
     }
   }
 
-  def handleHyperbusExceptions(requestContext: RequestContext) : PartialFunction[Throwable, Response[DynamicBody]] = {
+  def handleHyperbusExceptions(requestContext: FacadeRequestContext) : PartialFunction[Throwable, Response[DynamicBody]] = {
     case hyperbusException: HyperbusException[ErrorBody] ⇒
       hyperbusException
 
@@ -81,7 +84,7 @@ trait RequestProcessor extends Injectable {
       handleInternalError(nonFatal, requestContext)
   }
 
-  def handleFilterExceptions[T](requestContext: RequestContext)(func: FacadeResponse ⇒ T) : PartialFunction[Throwable, T] = {
+  def handleFilterExceptions[T](requestContext: FacadeRequestContext)(func: FacadeResponse ⇒ T) : PartialFunction[Throwable, T] = {
     case e: FilterInterruptException ⇒
       if (e.getCause != null) {
         log.error(s"Request execution interrupted: $requestContext", e)
@@ -93,7 +96,7 @@ trait RequestProcessor extends Injectable {
       func(FacadeResponse(response))
   }
 
-  def handleInternalError(exception: Throwable, requestContext: RequestContext): Response[ErrorBody] = {
+  def handleInternalError(exception: Throwable, requestContext: FacadeRequestContext): Response[ErrorBody] = {
     implicit val mcf = requestContext.clientMessagingContext()
     val errorId = IdGenerator.create()
     log.error(s"Exception #$errorId while handling $requestContext", exception)

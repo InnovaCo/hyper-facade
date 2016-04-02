@@ -1,8 +1,7 @@
 package eu.inn.facade.filter.http
 
 import eu.inn.binders.value._
-import eu.inn.facade.filter.RequestContext
-import eu.inn.facade.model._
+import eu.inn.facade.model.{FacadeRequestContext$, _}
 import eu.inn.hyperbus.model.Links.LinksMap
 import eu.inn.hyperbus.model.{DefLink, Header}
 import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
@@ -12,7 +11,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class HttpWsResponseFilter extends ResponseFilter {
 
-  override def apply(context: RequestContext, response: FacadeResponse)
+  override def apply(context: FacadeRequestContext, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       val headersBuilder = Map.newBuilder[String, Seq[String]]

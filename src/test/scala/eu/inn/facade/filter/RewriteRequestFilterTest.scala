@@ -2,7 +2,7 @@ package eu.inn.facade.filter
 
 import eu.inn.binders.value.{ObjV, Text}
 import eu.inn.facade.filter.raml.RewriteRequestFilter
-import eu.inn.facade.model.{FacadeRequest, FilterRestartException}
+import eu.inn.facade.model.{FacadeRequest, FacadeRequestContext, FacadeRequestContext$, FilterRestartException}
 import eu.inn.facade.raml._
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -27,7 +27,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         ObjV("field" → "value")
       )
 
-      val requestContext = RequestContext(request.uri.pattern.specific, request.method, Map.empty, None)
+      val requestContext = FacadeRequestContext(request.uri.pattern.specific, request.method, Map.empty, None)
 
       val restartException = intercept[FilterRestartException]{
         Await.result(filter.apply(requestContext, request), 10.seconds)
@@ -54,7 +54,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         ObjV("field" → "value")
       )
 
-      val requestContext = RequestContext(request.uri.formatted, request.method, Map.empty, None)
+      val requestContext = FacadeRequestContext(request.uri.formatted, request.method, Map.empty, None)
       val restartException = intercept[FilterRestartException]{
         Await.result(filter.apply(requestContext, request), 10.seconds)
       }
