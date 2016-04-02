@@ -38,7 +38,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
         )
       )
 
-      val filteredResponse = afterFilters.filterResponse(request, response).futureValue
+      val context = afterFilters.createFilterContext(request, request)
+      val filteredResponse = afterFilters.filterResponse(context, response).futureValue
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/test/1"))
       linksMap("some-other1") shouldBe Left(Link(href="/test/abc"))
@@ -61,7 +62,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
         )
       )
 
-      val filteredResponse = afterFilters.filterResponse(request, response).futureValue
+      val context = afterFilters.createFilterContext(request, request)
+      val filteredResponse = afterFilters.filterResponse(context, response).futureValue
 
       filteredResponse.headers("Location") shouldBe Seq("/test-factory/100500")
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
@@ -103,7 +105,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
         )
       )
 
-      val filteredResponse = afterFilters.filterResponse(request, response).futureValue
+      val context = afterFilters.createFilterContext(request, request)
+      val filteredResponse = afterFilters.filterResponse(context, response).futureValue
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/test/1"))
 

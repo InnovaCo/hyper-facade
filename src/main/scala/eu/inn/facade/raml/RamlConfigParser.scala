@@ -118,7 +118,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             val fields = td.asInstanceOf[ObjectFieldImpl].properties().foldLeft(Seq.newBuilder[Field]) {
               (fieldList, ramlField) ⇒
                 val fieldName = ramlField.name
-                val fieldType = ramlField.`type`.get(0)
+                val fieldType = ramlField.`type`.headOption.getOrElse("string")
                 val field = Field(fieldName, DataType(fieldType, Seq.empty, extractAnnotations(ramlField)))
                 fieldList += field
             }.result()

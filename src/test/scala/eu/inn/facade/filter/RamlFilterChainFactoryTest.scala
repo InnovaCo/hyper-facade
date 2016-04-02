@@ -2,7 +2,7 @@ package eu.inn.facade.filter
 
 import eu.inn.binders.value.Null
 import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain}
-import eu.inn.facade.filter.raml.{EnrichRequestFilter, PrivateFilter, RequestPrivateFilter, ResponsePrivateFilter}
+import eu.inn.facade.filter.raml.{EnrichRequestFilter, RequestPrivateFilter, ResponsePrivateFilter}
 import eu.inn.facade.model._
 import eu.inn.facade.modules.{ConfigModule, FiltersModule}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -21,7 +21,7 @@ class RamlFilterChainFactoryTest extends FreeSpec with Matchers with Injectable 
   "FilterChainRamlFactory " - {
     "resource filter chain" in {
       val request = FacadeRequest(Uri("/private"), "get", Map.empty, Null)
-      val context = filterChain.createRequestFilterContext(request)
+      val context = filterChain.createFilterContext(request, request)
       val filters = filterChain.findRequestFilters(context, request)
       filters.length should equal(1)
       filters.head shouldBe a[RequestPrivateFilter]
@@ -29,7 +29,7 @@ class RamlFilterChainFactoryTest extends FreeSpec with Matchers with Injectable 
 
     "annotation based filter chain" in {
       val request = FacadeRequest(Uri("/status/test-service"), "get", Map.empty, Null)
-      val context = filterChain.createRequestFilterContext(request)
+      val context = filterChain.createFilterContext(request, request)
       val filters = filterChain.findRequestFilters(context, request)
       filters.length should equal(1)
       filters.head shouldBe a[EnrichRequestFilter]
@@ -38,7 +38,7 @@ class RamlFilterChainFactoryTest extends FreeSpec with Matchers with Injectable 
     "trait and annotation based filter chain" in {
       val request = FacadeRequest(Uri("/users"), "get", Map.empty, Null)
       val response = FacadeResponse(200, Map.empty, Null)
-      val context = filterChain.createResponseFilterContext(request, response)
+      val context = filterChain.createFilterContext(request, request)
       val filters = filterChain.findResponseFilters(context, response)
 
       filters.head shouldBe a[ResponsePrivateFilter]

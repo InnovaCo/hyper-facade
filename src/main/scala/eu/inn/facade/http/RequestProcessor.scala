@@ -1,6 +1,7 @@
 package eu.inn.facade.http
 
 import akka.pattern.AskTimeoutException
+import eu.inn.facade.filter.FilterContext
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
@@ -25,22 +26,25 @@ trait RequestProcessor extends Injectable {
   val maxRestarts = 5 // todo: move to config
 
   def processRequestToFacade(originalRequest: FacadeRequest): Future[FacadeResponse] = {
-    beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
-      processRequestWithRaml(originalRequest, r, 0) flatMap { filteredRequest ⇒
+    val context1 = beforeFilterChain.createFilterContext(originalRequest, originalRequest)
+    beforeFilterChain.filterRequest(context1, originalRequest) flatMap { r ⇒
+      val context2 = beforeFilterChain.createFilterContext(originalRequest, r)
+
+      processRequestWithRaml(context2, r, 0) flatMap { filteredRequest ⇒
         hyperbus <~ filteredRequest.toDynamicRequest recover {
-          handleHyperbusExceptions(originalRequest)
+          handleHyperbusExceptions(context2)
         } flatMap { response ⇒
-          ramlFilterChain.filterResponse(originalRequest, FacadeResponse(response)) flatMap { r ⇒
-            afterFilterChain.filterResponse(originalRequest, r)
+          ramlFilterChain.filterResponse(context2, FacadeResponse(response)) flatMap { r ⇒
+            afterFilterChain.filterResponse(context2, r)
           }
         }
       }
-    } recover handleFilterExceptions(originalRequest) { response ⇒
+    } recover handleFilterExceptions(context1) { response ⇒
       response
     }
   }
 
-  def processRequestWithRaml(originalRequest: FacadeRequest, facadeRequest: FacadeRequest, tryNum: Int): Future[FacadeRequest] = {
+  def processRequestWithRaml(filterContext: FilterContext, facadeRequest: FacadeRequest, tryNum: Int): Future[FacadeRequest] = {
     if (tryNum > maxRestarts) {
       Future.failed(
         new RestartLimitReachedException(tryNum, maxRestarts)
@@ -49,52 +53,50 @@ trait RequestProcessor extends Injectable {
     else {
       val ramlParsedUri = ramlConfig.resourceUri(facadeRequest.uri.pattern.specific)
       val facadeRequestWithRamlUri = facadeRequest.copy(uri = ramlParsedUri)
-      ramlFilterChain.filterRequest(originalRequest, facadeRequestWithRamlUri) recoverWith {
+      ramlFilterChain.filterRequest(filterContext, facadeRequestWithRamlUri) recoverWith {
         case e : FilterRestartException ⇒
           if (log.isDebugEnabled) {
-            log.debug(s"Request $originalRequest is restarted from $facadeRequestWithRamlUri to ${e.request}")
+            log.debug(s"Request $filterContext is restarted from $facadeRequestWithRamlUri to ${e.request}")
           }
-          processRequestWithRaml(originalRequest, e.request, tryNum + 1)
+          processRequestWithRaml(filterContext, e.request, tryNum + 1)
       }
     }
   }
 
-  def handleHyperbusExceptions(originalRequest: FacadeRequest) : PartialFunction[Throwable, Response[DynamicBody]] = {
+  def handleHyperbusExceptions(filterContext: FilterContext) : PartialFunction[Throwable, Response[DynamicBody]] = {
     case hyperbusException: HyperbusException[ErrorBody] ⇒
       hyperbusException
 
     case noRoute: NoTransportRouteException ⇒
-      implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))
-      val uri = spray.http.Uri(originalRequest.uri.pattern.specific)
-      model.NotFound(ErrorBody("not-found", Some(s"'${uri.path}' is not found.")))
+      implicit val mcf = filterContext.clientMessagingContext()
+      model.NotFound(ErrorBody("not-found", Some(s"'${filterContext.originalPath}' is not found.")))
 
     case askTimeout: AskTimeoutException ⇒
-      implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))
-      val uri = spray.http.Uri(originalRequest.uri.pattern.specific)
+      implicit val mcf = filterContext.clientMessagingContext()
       val errorId = IdGenerator.create()
-      log.error(s"Timeout #$errorId while handling $originalRequest")
-      model.GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${uri.path}'"), errorId = errorId))
+      log.error(s"Timeout #$errorId while handling $filterContext")
+      model.GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${filterContext.originalPath}'"), errorId = errorId))
 
     case NonFatal(nonFatal) ⇒
-      handleInternalError(nonFatal, originalRequest)
+      handleInternalError(nonFatal, filterContext)
   }
 
-  def handleFilterExceptions[T](originalRequest: FacadeRequest)(func: FacadeResponse ⇒ T) : PartialFunction[Throwable, T] = {
+  def handleFilterExceptions[T](filterContext: FilterContext)(func: FacadeResponse ⇒ T) : PartialFunction[Throwable, T] = {
     case e: FilterInterruptException ⇒
       if (e.getCause != null) {
-        log.error(s"Request execution interrupted: $originalRequest", e)
+        log.error(s"Request execution interrupted: $filterContext", e)
       }
       func(e.response)
 
     case NonFatal(nonFatal) ⇒
-      val response = handleInternalError(nonFatal, originalRequest)
+      val response = handleInternalError(nonFatal, filterContext)
       func(FacadeResponse(response))
   }
 
-  def handleInternalError(exception: Throwable, originalRequest: FacadeRequest): Response[ErrorBody] = {
-    implicit val mcf = MessagingContextFactory.withCorrelationId(originalRequest.clientCorrelationId.getOrElse(IdGenerator.create()))
+  def handleInternalError(exception: Throwable, filterContext: FilterContext): Response[ErrorBody] = {
+    implicit val mcf = filterContext.clientMessagingContext()
     val errorId = IdGenerator.create()
-    log.error(s"Exception #$errorId while handling $originalRequest", exception)
+    log.error(s"Exception #$errorId while handling $filterContext", exception)
     model.InternalServerError(ErrorBody("internal-server-error", Some(exception.getMessage), errorId = errorId))
   }
 }

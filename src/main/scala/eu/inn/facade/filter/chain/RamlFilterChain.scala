@@ -1,17 +1,18 @@
 package eu.inn.facade.filter.chain
 
+import eu.inn.facade.filter.FilterContext
 import eu.inn.facade.model._
 import eu.inn.facade.raml.{ContentType, Method, RamlConfig, ResourceMethod}
 
 class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
 
-  def findRequestFilters(context: RequestFilterContext, request: FacadeRequest): Seq[RequestFilter] = {
+  def findRequestFilters(context: FilterContext, request: FacadeRequest): Seq[RequestFilter] = {
     requestOrEventFilters(request.uri.formatted, request.method, request.contentType).requestFilters
   }
 
-  def findResponseFilters(context: ResponseFilterContext, response: FacadeResponse): Seq[ResponseFilter] = {
-    val uri = context.uri.formatted
-    val method = context.method
+  def findResponseFilters(context: FilterContext, response: FacadeResponse): Seq[ResponseFilter] = {
+    val uri = context.requestUri.formatted
+    val method = context.requestMethod
     val result = filtersOrMethod(uri, method) match {
       case Left(filters) ⇒
         filters
@@ -32,8 +33,8 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
     result.responseFilters
   }
 
-  def findEventFilters(context: EventFilterContext, event: FacadeRequest): Seq[EventFilter] = {
-    val uri = context.uri.formatted
+  def findEventFilters(context: FilterContext, event: FacadeRequest): Seq[EventFilter] = {
+    val uri = context.requestUri.formatted
     val methodName = if (event.method.startsWith("feed:")) event.method.substring(5) else event.method
     requestOrEventFilters(uri, methodName, event.contentType).eventFilters
   }

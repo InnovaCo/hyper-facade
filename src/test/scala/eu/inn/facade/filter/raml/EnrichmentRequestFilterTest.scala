@@ -1,7 +1,8 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.binders.value.{Null, Text}
-import eu.inn.facade.model.{FacadeHeaders, FacadeRequest, RequestFilterContext}
+import eu.inn.binders.value.Text
+import eu.inn.facade.filter.FilterContext
+import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
 import eu.inn.facade.raml.{Annotation, DataType, Field, Method}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -25,9 +26,11 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
         Map("Accept-Language" → Seq("ru"), FacadeHeaders.CLIENT_IP → Seq("127.0.0.1")),
         Map("field" → Text("value"))
       )
-      val requestFilterContext = RequestFilterContext(request.uri, request.method, Map.empty, Null)
+      val filterContext = FilterContext(request.uri.formatted, request.method, Map.empty,
+        request.uri, request.method, Map.empty
+      )
 
-      whenReady(filter.apply(requestFilterContext, request), Timeout(Span(10, Seconds))) { filteredRequest ⇒
+      whenReady(filter.apply(filterContext, request), Timeout(Span(10, Seconds))) { filteredRequest ⇒
         val expectedRequest = FacadeRequest(
           Uri("/resource"),
           Method.POST,
@@ -39,7 +42,7 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
       }
     }
 
-    "try to add fields if request headers are missed" in {
+    "don't add fields if request headers are missed" in {
       val filter = new EnrichRequestFilter(Seq(
         Field("clientIp", DataType("string", Seq.empty, Seq(Annotation(Annotation.CLIENT_IP)))),
         Field("acceptLanguage", DataType("string", Seq.empty, Seq(Annotation(Annotation.CLIENT_LANGUAGE))))))
@@ -50,9 +53,11 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
         Map.empty,
         Map("field" → Text("value"))
       )
-      val requestFilterContext = RequestFilterContext(initialRequest.uri, initialRequest.method, Map.empty, Null)
+      val filterContext = FilterContext(initialRequest.uri.formatted, initialRequest.method, Map.empty,
+        initialRequest.uri, initialRequest.method, Map.empty
+      )
 
-      whenReady(filter.apply(requestFilterContext, initialRequest), Timeout(Span(10, Seconds))) { filteredRequest ⇒
+      whenReady(filter.apply(filterContext, initialRequest), Timeout(Span(10, Seconds))) { filteredRequest ⇒
         filteredRequest shouldBe initialRequest
       }
     }

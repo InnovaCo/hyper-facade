@@ -57,7 +57,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
   "Facade integration" - {
     "http get. Resource configured in RAML" in {
       testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
-        Ok(DynamicBody(Text("response"))), { request ⇒
+        Ok(DynamicBody(ObjV("a"→"response"))), { request ⇒
           request.uri shouldBe Uri("/status/test-service")
           request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
         }
@@ -65,7 +65,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         case subscr ⇒ register(subscr)
       }
 
-      Source.fromURL("http://localhost:54321/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
+      Source.fromURL("http://localhost:54321/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """{"a":"response"}"""
     }
 
     "http get. Resource is not configured in RAML" in {

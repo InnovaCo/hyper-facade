@@ -1,20 +1,10 @@
 package eu.inn.facade.model
 
-import eu.inn.binders.value.Value
-import eu.inn.hyperbus.transport.api.uri.Uri
+import eu.inn.facade.filter.FilterContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
-case class EventFilterContext(
-                                  uri: Uri,
-                                  requestHeaders: Map[String, Seq[String]],
-                                  requestBody: Value,
-                                  eventMethod: String,
-                                  eventHeaders: Map[String, Seq[String]],
-                                  eventBody: Value
-                                )
-
 trait EventFilter extends Filter {
-  def apply(context: EventFilterContext, event: FacadeRequest)
+  def apply(context: FilterContext, event: FacadeRequest)
            (implicit ec: ExecutionContext): Future[FacadeRequest]
 }

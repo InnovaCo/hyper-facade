@@ -7,7 +7,6 @@ import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.{FacadeHeaders, FacadeMessage, FacadeRequest, FacadeResponse}
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.{Hyperbus, IdGenerator}
-import eu.inn.hyperbus.model._
 import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
 import spray.can.websocket.frame.Frame
@@ -75,6 +74,9 @@ class WsRestWorker(val serverConnection: ActorRef,
     case message: Frame ⇒
       try {
         val facadeRequest = FacadeRequest(message)
+        // todo: add uri validation (for example this isn't valid uri here: https://ya.ru only path is allowed
+        // todo: + headers for host & port
+        // todo: same for http requests
         val uriPattern = facadeRequest.uri.pattern.specific
         val method = facadeRequest.method
         if (isPingRequest(uriPattern, method)) {
