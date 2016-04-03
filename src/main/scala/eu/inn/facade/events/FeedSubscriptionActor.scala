@@ -91,11 +91,9 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     context.become(filtering(originalRequest, subscriptionSyncTries) orElse stopStartSubscription)
 
     implicit val ec = executionContext
-    beforeFilterChain.filterRequest(requestContext, originalRequest) map { r ⇒
-      val ramlParsedUri = ramlConfig.resourceUri(r.uri.pattern.specific)
-      val facadeRequestWithRamlUri = r.copy(uri = ramlParsedUri)
-      val preparedContext = requestContext.prepare(facadeRequestWithRamlUri)
-      BeforeFilterComplete(preparedContext, facadeRequestWithRamlUri)
+    beforeFilterChain.filterRequest(requestContext, originalRequest) map { unpreparedRequest ⇒
+      val (preparedContext, preparedRequest) = prepareContextAndRequestBeforeRaml(requestContext, unpreparedRequest)
+      BeforeFilterComplete(preparedContext, preparedRequest)
     } recover handleFilterExceptions(requestContext) { response ⇒
       websocketWorker ! response
       PoisonPill

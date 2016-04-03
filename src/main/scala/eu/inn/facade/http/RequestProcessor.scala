@@ -30,12 +30,9 @@ trait RequestProcessor extends Injectable {
   val maxRestarts = 5 // todo: move to config
 
   def processRequestToFacade(requestContext: FacadeRequestContext, request: FacadeRequest): Future[FacadeResponse] = {
-    beforeFilterChain.filterRequest(requestContext, request) flatMap { r ⇒
-      val ramlParsedUri = ramlConfig.resourceUri(r.uri.pattern.specific)
-      val facadeRequestWithRamlUri = r.copy(uri = ramlParsedUri)
-      val preparedContext = requestContext.prepare(facadeRequestWithRamlUri)
-
-      processRequestWithRaml(preparedContext, facadeRequestWithRamlUri, 0) flatMap { filteredRequest ⇒
+    beforeFilterChain.filterRequest(requestContext, request) flatMap { unpreparedRequest ⇒
+      val (preparedContext, preparedRequest) = prepareContextAndRequestBeforeRaml(requestContext, unpreparedRequest)
+      processRequestWithRaml(preparedContext, preparedRequest, 0) flatMap { filteredRequest ⇒
         hyperbus <~ filteredRequest.toDynamicRequest recover {
           handleHyperbusExceptions(preparedContext)
         } flatMap { response ⇒
@@ -64,6 +61,13 @@ trait RequestProcessor extends Injectable {
           processRequestWithRaml(requestContext, e.request, tryNum + 1)
       }
     }
+  }
+
+  def prepareContextAndRequestBeforeRaml(requestContext: FacadeRequestContext, request: FacadeRequest) = {
+    val ramlParsedUri = ramlConfig.resourceUri(request.uri.pattern.specific)
+    val facadeRequestWithRamlUri = request.copy(uri = ramlParsedUri)
+    val preparedContext = requestContext.prepare(facadeRequestWithRamlUri)
+    (preparedContext, facadeRequestWithRamlUri)
   }
 
   def handleHyperbusExceptions(requestContext: FacadeRequestContext) : PartialFunction[Throwable, Response[DynamicBody]] = {
