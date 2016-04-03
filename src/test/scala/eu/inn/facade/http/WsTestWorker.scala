@@ -1,13 +1,14 @@
 package eu.inn.facade.http
 
 import akka.actor.ActorRef
+import eu.inn.facade.MockContext
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model.{FacadeRequest, FacadeRequestContext, FacadeRequestContext$}
+import eu.inn.facade.model.FacadeRequest
 import spray.can.websocket.frame.TextFrame
 import spray.can.{Http, websocket}
 import spray.routing.HttpServiceActor
 
-abstract class WsTestWorker(filterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker {
+abstract class WsTestWorker(filterChain: FilterChain) extends HttpServiceActor with websocket.WebSocketServerWorker with MockContext {
   import context._
   private var _serverConnection: ActorRef = _
 
@@ -23,7 +24,7 @@ abstract class WsTestWorker(filterChain: FilterChain) extends HttpServiceActor w
   def businessLogic: Receive = {
     case frame: TextFrame =>
       val facadeRequest = FacadeRequest(frame)
-      val context = FacadeRequestContext.create(facadeRequest)
+      val context = mockContext(facadeRequest)
       filterChain.filterRequest(context, facadeRequest) map { filteredRequest ⇒
         exposeFacadeRequest(filteredRequest)
       }

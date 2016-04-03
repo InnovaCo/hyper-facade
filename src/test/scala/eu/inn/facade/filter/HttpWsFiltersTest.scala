@@ -1,7 +1,8 @@
 package eu.inn.facade.filter
 
 import eu.inn.binders.value._
-import eu.inn.facade.filter.chain.{FilterChain}
+import eu.inn.facade.MockContext
+import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
 import eu.inn.hyperbus.model.Link
@@ -13,7 +14,7 @@ import scaldi.Injectable
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with Injectable {
+class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with Injectable with MockContext {
 
   implicit val injector = Injectors()
   val afterFilters = inject[FilterChain]("afterFilterChain")
@@ -38,7 +39,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
         )
       )
 
-      val context = FacadeRequestContext.create(request)
+      val context = mockContext(request)
       val filteredResponse = afterFilters.filterResponse(context, response).futureValue
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/test/1"))
@@ -62,7 +63,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
         )
       )
 
-      val context = FacadeRequestContext.create(request)
+      val context = mockContext(request)
       val filteredResponse = afterFilters.filterResponse(context, response).futureValue
 
       filteredResponse.headers("Location") shouldBe Seq("/test-factory/100500")
@@ -105,7 +106,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
         )
       )
 
-      val context = FacadeRequestContext.create(request)
+      val context = mockContext(request)
       val filteredResponse = afterFilters.filterResponse(context, response).futureValue
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/test/1"))

@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
-import eu.inn.facade.model.{FacadeRequestContext$, _}
+import eu.inn.facade.model._
 import eu.inn.facade.raml.Annotation
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.hyperbus.transport.api.matchers.Specific

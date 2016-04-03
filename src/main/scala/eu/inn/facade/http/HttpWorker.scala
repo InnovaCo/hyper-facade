@@ -27,10 +27,13 @@ class HttpWorker(implicit val injector: Injector) extends RequestProcessor {
   }
 
   def processRequest(request: HttpRequest, remoteAddress: String): Future[HttpResponse] = {
-    val facadeRequest = FacadeRequest(request, remoteAddress) // todo: move ip to context
-    val requestContext = FacadeRequestContext.create(facadeRequest)
-
-    processRequestToFacade(facadeRequest, requestContext) map { response ⇒
+    val facadeRequest = FacadeRequest(request)
+    val requestContext = FacadeRequestContext.create(
+        remoteAddress,
+        request,
+        facadeRequest
+      )
+    processRequestToFacade(requestContext, facadeRequest) map { response ⇒
       response.toHttpResponse
     }
   }

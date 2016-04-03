@@ -1,6 +1,7 @@
 package eu.inn.facade.filter
 
 import eu.inn.binders.value.{Null, ObjV}
+import eu.inn.facade.MockContext
 import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain}
 import eu.inn.facade.filter.raml.{EnrichRequestFilter, EventPrivateFilter, RequestPrivateFilter, ResponsePrivateFilter}
 import eu.inn.facade.model.{FacadeRequest, _}
@@ -9,7 +10,7 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.{Injectable, Module}
 
-class RamlFilterChainTest extends FreeSpec with Matchers with Injectable {
+class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with MockContext {
   implicit val injector = new ConfigModule :: new FiltersModule :: new Module {
     bind [Seq[RamlFilterFactory]] identifiedBy "paged" to Seq(new NoOpFilterFactory)
   }
@@ -19,7 +20,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable {
   "FilterChainRamlFactory " - {
     "resource filter chain" in {
       val request = FacadeRequest(Uri("/private"), "get", Map.empty, Null)
-      val context = FacadeRequestContext.create(request)
+      val context = mockContext(request)
       val filters = filterChain.findRequestFilters(context, request)
       filters.length should equal(1)
       filters.head shouldBe a[RequestPrivateFilter]
@@ -27,7 +28,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable {
 
     "annotation based filter chain" in {
       val request = FacadeRequest(Uri("/status/test-service"), "get", Map.empty, Null)
-      val context = FacadeRequestContext.create(request)
+      val context = mockContext(request)
       val filters = filterChain.findRequestFilters(context, request)
       filters.length should equal(1)
       filters.head shouldBe a[EnrichRequestFilter]
@@ -36,7 +37,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable {
     "trait and annotation based filter chain" in {
       val request = FacadeRequest(Uri("/users"), "get", Map.empty, Null)
       val response = FacadeResponse(200, Map.empty, Null)
-      val context = FacadeRequestContext.create(request).prepare(request)
+      val context = mockContext(request).prepare(request)
       val filters = filterChain.findResponseFilters(context, response)
 
       filters.head shouldBe a[ResponsePrivateFilter]
@@ -45,7 +46,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable {
 
     "response filter chain (annotation fields)" in {
       val request = FacadeRequest(Uri("/users"), "get", Map.empty, Null)
-      val context = FacadeRequestContext.create(request).prepare(request)
+      val context = mockContext(request).prepare(request)
       val response = FacadeResponse(200, Map.empty, ObjV("statusCode" → 100500, "processedBy" → "John"))
       val filters = filterChain.findResponseFilters(context, response)
       filters.head shouldBe a[ResponsePrivateFilter]
@@ -55,7 +56,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable {
 
     "event filter chain (annotation fields)" in {
       val request = FacadeRequest(Uri("/users"), "get", Map.empty, Null)
-      val context = FacadeRequestContext.create(request).prepare(request)
+      val context = mockContext(request).prepare(request)
       val event = FacadeRequest(Uri("/users"), "feed:put", Map.empty,
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )

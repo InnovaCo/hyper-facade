@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.http
 
-import eu.inn.facade.model.{FacadeRequestContext$, _}
+import eu.inn.facade.model._
 import eu.inn.hyperbus.model.Header
 import eu.inn.hyperbus.transport.api.uri.Uri
 

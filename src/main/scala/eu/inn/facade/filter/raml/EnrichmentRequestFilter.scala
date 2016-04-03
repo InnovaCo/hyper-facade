@@ -3,7 +3,7 @@ package eu.inn.facade.filter.raml
 import eu.inn.binders.value.{Obj, Text}
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.raml.EnrichRequestFilter._
-import eu.inn.facade.model.{FacadeRequestContext$, _}
+import eu.inn.facade.model._
 import eu.inn.facade.raml.{Annotation, Field}
 
 import scala.concurrent.{ExecutionContext, Future}

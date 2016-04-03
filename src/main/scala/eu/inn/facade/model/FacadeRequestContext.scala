@@ -3,18 +3,20 @@ package eu.inn.facade.model
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.MessagingContextFactory
 import eu.inn.hyperbus.transport.api.uri.Uri
+import spray.http.HttpRequest
 
 case class FacadeRequestContext(
-                          originalPath: String,
-                          originalMethod: String,
-                          originalRequestHeaders: Map[String, Seq[String]],
-
-                          prepared: Option[PreparedRequestContext]
-                        )
+                                 remoteAddress: String,
+                                 httpUri: spray.http.Uri,
+                                 pathAndQuery: String,
+                                 method: String,
+                                 requestHeaders: Map[String, Seq[String]],
+                                 prepared: Option[PreparedRequestContext]
+                               )
 {
   def clientCorrelationId: Option[String] = {
-    val messageId = originalRequestHeaders.getOrElse(FacadeHeaders.CLIENT_MESSAGE_ID, Seq.empty)
-    originalRequestHeaders.getOrElse(FacadeHeaders.CLIENT_CORRELATION_ID, messageId).headOption
+    val messageId = requestHeaders.getOrElse(FacadeHeaders.CLIENT_MESSAGE_ID, Seq.empty)
+    requestHeaders.getOrElse(FacadeHeaders.CLIENT_CORRELATION_ID, messageId).headOption
   }
 
   def clientMessagingContext() = {
@@ -27,11 +29,17 @@ case class FacadeRequestContext(
 }
 
 object FacadeRequestContext {
-  def create(originalRequest: FacadeRequest) = {
+  def create(remoteAddress: String, httpRequest: HttpRequest, facadeRequest: FacadeRequest) = {
     FacadeRequestContext(
-      originalRequest.uri.pattern.specific,
-      originalRequest.method,
-      originalRequest.headers,
+      remoteAddress,
+      httpRequest.uri,
+      facadeRequest.uri.pattern.specific,
+      facadeRequest.method,
+      // http headers always override request headers
+      // this could be important for WS request
+      facadeRequest.headers ++ httpRequest.headers.groupBy(_.name).map { kv ⇒
+        kv._1 → kv._2.map(_.value)
+      },
       None
     )
   }

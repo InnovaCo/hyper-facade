@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.chain
 
-import eu.inn.facade.model.{FacadeRequestContext$, _}
+import eu.inn.facade.model._
 import scaldi.Injectable
 
 

@@ -1,8 +1,9 @@
 package eu.inn.facade.filter
 
 import eu.inn.binders.value.{ObjV, Text}
+import eu.inn.facade.MockContext
 import eu.inn.facade.filter.raml.RewriteRequestFilter
-import eu.inn.facade.model.{FacadeRequest, FacadeRequestContext, FacadeRequestContext$, FilterRestartException}
+import eu.inn.facade.model.{FacadeRequest, FilterRestartException}
 import eu.inn.facade.raml._
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -13,7 +14,7 @@ import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures {
+class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with MockContext {
   "RewriteFilter" - {
     "simple rewrite" in {
       val args = new rewrite()
@@ -27,7 +28,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         ObjV("field" → "value")
       )
 
-      val requestContext = FacadeRequestContext(request.uri.pattern.specific, request.method, Map.empty, None)
+      val requestContext = mockContext(request)
 
       val restartException = intercept[FilterRestartException]{
         Await.result(filter.apply(requestContext, request), 10.seconds)
@@ -54,7 +55,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         ObjV("field" → "value")
       )
 
-      val requestContext = FacadeRequestContext(request.uri.formatted, request.method, Map.empty, None)
+      val requestContext = mockContext(request)
       val restartException = intercept[FilterRestartException]{
         Await.result(filter.apply(requestContext, request), 10.seconds)
       }

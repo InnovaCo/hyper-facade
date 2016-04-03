@@ -5,7 +5,7 @@ import akka.pattern.pipe
 import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfig
 import eu.inn.facade.http.{FacadeRequestWithContext, RequestProcessor}
-import eu.inn.facade.model.{FacadeRequestContext$, _}
+import eu.inn.facade.model._
 import eu.inn.facade.raml.Method
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
@@ -72,10 +72,10 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def stopStartSubscription: Receive = {
-    case FacadeRequestWithContext(request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _), requestContext) ⇒
+    case FacadeRequestWithContext(requestContext, request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _)) ⇒
       startSubscription(requestContext, request, 0)
 
-    case FacadeRequestWithContext(FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _), _) ⇒
+    case FacadeRequestWithContext(_, FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _)) ⇒
       context.stop(self)
   }
 
@@ -124,7 +124,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
   def processEventWhileSubscribing(requestContext: FacadeRequestContext, event: DynamicRequest): Unit = {
     if (log.isTraceEnabled) {
-      log.trace(s"Processing event while subscribing $event for ${requestContext.originalPath}")
+      log.trace(s"Processing event while subscribing $event for ${requestContext.pathAndQuery}")
     }
 
     event.headers.get(Header.REVISION) match {
@@ -142,7 +142,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def processResourceState(requestContext: FacadeRequestContext, resourceState: Response[DynamicBody], subscriptionSyncTries: Int) = {
     val facadeResponse = FacadeResponse(resourceState)
     if (log.isTraceEnabled) {
-      log.trace(s"Processing resource state $resourceState for ${requestContext.originalPath}")
+      log.trace(s"Processing resource state $resourceState for ${requestContext.pathAndQuery}")
     }
 
     implicit val ec = executionContext
@@ -172,7 +172,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
   def processUnreliableEvent(requestContext: FacadeRequestContext, event: DynamicRequest): Unit = {
     if (log.isTraceEnabled) {
-      log.trace(s"Processing unreliable event $event for ${requestContext.originalPath}")
+      log.trace(s"Processing unreliable event $event for ${requestContext.pathAndQuery}")
     }
     implicit val ec = executionContext
     ramlFilterChain.filterEvent(requestContext, FacadeRequest(event)) flatMap { e ⇒
@@ -195,7 +195,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       case Some(revision :: tail) ⇒
         val revisionId = revision.toLong
         if (log.isTraceEnabled) {
-          log.trace(s"Processing reliable event #$revisionId $event for ${requestContext.originalPath}")
+          log.trace(s"Processing reliable event #$revisionId $event for ${requestContext.pathAndQuery}")
         }
 
         if (revisionId == lastRevisionId + 1) {
@@ -216,7 +216,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         if (revisionId > lastRevisionId + 1) {
           // we lost some events, start from the beginning
           self ! RestartSubscription
-          log.info(s"Subscription on ${requestContext.originalPath} lost events from $lastRevisionId to $revisionId. Restarting...")
+          log.info(s"Subscription on ${requestContext.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting...")
         }
         // if revisionId <= lastRevisionId -- just ignore this event
 

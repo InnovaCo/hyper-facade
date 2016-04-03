@@ -1,7 +1,8 @@
 package eu.inn.facade.filter
 
 import eu.inn.binders.value.{Null, Text}
-import eu.inn.facade.filter.chain.{SimpleFilterChain}
+import eu.inn.facade.MockContext
+import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.facade.model._
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
@@ -11,7 +12,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 
-class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
+class FilterChainTest extends FreeSpec with Matchers with ScalaFutures with MockContext{
 
   val filterChain = new SimpleFilterChain(
     requestFilters = Seq(new TestRequestFilter),
@@ -50,10 +51,9 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   "FilterChain " - {
     "applyInputFilters empty headers" in {
       val request = FacadeRequest(Uri("testUri"), "get", Map.empty, Text("test body"))
-      val context = FacadeRequestContext.create(request)
 
       val interrupt = intercept[FilterInterruptException] {
-        filterChain.filterRequest(context, request).awaitFuture
+        filterChain.filterRequest(mockContext(request), request).awaitFuture
       }
 
       interrupt.response.body shouldBe Text("Forbidden")
@@ -66,8 +66,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
         Map("url" → Seq("/some_url"), "messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
         Text("test body"))
 
-      val context = FacadeRequestContext.create(request)
-      val filteredRequest = filterChain.filterRequest(context, request).futureValue
+      val filteredRequest = filterChain.filterRequest(mockContext(request), request).futureValue
 
       filteredRequest.body shouldBe Text("test body")
       filteredRequest.headers shouldBe Map("url" → Seq("/some_url"), "messageId" → Seq("#12345"), "correlationId" → Seq("#54321"))
@@ -78,9 +77,8 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
     val request = FacadeRequest(Uri("testUri"), "get", Map.empty, Null)
     val response = FacadeResponse(201, Map.empty, Text("test body"))
 
-    val context = FacadeRequestContext.create(request)
     val interrupt = intercept[FilterInterruptException] {
-      filterChain.filterResponse(context,response).awaitFuture
+      filterChain.filterResponse(mockContext(request),response).awaitFuture
     }
 
     interrupt.response.body shouldBe Null
@@ -95,8 +93,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures {
       Text("test body")
     )
 
-    val context = FacadeRequestContext.create(request)
-    val filteredResponse = filterChain.filterResponse(context, response).futureValue
+    val filteredResponse = filterChain.filterResponse(mockContext(request), response).futureValue
 
     filteredResponse.body shouldBe Text("test body")
     filteredResponse.headers shouldBe Map("contentType" → Seq("application/json"), "messageId" → Seq("#12345"), "correlationId" → Seq("#54321"))

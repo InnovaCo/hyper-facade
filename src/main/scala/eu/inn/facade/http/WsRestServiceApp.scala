@@ -57,8 +57,12 @@ class WsRestServiceApp(implicit inj: Injector)
                 connectionId += 1
                 connectionCount += 1
                 val worker = context.actorOf(
-                  WsRestWorker.props(serverConnection, new WsRestRoutes(route), hyperbus, subscriptionsManager, remoteAddress.toString),
-                  "wrkr-" + connectionId.toHexString
+                  WsRestWorker.props(serverConnection,
+                    new WsRestRoutes(route),
+                    hyperbus,
+                    subscriptionsManager,
+                    remoteAddress.toString
+                  ), "wrkr-" + connectionId.toHexString
                 )
                 context.watch(worker)
                 connectionCountStat.inc()

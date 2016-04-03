@@ -1,9 +1,8 @@
 package eu.inn.facade.model
 
 import eu.inn.binders.core.{ImplicitDeserializer, ImplicitSerializer}
-import eu.inn.binders.value.{Null, Value}
 import eu.inn.binders.json._
-import eu.inn.facade.utils.NamingUtils
+import eu.inn.binders.value.{Null, Value}
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.serialization.{ResponseHeader, StringDeserializer}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -57,14 +56,16 @@ case class FacadeRequest(uri: Uri, method: String, headers: Map[String, Seq[Stri
 }
 
 object FacadeRequest {
-  def apply(request: HttpRequest, remoteAddress: String): FacadeRequest = {
-    val headers: Map[String,Seq[String]] = request.headers.groupBy(_.name).map { kv ⇒
-      kv._1 → kv._2.map(_.value)
+  def apply(request: HttpRequest): FacadeRequest = {
+    val pathAndQuery = request.uri.path.toString + {
+      if (request.uri.query.nonEmpty)
+        "?" + request.uri.query.toString
+      else
+        ""
     }
-
-    FacadeRequest(Uri(request.uri.toString),
+    FacadeRequest(Uri(pathAndQuery),
       request.method.name,
-      headers + (NamingUtils.httpToFacade.convert("X-Forwarded-For") → Seq(remoteAddress)),
+      Map.empty,
       if (request.entity.nonEmpty){
         StringDeserializer.dynamicBody(Some(request.entity.asString)).content
       }

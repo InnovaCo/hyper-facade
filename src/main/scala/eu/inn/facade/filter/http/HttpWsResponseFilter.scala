@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.http
 
 import eu.inn.binders.value._
-import eu.inn.facade.model.{FacadeRequestContext$, _}
+import eu.inn.facade.model._
 import eu.inn.hyperbus.model.Links.LinksMap
 import eu.inn.hyperbus.model.{DefLink, Header}
 import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}

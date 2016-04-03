@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.http
 
 import eu.inn.binders.value.Null
-import eu.inn.facade.model.{FacadeRequestContext$, _}
+import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.{Header, Method, QueryBody}

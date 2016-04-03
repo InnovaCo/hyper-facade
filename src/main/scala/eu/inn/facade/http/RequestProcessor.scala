@@ -2,7 +2,7 @@ package eu.inn.facade.http
 
 import akka.pattern.AskTimeoutException
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model.{FacadeRequestContext$, _}
+import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.NoTransportRouteException
@@ -14,8 +14,8 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
 case class FacadeRequestWithContext(
-                                   request: FacadeRequest,
-                                   context: FacadeRequestContext
+                                   context: FacadeRequestContext,
+                                   request: FacadeRequest
                                    )
 
 trait RequestProcessor extends Injectable {
@@ -29,9 +29,9 @@ trait RequestProcessor extends Injectable {
   val afterFilterChain = inject[FilterChain]("afterFilterChain")
   val maxRestarts = 5 // todo: move to config
 
-  def processRequestToFacade(request: FacadeRequest, context: FacadeRequestContext): Future[FacadeResponse] = {
-    beforeFilterChain.filterRequest(context, request) flatMap { r ⇒
-      val preparedContext = context.prepare(r)
+  def processRequestToFacade(requestContext: FacadeRequestContext, request: FacadeRequest): Future[FacadeResponse] = {
+    beforeFilterChain.filterRequest(requestContext, request) flatMap { r ⇒
+      val preparedContext = requestContext.prepare(r)
 
       processRequestWithRaml(preparedContext, r, 0) flatMap { filteredRequest ⇒
         hyperbus <~ filteredRequest.toDynamicRequest recover {
@@ -42,7 +42,7 @@ trait RequestProcessor extends Injectable {
           }
         }
       }
-    } recover handleFilterExceptions(context) { response ⇒
+    } recover handleFilterExceptions(requestContext) { response ⇒
       response
     }
   }
@@ -72,13 +72,13 @@ trait RequestProcessor extends Injectable {
 
     case noRoute: NoTransportRouteException ⇒
       implicit val mcf = requestContext.clientMessagingContext()
-      model.NotFound(ErrorBody("not-found", Some(s"'${requestContext.originalPath}' is not found.")))
+      model.NotFound(ErrorBody("not-found", Some(s"'${requestContext.pathAndQuery}' is not found.")))
 
     case askTimeout: AskTimeoutException ⇒
       implicit val mcf = requestContext.clientMessagingContext()
       val errorId = IdGenerator.create()
       log.error(s"Timeout #$errorId while handling $requestContext")
-      model.GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${requestContext.originalPath}'"), errorId = errorId))
+      model.GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${requestContext.pathAndQuery}'"), errorId = errorId))
 
     case NonFatal(nonFatal) ⇒
       handleInternalError(nonFatal, requestContext)
