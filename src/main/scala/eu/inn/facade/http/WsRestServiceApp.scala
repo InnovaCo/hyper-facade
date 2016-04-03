@@ -61,7 +61,7 @@ class WsRestServiceApp(implicit inj: Injector)
                     new WsRestRoutes(route),
                     hyperbus,
                     subscriptionsManager,
-                    remoteAddress.toString
+                    remoteAddress.getAddress.toString
                   ), "wrkr-" + connectionId.toHexString
                 )
                 context.watch(worker)

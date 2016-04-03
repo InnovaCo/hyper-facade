@@ -36,9 +36,9 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
     }
 
     "trait and annotation based filter chain" in {
-      val request = FacadeRequest(Uri("/users"), "get", Map.empty, Null)
+      val request = FacadeRequest(Uri("/users/{userId}", Map("userId" → "100500")), "get", Map.empty, Null)
       val response = FacadeResponse(200, Map.empty, Null)
-      val context = mockContext(request).prepare(request)
+      val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepare(request)
       val filters = filterChain.findResponseFilters(context, response)
 
       filters.head shouldBe a[ResponsePrivateFilter]
@@ -46,8 +46,8 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
     }
 
     "response filter chain (annotation fields)" in {
-      val request = FacadeRequest(Uri("/users"), "get", Map.empty, Null)
-      val context = mockContext(request).prepare(request)
+      val request = FacadeRequest(Uri("/users/{userId}", Map("userId" → "100500")), "get", Map.empty, Null)
+      val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepare(request)
       val response = FacadeResponse(200, Map.empty, ObjV("statusCode" → 100500, "processedBy" → "John"))
       val filters = filterChain.findResponseFilters(context, response)
       filters.head shouldBe a[ResponsePrivateFilter]
@@ -56,9 +56,9 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
     }
 
     "event filter chain (annotation fields)" in {
-      val request = FacadeRequest(Uri("/users"), "get", Map.empty, Null)
-      val context = mockContext(request).prepare(request)
-      val event = FacadeRequest(Uri("/users"), "feed:put", Map.empty,
+      val request = FacadeRequest(Uri("/users/{userId}", Map("userId" → "100500")), "get", Map.empty, Null)
+      val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepare(request)
+      val event = FacadeRequest(request.uri, "feed:put", Map.empty,
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )
       val filters = filterChain.findEventFilters(context, event)

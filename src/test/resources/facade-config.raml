@@ -81,10 +81,9 @@ traits:
 /test-not-defined-filter:
   (not-defined):      
 
-/users:
-  is: [ secured ]
+/users/{userId}:
   get:
-    is: [ rateLimited ]
+    is: [ secured, rateLimited ]
     (paged):
     headers:
       authToken:
@@ -95,6 +94,7 @@ traits:
         headers:
           content-type:
   put:
+    is: [ secured ]
     body:
       application/json:
         type: User

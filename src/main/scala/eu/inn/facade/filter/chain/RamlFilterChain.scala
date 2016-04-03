@@ -39,7 +39,7 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
   def findEventFilters(context: FacadeRequestContext, event: FacadeRequest): Seq[EventFilter] = {
     context.prepared match {
       case Some(r) ⇒
-        val uri = r.requestUri.formatted
+        val uri = r.requestUri.pattern.specific
         val methodName = if (event.method.startsWith("feed:")) event.method.substring(5) else event.method
         requestOrEventFilters(uri, methodName, event.contentType).eventFilters
 

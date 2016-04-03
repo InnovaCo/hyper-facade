@@ -28,18 +28,6 @@ abstract class WsTestWorker(filterChain: FilterChain) extends HttpServiceActor w
       filterChain.filterRequest(context, facadeRequest) map { filteredRequest ⇒
         exposeFacadeRequest(filteredRequest)
       }
-/*  todo: intention isn't clear here
-    case request: DynamicRequest =>
-      request match {
-        case DynamicRequest(uri, dynamicBody, requestHeader) ⇒
-          val headers = extractRequestHeaders(uri, requestHeader)
-          outputFilterChain.applyFilters(headers, dynamicBody) onComplete {
-            case Success((filteredHeaders, body)) ⇒
-              send(toFrame(toDynamicRequest(filteredHeaders, body)))
-          }
-      }
-
-    case request: HttpRequest =>*/
   }
 
   def exposeFacadeRequest(facadeRequest: FacadeRequest): Unit

@@ -50,12 +50,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     case BecomeReliable(lastRevision: Long) ⇒
       context.become(subscribedReliable(requestContext, originalRequest, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
       unstashAll()
-      log.debug(s"Reliable subscription started for $originalRequest with revision $lastRevision")
+      log.debug(s"Reliable subscription started for $requestContext with revision $lastRevision")
 
     case BecomeUnreliable ⇒
       context.become(subscribedUnreliable(requestContext) orElse stopStartSubscription)
       unstashAll()
-      log.debug(s"Unreliable subscription started for $originalRequest")
+      log.debug(s"Unreliable subscription started for $requestContext")
   }
 
   def subscribedReliable(requestContext: FacadeRequestContext, originalRequest: FacadeRequest, lastRevisionId: Long, subscriptionSyncTries: Int): Receive = {
@@ -93,7 +93,9 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     implicit val ec = executionContext
     beforeFilterChain.filterRequest(requestContext, originalRequest) map { r ⇒
-      val preparedContext = requestContext.prepare(r)
+      val ramlParsedUri = ramlConfig.resourceUri(r.uri.pattern.specific)
+      val facadeRequestWithRamlUri = r.copy(uri = ramlParsedUri)
+      val preparedContext = requestContext.prepare(facadeRequestWithRamlUri)
       BeforeFilterComplete(preparedContext, r)
     } recover handleFilterExceptions(requestContext) { response ⇒
       websocketWorker ! response

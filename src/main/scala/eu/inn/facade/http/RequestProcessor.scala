@@ -31,9 +31,11 @@ trait RequestProcessor extends Injectable {
 
   def processRequestToFacade(requestContext: FacadeRequestContext, request: FacadeRequest): Future[FacadeResponse] = {
     beforeFilterChain.filterRequest(requestContext, request) flatMap { r ⇒
-      val preparedContext = requestContext.prepare(r)
+      val ramlParsedUri = ramlConfig.resourceUri(r.uri.pattern.specific)
+      val facadeRequestWithRamlUri = r.copy(uri = ramlParsedUri)
+      val preparedContext = requestContext.prepare(facadeRequestWithRamlUri)
 
-      processRequestWithRaml(preparedContext, r, 0) flatMap { filteredRequest ⇒
+      processRequestWithRaml(preparedContext, facadeRequestWithRamlUri, 0) flatMap { filteredRequest ⇒
         hyperbus <~ filteredRequest.toDynamicRequest recover {
           handleHyperbusExceptions(preparedContext)
         } flatMap { response ⇒
@@ -54,12 +56,10 @@ trait RequestProcessor extends Injectable {
       )
     }
     else {
-      val ramlParsedUri = ramlConfig.resourceUri(facadeRequest.uri.pattern.specific)
-      val facadeRequestWithRamlUri = facadeRequest.copy(uri = ramlParsedUri)
-      ramlFilterChain.filterRequest(requestContext, facadeRequestWithRamlUri) recoverWith {
+      ramlFilterChain.filterRequest(requestContext, facadeRequest) recoverWith {
         case e : FilterRestartException ⇒
           if (log.isDebugEnabled) {
-            log.debug(s"Request $requestContext is restarted from $facadeRequestWithRamlUri to ${e.request}")
+            log.debug(s"Request $requestContext is restarted from $facadeRequest to ${e.request}")
           }
           processRequestWithRaml(requestContext, e.request, tryNum + 1)
       }
