@@ -1,5 +1,4 @@
 rewrite
-#privateField
-#privateResource
-#x_client_ip
-#x_client_language
+private
+x_client_ip
+x_client_language

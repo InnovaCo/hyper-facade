@@ -9,7 +9,6 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement
 public class rewrite extends CustomType implements RamlAnnotation {
-
     private String uri;
 
     @XmlElement(name="uri")

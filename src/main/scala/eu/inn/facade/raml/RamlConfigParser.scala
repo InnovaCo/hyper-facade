@@ -60,7 +60,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             filterFactory.createFilterChain(target)
 
           case None ⇒
-            log.warn(s"Annotation '${annotation.name}' has no bound filter to create")
+            log.warn(s"Annotation '${annotation.name}' is not bound")
             filterChain
         }
       }
