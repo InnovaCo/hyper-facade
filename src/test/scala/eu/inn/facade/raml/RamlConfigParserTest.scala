@@ -47,7 +47,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
         DataType("TestRequest",
           Seq(Field("mode", DataType()),
               Field("resultType", DataType()),
-              Field("clientIP", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(CLIENT_IP)))),
+              Field("clientIp", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(CLIENT_IP)))),
               Field("clientLanguage", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(CLIENT_LANGUAGE))))),
           Seq()))
 
@@ -101,7 +101,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
         DataType("TestRequest",
           Seq(Field("mode", DataType("string", Seq(), Seq())),
               Field("resultType", DataType("string", Seq(), Seq())),
-              Field("clientIP", DataType("string", Seq(), Seq(Annotation(CLIENT_IP)))),
+              Field("clientIp", DataType("string", Seq(), Seq(Annotation(CLIENT_IP)))),
               Field("clientLanguage", DataType("string", Seq(), Seq(Annotation(CLIENT_LANGUAGE))))),
         Seq()))
       val resourceStateContentType = Some("app-server-status")

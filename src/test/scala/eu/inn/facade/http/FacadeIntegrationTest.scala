@@ -59,7 +59,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
         Ok(DynamicBody(ObjV("a"→"response"))), { request ⇒
           request.uri shouldBe Uri("/status/test-service")
-          request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
+          request.body shouldBe DynamicBody(ObjV("emptyParam" → Null, "param" → "1", "clientIp" → "127.0.0.1"))
         }
       ) onSuccess {
         case subscr ⇒ register(subscr)

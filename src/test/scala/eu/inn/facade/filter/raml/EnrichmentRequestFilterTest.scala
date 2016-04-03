@@ -2,7 +2,7 @@ package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.Text
 import eu.inn.facade.MockContext
-import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
+import eu.inn.facade.model.FacadeRequest
 import eu.inn.facade.raml.{Annotation, DataType, Field, Method}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -23,7 +23,7 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
       val request = FacadeRequest(
         Uri("/resource"),
         Method.POST,
-        Map("Accept-Language" → Seq("ru"), FacadeHeaders.CLIENT_IP → Seq("127.0.0.1")),
+        Map("Accept-Language" → Seq("ru")),
         Map("field" → Text("value"))
       )
 
@@ -37,13 +37,12 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
           Map("field" → Text("value"),
             "clientIp" → Text("127.0.0.1"),
             "acceptLanguage" → Text("ru")))
-        filteredRequest shouldBe expectedRequest
+        filteredRequest.copy(headers=Map.empty) shouldBe expectedRequest
       }
     }
 
     "don't add fields if request headers are missed" in {
       val filter = new EnrichRequestFilter(Seq(
-        Field("clientIp", DataType("string", Seq.empty, Seq(Annotation(Annotation.CLIENT_IP)))),
         Field("acceptLanguage", DataType("string", Seq.empty, Seq(Annotation(Annotation.CLIENT_LANGUAGE))))))
 
       val initialRequest = FacadeRequest(
