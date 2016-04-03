@@ -343,6 +343,51 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":"got it"}"""
     }
 
+    "websocket: get with rewrite" in {
+      val q = new TestQueue
+      val client = createWsClient("ws-get-rewrite-client", "/test-rewrite/some-service", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Text("response"))), { request ⇒
+            request.uri shouldBe Uri("/status/test-service")
+          }
+        ).futureValue
+      }
+
+      client ! FacadeRequest(Uri("/test-rewrite/some-service"), Method.GET,
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
+
+      val resourceState = q.next().futureValue
+      resourceState should include (""""response"""")
+    }
+
+    "websocket: get applies private response filter" in {
+      val q = new TestQueue
+      val client = createWsClient("ws-get-private-client", "/test-rewrite/some-service", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(
+            ObjV(
+              "fullName" → "John Smith",
+              "userName" → "jsmith",
+              "password" → "abyrvalg"
+            )
+          )), { request ⇒
+            request.uri shouldBe Uri("/users/{userId}", Map("userId" → "100500"))
+          }
+        ).futureValue
+      }
+
+      client ! FacadeRequest(Uri("/users/100500"), Method.GET,
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
+
+      val resourceState = q.next().futureValue
+      resourceState should include (""""userName":"jsmith"""")
+      resourceState shouldNot include ("""password""")
+    }
+
     "http get with rewrite" in {
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
