@@ -50,7 +50,7 @@ object FacadeConfig {
   val RAML_FILE = ROOT + "raml-file"
   val HYPERBUS_GROUP = ROOT + "hyperbus.group-name"
   val GRAPHITE = ROOT + "graphite"
-  val FILTERS = ROOT + "filters"
+  val INJECT_MODULES = ROOT + "inject-modules"
   val HTTP = ROOT + "http-transport"
   val SHUTDOWN_TIMEOUT = ROOT + "shutdown-timeout"
   val MAX_RESUBSCRIPTIONS = ROOT + "max-resubscriptions"

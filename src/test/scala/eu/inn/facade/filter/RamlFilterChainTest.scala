@@ -5,16 +5,14 @@ import eu.inn.facade.MockContext
 import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain}
 import eu.inn.facade.filter.raml.{EnrichRequestFilter, EventPrivateFilter, RequestPrivateFilter, ResponsePrivateFilter}
 import eu.inn.facade.model.{FacadeRequest, _}
-import eu.inn.facade.modules.{ConfigModule, FiltersModule}
+import eu.inn.facade.modules.Injectors
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
-import scaldi.{Injectable, Module}
+import scaldi.Injectable
 
 class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with MockContext {
-  implicit val injector = new ConfigModule :: new FiltersModule :: new Module {
-    bind [Seq[RamlFilterFactory]] identifiedBy "paged" to Seq(new NoOpFilterFactory)
-  }
-  injector.initNonLazy()
+  implicit val injector = Injectors()
+
   val filterChain = inject [FilterChain].asInstanceOf[RamlFilterChain]
 
   "FilterChainRamlFactory " - {

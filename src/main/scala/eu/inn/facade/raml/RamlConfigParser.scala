@@ -56,10 +56,8 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
         val ident = StringIdentifier(annotation.name)
         inj.getBinding(List(ident)) match {
           case Some(_) ⇒
-            val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
-            filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
-              filterChainInner ++ factory.createFilterChain(target)
-            }
+            val filterFactory = inject[RamlFilterFactory](annotation.name)
+            filterFactory.createFilterChain(target)
 
           case None ⇒
             log.warn(s"Annotation '${annotation.name}' has no bound filter to create")
@@ -126,10 +124,8 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             val filterMap = fields.foldLeft(Seq.newBuilder[(RamlFilterFactory,Field)]) { (filterSeq, field) ⇒
               field.dataType.annotations.foreach { annotation ⇒
                 try {
-                  val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
-                  filterFactories.foreach { filterFactory: RamlFilterFactory ⇒
-                    filterSeq += (filterFactory → field)
-                  }
+                  val filterFactory = inject[RamlFilterFactory](annotation.name)
+                  filterSeq += (filterFactory → field)
                 }
                 catch {
                   case NonFatal(e) ⇒

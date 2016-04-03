@@ -39,7 +39,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
     "request data structure" in {
       val usersHeaders = Seq(Header("authToken"))
       val usersBody = Body(DataType("StatusRequest", Seq(Field("serviceType", DataType())), Seq()))
-      val dsStatus = ramlConfig.resourcesByUri("/status").methods(Method(POST)).requests.dataStructures(None)
+      val dsStatus = ramlConfig.resourcesByUri("/status").methods(Method(POST)).requests.dataStructures(None).copy(filters=FilterChain.empty)
       dsStatus shouldBe DataStructure(usersHeaders, Some(usersBody), FilterChain.empty)
 
       val testServiceHeaders = Seq(Header("authToken"))
@@ -81,7 +81,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
 
       val test404Headers = Seq[Header]()
       val test404Body = Body(DataType())
-      val dsResponse404 = ramlConfig.resourcesByUri("/status/test-service").methods(Method(GET)).responses(404).dataStructures(None)
+      val dsResponse404 = ramlConfig.resourcesByUri("/status/test-service").methods(Method(GET)).responses(404).dataStructures(None).copy(filters=FilterChain.empty)
       dsResponse404 shouldBe DataStructure(test404Headers, Some(test404Body), FilterChain.empty)
     }
 

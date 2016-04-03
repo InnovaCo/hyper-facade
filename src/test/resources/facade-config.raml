@@ -72,10 +72,14 @@ annotationTypes:
   private:
   paged:
   rewrite:
+  not-defined:
 
 traits:
   secured:
   rateLimited:
+
+/test-not-defined-filter:
+  (not-defined):      
 
 /users:
   is: [ secured ]
@@ -119,8 +123,6 @@ traits:
         headers:
           content-type:
 
-  post:
-    is: [ rateLimited ]
   /test-service:
     get:
       (paged):
