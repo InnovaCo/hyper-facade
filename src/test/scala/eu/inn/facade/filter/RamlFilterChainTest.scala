@@ -10,6 +10,9 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
+// todo: important to test when specific != formatted!
+// + integrated test with filter lookup when specific != formatted!
+
 class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with MockContext {
   implicit val injector = Injectors()
 
