@@ -29,10 +29,9 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
   def receive: Receive = stopStartSubscription orElse {
-    case FacadeRequestWithContext(request, requestContext) ⇒ {
+    case FacadeRequestWithContext(request, requestContext) ⇒
       implicit val ec = executionContext
       processRequestToFacade(request, requestContext) pipeTo websocketWorker
-    }
   }
 
   def filtering(originalRequest: FacadeRequest, subscriptionSyncTries: Int): Receive = {
@@ -96,7 +95,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       val ramlParsedUri = ramlConfig.resourceUri(r.uri.pattern.specific)
       val facadeRequestWithRamlUri = r.copy(uri = ramlParsedUri)
       val preparedContext = requestContext.prepare(facadeRequestWithRamlUri)
-      BeforeFilterComplete(preparedContext, r)
+      BeforeFilterComplete(preparedContext, facadeRequestWithRamlUri)
     } recover handleFilterExceptions(requestContext) { response ⇒
       websocketWorker ! response
       PoisonPill

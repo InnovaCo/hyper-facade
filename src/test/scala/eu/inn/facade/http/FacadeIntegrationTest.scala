@@ -388,6 +388,40 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       resourceState shouldNot include ("""password""")
     }
 
+    "websocket: get applies private event filter" in {
+      val q = new TestQueue
+      val client = createWsClient("ws-get-private-event-client", "/test-rewrite/some-service", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(
+            ObjV(
+              "fullName" → "John Smith",
+              "userName" → "jsmith",
+              "password" → "abyrvalg"
+            )
+          )), { request ⇒
+            request.uri shouldBe Uri("/users/{userId}", Map("userId" → "100500"))
+          }
+        ).futureValue
+      }
+
+      client ! FacadeRequest(Uri("/users/100500"), "subscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
+
+      val resourceState = q.next().futureValue
+      resourceState should include (""""userName":"jsmith"""")
+      resourceState shouldNot include ("""password""")
+
+      hyperbus <| DynamicRequest(Uri("/users/{userId}", Map("userId" → "100500")), "feed:put", DynamicBody(
+        ObjV("fullName" → "John Smith", "userName" → "newsmith", "password" → "neverforget")
+      ))
+
+      val event = q.next().futureValue
+      event should include (""""userName":"newsmith"""")
+      event shouldNot include ("""password""")
+    }
+
     "http get with rewrite" in {
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
