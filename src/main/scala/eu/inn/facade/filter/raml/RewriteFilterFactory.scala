@@ -1,10 +1,9 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
-import eu.inn.facade.model.{FacadeResponse, _}
-import eu.inn.facade.raml.{Annotation, RamlConfig}
+import eu.inn.facade.model._
+import eu.inn.facade.raml.Annotation
 import eu.inn.facade.raml.annotationtypes.rewrite
-import eu.inn.hyperbus.model.{ErrorBody, NotFound}
 import eu.inn.hyperbus.transport.api.matchers.Specific
 import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
 
@@ -33,7 +32,7 @@ class RewriteFilterFactory extends RamlFilterFactory {
 class RewriteRequestFilter(args: rewrite) extends RequestFilter {
   val uriParameters = UriParser.extractParameters(args.getUri)
 
-  override def apply(context: RequestFilterContext, request: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
+  override def apply(context: FacadeRequestContext, request: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
     var failures = mutable.ArrayBuffer[Throwable]()
     val newArgs = uriParameters flatMap { uriParameter ⇒
       request.uri.args.get(uriParameter) match {

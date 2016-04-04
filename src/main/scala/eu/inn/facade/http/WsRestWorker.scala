@@ -4,16 +4,17 @@ import akka.actor._
 import eu.inn.binders.value.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model.{FacadeHeaders, FacadeMessage, FacadeRequest, FacadeResponse}
+import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.{Hyperbus, IdGenerator}
-import eu.inn.hyperbus.model._
 import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
 import spray.can.websocket.frame.Frame
 import spray.can.{Http, websocket}
 import spray.http.HttpRequest
 import spray.routing.HttpServiceActor
+
+import scala.util.control.NonFatal
 
 class WsRestWorker(val serverConnection: ActorRef,
                    workerRoutes: WsRestRoutes,
@@ -74,26 +75,33 @@ class WsRestWorker(val serverConnection: ActorRef,
   def businessLogic: Receive = {
     case message: Frame ⇒
       try {
-        val facadeRequest = FacadeRequest(message)
-        val uriPattern = facadeRequest.uri.pattern.specific
-        val method = facadeRequest.method
+        val originalRequest = FacadeRequest(message)
+        val uriPattern = originalRequest.uri.pattern.specific
+        val uri = spray.http.Uri()
+        if (uri.scheme.nonEmpty || uri.authority.nonEmpty) {
+          throw new IllegalArgumentException(s"Uri $uri has invalid format. Only path and query is allowed.")
+        }
+        val method = originalRequest.method
         if (isPingRequest(uriPattern, method)) {
-          pong(facadeRequest)
+          pong(originalRequest)
         }
         else {
-          val requestWithClientIp = facadeRequest.copy(
-            // todo: support Forwarded by RFC 7239
-            headers = facadeRequest.headers + (FacadeHeaders.CLIENT_IP → Seq(remoteAddress))
-          )
-          processRequest(requestWithClientIp)
+          httpRequest match {
+            case Some(h) ⇒
+              val requestContext = FacadeRequestContext.create(remoteAddress, h, originalRequest )
+              processRequest(requestContext, originalRequest.copy(headers = requestContext.requestHeaders))
+
+            case None ⇒
+              throw new RuntimeException(s"httpRequest is empty while processing frame.")
+          }
         }
       }
       catch {
-        case t: Throwable ⇒
+        case NonFatal(t) ⇒
+          // todo: send error response to the client
           val msg = message.payload.utf8String
           //          val msgShort = msg.substring(0, Math.min(msg.length, 240))
-          log.warning(s"Can't deserialize websocket message '$msg' from ${sender()}/$remoteAddress. $t")
-          t.printStackTrace()
+          log.warning(s"Can't deserialize WS message '$msg' from ${sender()}/$remoteAddress. $t")
           None
       }
 
@@ -111,12 +119,13 @@ class WsRestWorker(val serverConnection: ActorRef,
     }
   }
 
-  def processRequest(facadeRequest: FacadeRequest) = {
+  def processRequest(requestContext: FacadeRequestContext, facadeRequest: FacadeRequest) = {
     val key = facadeRequest.clientCorrelationId.get
     val actorName = "Subscr-" + key
+    val requestWithContext = FacadeRequestWithContext(requestContext, facadeRequest)
     context.child(actorName) match {
-      case Some(actor) ⇒ actor.forward(facadeRequest)
-      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperbus, subscriptionManager), actorName) ! facadeRequest
+      case Some(actor) ⇒ actor.forward(requestWithContext)
+      case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperbus, subscriptionManager), actorName) ! requestWithContext
     }
   }
 

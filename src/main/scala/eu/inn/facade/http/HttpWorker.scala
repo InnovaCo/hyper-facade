@@ -11,7 +11,6 @@ import spray.routing._
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpWorker(implicit val injector: Injector) extends RequestProcessor {
-
   val log = LoggerFactory.getLogger(getClass.getName)
   implicit val actorSystem = inject[ActorSystem]
   implicit val executionContext = inject[ExecutionContext]
@@ -27,7 +26,13 @@ class HttpWorker(implicit val injector: Injector) extends RequestProcessor {
   }
 
   def processRequest(request: HttpRequest, remoteAddress: String): Future[HttpResponse] = {
-    processRequestToFacade(FacadeRequest(request, remoteAddress)) map { response ⇒
+    val facadeRequest = FacadeRequest(request)
+    val requestContext = FacadeRequestContext.create(
+        remoteAddress,
+        request,
+        facadeRequest
+      )
+    processRequestToFacade(requestContext, facadeRequest) map { response ⇒
       response.toHttpResponse
     }
   }

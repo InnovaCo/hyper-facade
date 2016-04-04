@@ -22,7 +22,7 @@ types:
     properties:
       mode: string
       resultType: string
-      clientIP:
+      clientIp:
         (x-client-ip):
         type: string
       clientLanguage:
@@ -57,20 +57,59 @@ types:
       revisionId: number
       update: string
 
+  User:
+    type: object
+    properties:
+      fullName: string
+      userName: string
+      password:
+        (private):
+        type: string
+
 annotationTypes:
   x-client-ip:
   x-client-language:
   private:
   paged:
   rewrite:
+  not-defined:
 
 traits:
   secured:
   rateLimited:
 
-/users:
-  is: [ secured ]
+/test-not-defined-filter:
+  (not-defined):      
+
+/users/{userId}:
   get:
+    is: [ secured, rateLimited ]
+    (paged):
+    headers:
+      authToken:
+    responses:
+      200:
+        body:
+          type: User
+        headers:
+          content-type:
+  put:
+    is: [ secured ]
+    body:
+      application/json:
+        type: User
+
+/status:
+  get:
+    headers:
+      authToken:
+    responses:
+      200:
+        body:
+          type: Status
+        headers:
+          content-type:
+  post:
     is: [ rateLimited ]
     (paged):
     body:
@@ -84,9 +123,6 @@ traits:
         headers:
           content-type:
 
-/status:
-  post:
-    is: [ rateLimited ]
   /test-service:
     get:
       (paged):
@@ -118,7 +154,7 @@ traits:
 /reliable-feed/{content:*}:
   post:
     body:
-      none:
+      application/json:
         type: TestRequest
       application/vnd.app-server-status+json:
         type: ReliableResourceState

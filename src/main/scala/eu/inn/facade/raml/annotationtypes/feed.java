@@ -8,6 +8,5 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement
-public class privateField extends CustomType implements RamlAnnotation {
-
+public class feed extends CustomType implements RamlAnnotation {
 }

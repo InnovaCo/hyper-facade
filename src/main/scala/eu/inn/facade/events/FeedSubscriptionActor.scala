@@ -4,7 +4,7 @@ import akka.actor._
 import akka.pattern.pipe
 import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfig
-import eu.inn.facade.http.RequestProcessor
+import eu.inn.facade.http.{FacadeRequestWithContext, RequestProcessor}
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Method
 import eu.inn.hyperbus.Hyperbus
@@ -29,52 +29,56 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
   def receive: Receive = stopStartSubscription orElse {
-    case request : FacadeRequest ⇒ {
+    case FacadeRequestWithContext(request, requestContext) ⇒
       implicit val ec = executionContext
-      processRequestToFacade(request) pipeTo websocketWorker
-    }
+      processRequestToFacade(request, requestContext) pipeTo websocketWorker
   }
 
-  def subscribing(originalRequest: FacadeRequest, subscriptionSyncTries: Int): Receive = {
+  def filtering(originalRequest: FacadeRequest, subscriptionSyncTries: Int): Receive = {
+    case BeforeFilterComplete(requestContext, facadeRequest) ⇒
+      continueSubscription(originalRequest, requestContext, facadeRequest, subscriptionSyncTries)
+  }
+
+  def subscribing(originalRequest: FacadeRequest, requestContext: FacadeRequestContext, subscriptionSyncTries: Int): Receive = {
     case event: DynamicRequest ⇒
-      processEventWhileSubscribing(originalRequest, event)
+      processEventWhileSubscribing(requestContext, event)
 
     case resourceState: Response[DynamicBody] @unchecked ⇒
-      processResourceState(originalRequest, resourceState, subscriptionSyncTries)
+      processResourceState(requestContext, resourceState, subscriptionSyncTries)
 
     case BecomeReliable(lastRevision: Long) ⇒
-      context.become(subscribedReliable(originalRequest, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
+      context.become(subscribedReliable(requestContext, originalRequest, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
       unstashAll()
-      log.debug(s"Reliable subscription started for $originalRequest with revision $lastRevision")
+      log.debug(s"Reliable subscription started for $requestContext with revision $lastRevision")
 
     case BecomeUnreliable ⇒
-      context.become(subscribedUnreliable(originalRequest) orElse stopStartSubscription)
+      context.become(subscribedUnreliable(requestContext) orElse stopStartSubscription)
       unstashAll()
-      log.debug(s"Unreliable subscription started for $originalRequest")
+      log.debug(s"Unreliable subscription started for $requestContext")
   }
 
-  def subscribedReliable(originalRequest: FacadeRequest, lastRevisionId: Long, subscriptionSyncTries: Int): Receive = {
+  def subscribedReliable(requestContext: FacadeRequestContext, originalRequest: FacadeRequest, lastRevisionId: Long, subscriptionSyncTries: Int): Receive = {
     case event: DynamicRequest ⇒
-      processReliableEvent(originalRequest, event, lastRevisionId, subscriptionSyncTries)
+      processReliableEvent(requestContext, originalRequest, event, lastRevisionId, subscriptionSyncTries)
 
     case RestartSubscription ⇒
-      startSubscription(originalRequest, subscriptionSyncTries + 1)
+      startSubscription(requestContext, originalRequest, subscriptionSyncTries + 1)
   }
 
-  def subscribedUnreliable(request: FacadeRequest): Receive = {
+  def subscribedUnreliable(requestContext: FacadeRequestContext): Receive = {
     case event: DynamicRequest ⇒
-      processUnreliableEvent(request, event)
+      processUnreliableEvent(requestContext, event)
   }
 
   def stopStartSubscription: Receive = {
-    case request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _) ⇒
-      startSubscription(request, 0)
+    case FacadeRequestWithContext(requestContext, request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _)) ⇒
+      startSubscription(requestContext, request, 0)
 
-    case FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _) ⇒
+    case FacadeRequestWithContext(_, FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _)) ⇒
       context.stop(self)
   }
 
-  def startSubscription(originalRequest: FacadeRequest, subscriptionSyncTries: Int): Unit = {
+  def startSubscription(requestContext: FacadeRequestContext, originalRequest: FacadeRequest, subscriptionSyncTries: Int): Unit = {
     if (log.isTraceEnabled) {
       log.trace(s"Starting subscription #$subscriptionSyncTries for ${originalRequest.uri}")
     }
@@ -83,29 +87,43 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       context.stop(self)
     }
     subscriptionManager.off(self)
-    context.become(subscribing(originalRequest, subscriptionSyncTries) orElse stopStartSubscription)
+
+    context.become(filtering(originalRequest, subscriptionSyncTries) orElse stopStartSubscription)
 
     implicit val ec = executionContext
-    beforeFilterChain.filterRequest(originalRequest, originalRequest) flatMap { r ⇒
-      processRequestWithRaml(originalRequest, r, 0) map { filteredRequest ⇒
-        val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
-          filteredRequest.headers(Header.MESSAGE_ID)).head
-        val subscriptionUri = getSubscriptionUri(filteredRequest)
-        val newSubscriptionId = subscriptionManager.subscribe(self, subscriptionUri, correlationId)
-        implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
-        hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
-          handleHyperbusExceptions(originalRequest)
-        } pipeTo self
-      }
-    } recover handleFilterExceptions(originalRequest) { response ⇒
+    beforeFilterChain.filterRequest(requestContext, originalRequest) map { unpreparedRequest ⇒
+      val (preparedContext, preparedRequest) = prepareContextAndRequestBeforeRaml(requestContext, unpreparedRequest)
+      BeforeFilterComplete(preparedContext, preparedRequest)
+    } recover handleFilterExceptions(requestContext) { response ⇒
       websocketWorker ! response
-      self ! PoisonPill
+      PoisonPill
+    } pipeTo self
+  }
+
+  def continueSubscription(originalRequest: FacadeRequest,
+                           requestContext: FacadeRequestContext,
+                           facadeRequest: FacadeRequest,
+                           subscriptionSyncTries: Int): Unit = {
+
+    context.become(subscribing(originalRequest, requestContext, subscriptionSyncTries) orElse stopStartSubscription)
+
+    implicit val ec = executionContext
+
+    processRequestWithRaml(requestContext, facadeRequest, 0) map { filteredRequest ⇒
+      val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
+        filteredRequest.headers(Header.MESSAGE_ID)).head
+      val subscriptionUri = getSubscriptionUri(filteredRequest)
+      subscriptionManager.subscribe(self, subscriptionUri, correlationId)
+      implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
+      hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
+        handleHyperbusExceptions(requestContext)
+      }  pipeTo self
     }
   }
 
-  def processEventWhileSubscribing(originalRequest: FacadeRequest, event: DynamicRequest): Unit = {
+  def processEventWhileSubscribing(requestContext: FacadeRequestContext, event: DynamicRequest): Unit = {
     if (log.isTraceEnabled) {
-      log.trace(s"Processing event while subscribing $event for ${originalRequest.uri}")
+      log.trace(s"Processing event while subscribing $event for ${requestContext.pathAndQuery}")
     }
 
     event.headers.get(Header.REVISION) match {
@@ -116,19 +134,19 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
       // unreliable feed
       case _ ⇒
-        processUnreliableEvent(originalRequest, event)
+        processUnreliableEvent(requestContext, event)
     }
   }
 
-  def processResourceState(originalRequest: FacadeRequest, resourceState: Response[DynamicBody], subscriptionSyncTries: Int) = {
+  def processResourceState(requestContext: FacadeRequestContext, resourceState: Response[DynamicBody], subscriptionSyncTries: Int) = {
     val facadeResponse = FacadeResponse(resourceState)
     if (log.isTraceEnabled) {
-      log.trace(s"Processing resource state $resourceState for ${originalRequest.uri}")
+      log.trace(s"Processing resource state $resourceState for ${requestContext.pathAndQuery}")
     }
 
     implicit val ec = executionContext
-    ramlFilterChain.filterResponse(originalRequest, facadeResponse) flatMap { filteredResponse ⇒
-      afterFilterChain.filterResponse(originalRequest, filteredResponse) map { finalResponse ⇒
+    ramlFilterChain.filterResponse(requestContext, facadeResponse) flatMap { filteredResponse ⇒
+      afterFilterChain.filterResponse(requestContext, filteredResponse) map { finalResponse ⇒
         websocketWorker ! finalResponse
         if (finalResponse.status > 399) { // failed
           PoisonPill
@@ -145,49 +163,51 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           }
         }
       }
-    } recover handleFilterExceptions(originalRequest) { response ⇒
+    } recover handleFilterExceptions(requestContext) { response ⇒
       websocketWorker ! response
       PoisonPill
     } pipeTo self
   }
 
-  def processUnreliableEvent(originalRequest: FacadeRequest, event: DynamicRequest): Unit = {
+  def processUnreliableEvent(requestContext: FacadeRequestContext, event: DynamicRequest): Unit = {
     if (log.isTraceEnabled) {
-      log.trace(s"Processing unreliable event $event for ${originalRequest.uri}")
+      log.trace(s"Processing unreliable event $event for ${requestContext.pathAndQuery}")
     }
     implicit val ec = executionContext
-    ramlFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
-      afterFilterChain.filterEvent(originalRequest, e) map { filteredRequest ⇒
+    ramlFilterChain.filterEvent(requestContext, FacadeRequest(event)) flatMap { e ⇒
+      afterFilterChain.filterEvent(requestContext, e) map { filteredRequest ⇒
         websocketWorker ! filteredRequest
       }
-    } recover handleFilterExceptions(originalRequest) { response ⇒
+    } recover handleFilterExceptions(requestContext) { response ⇒
       if (log.isDebugEnabled) {
-        log.debug(s"Event is discarded for request $originalRequest with filter response $response")
+        log.debug(s"Event is discarded for $requestContext with filter response $response")
       }
     }
   }
 
-  def processReliableEvent(originalRequest: FacadeRequest, event: DynamicRequest,
+  def processReliableEvent(requestContext: FacadeRequestContext,
+                           originalRequest: FacadeRequest,
+                           event: DynamicRequest,
                            lastRevisionId: Long,
                            subscriptionSyncTries: Int): Unit = {
     event.headers.get(Header.REVISION) match {
       case Some(revision :: tail) ⇒
         val revisionId = revision.toLong
         if (log.isTraceEnabled) {
-          log.trace(s"Processing reliable event #$revisionId $event for ${originalRequest.uri}")
+          log.trace(s"Processing reliable event #$revisionId $event for ${requestContext.pathAndQuery}")
         }
 
         if (revisionId == lastRevisionId + 1) {
-          context.become(subscribedReliable(originalRequest, lastRevisionId + 1, 0) orElse stopStartSubscription)
+          context.become(subscribedReliable(requestContext, originalRequest, lastRevisionId + 1, 0) orElse stopStartSubscription)
 
           implicit val ec = executionContext
-          ramlFilterChain.filterEvent(originalRequest, FacadeRequest(event)) flatMap { e ⇒
-            afterFilterChain.filterEvent(originalRequest, e) map { filteredRequest ⇒
+          ramlFilterChain.filterEvent(requestContext, FacadeRequest(event)) flatMap { e ⇒
+            afterFilterChain.filterEvent(requestContext, e) map { filteredRequest ⇒
               websocketWorker ! filteredRequest
             }
-          } recover handleFilterExceptions(originalRequest) { response ⇒
+          } recover handleFilterExceptions(requestContext) { response ⇒
             if (log.isDebugEnabled) {
-              log.debug(s"Event is discarded for request $originalRequest with filter response $response")
+              log.debug(s"Event is discarded for $requestContext with filter response $response")
             }
           }
         }
@@ -195,12 +215,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         if (revisionId > lastRevisionId + 1) {
           // we lost some events, start from the beginning
           self ! RestartSubscription
-          log.info(s"Subscription on ${originalRequest.uri} lost events from $lastRevisionId to $revisionId. Restarting...")
+          log.info(s"Subscription on ${requestContext.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting...")
         }
         // if revisionId <= lastRevisionId -- just ignore this event
 
       case _ ⇒
-        log.error(s"Received event: $event without revisionId for reliable feed: $originalRequest")
+        log.error(s"Received event: $event without revisionId for reliable feed: $requestContext")
     }
   }
 
@@ -229,6 +249,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 case class BecomeReliable(lastRevision: Long)
 case object BecomeUnreliable
 case object RestartSubscription
+case class BeforeFilterComplete(requestContext: FacadeRequestContext, facadeRequest: FacadeRequest)
 
 object FeedSubscriptionActor {
   def props(websocketWorker: ActorRef,

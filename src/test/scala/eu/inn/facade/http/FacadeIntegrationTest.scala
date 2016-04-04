@@ -2,10 +2,11 @@ package eu.inn.facade.http
 
 import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, TimeUnit}
 
-import akka.actor.{ActorSystem, Props}
+import akka.actor.ActorSystem
 import com.typesafe.config.Config
+import eu.inn.binders.json._
 import eu.inn.binders.value.{Null, Obj, ObjV, Text}
-import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
+import eu.inn.facade.model.{FacadeHeaders, FacadeRequest, UriSpecificDeserializer, UriSpecificSerializer}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
 import eu.inn.hyperbus.Hyperbus
@@ -14,33 +15,33 @@ import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import eu.inn.hyperbus.transport.api.{Subscription, TransportConfigurationLoader, TransportManager}
 import eu.inn.servicecontrol.api.Service
-import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.concurrent.{Eventually, ScalaFutures}
 import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{BeforeAndAfterEach, FreeSpec, Matchers}
 import scaldi.Injectable
-import spray.can.Http
-import spray.can.websocket.frame.TextFrame
 import spray.client.pipelining._
 import spray.http
 import spray.http.HttpCharsets._
 import spray.http.HttpHeaders.{RawHeader, `Content-Type`}
 import spray.http._
 
-import scala.collection.mutable
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.duration.{Duration, _}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.io.Source
-import scala.util.Success
-
 
 /**
   * Important: Kafka should be up and running to pass this test
   */
-class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with Injectable with BeforeAndAfterEach {
+class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with Injectable
+  with BeforeAndAfterEach with WsTestClientHelper with Eventually {
   implicit val injector = Injectors()
   implicit val actorSystem = inject[ActorSystem]
+  implicit val patience = PatienceConfig(scaled(Span(15, Seconds)))
+  implicit val timeout = akka.util.Timeout(15.seconds)
+  implicit val uid = new UriSpecificDeserializer
+  implicit val uis = new UriSpecificSerializer
+
   val httpWorker = inject[HttpWorker]
 
   inject[Service].asInstanceOf[WsRestServiceApp].start {
@@ -56,153 +57,103 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
   "Facade integration" - {
     "http get. Resource configured in RAML" in {
-      testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
-        Ok(DynamicBody(Text("response"))), { request ⇒
-          request.uri shouldBe Uri("/status/test-service")
-          request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
-        }
-      ) onSuccess {
-        case subscr ⇒ register(subscr)
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(ObjV("a" → "response"))), { request ⇒
+            request.uri shouldBe Uri("/status/test-service")
+            request.body shouldBe DynamicBody(ObjV("emptyParam" → Null, "param" → "1", "clientIp" → "127.0.0.1"))
+          }
+        ).futureValue
       }
 
-      Source.fromURL("http://localhost:54321/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
+      Source.fromURL("http://localhost:54321/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """{"a":"response"}"""
     }
 
     "http get. Resource is not configured in RAML" in {
-      testService.onCommand(RequestMatcher(Some(Uri("/someSecretResource")), Map(Header.METHOD → Specific(Method.GET))),
-        Ok(DynamicBody(Text("response"))), { request ⇒
-          request.uri shouldBe Uri("/someSecretResource")
-          request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
-        }
-      ) onSuccess {
-        case subscr ⇒ register(subscr)
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/someSecretResource")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Text("response"))), { request ⇒
+            request.uri shouldBe Uri("/someSecretResource")
+            request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
+          }
+        ).futureValue
       }
-
-      Thread.sleep(1000)
-
       Source.fromURL("http://localhost:54321/someSecretResource?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
     }
 
     "http get. Error response" in {
-      testService.onCommand(RequestMatcher(Some(Uri("/failed-resource")), Map(Header.METHOD → Specific(Method.GET))),
-        ServiceUnavailable(ErrorBody("service-is-not-available", Some("No connection to DB")))) onSuccess {
-        case subscr ⇒ register(subscr)
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/failed-resource")), Map(Header.METHOD → Specific(Method.GET))),
+          ServiceUnavailable(ErrorBody("service-is-not-available", Some("No connection to DB")))
+        ).futureValue
       }
 
       val clientActorSystem = ActorSystem()
       val pipeline: HttpRequest => Future[HttpResponse] = sendReceive(clientActorSystem, ExecutionContext.fromExecutor(newPoolExecutor()))
       val uri404 = "http://localhost:54321/test-service/reliable"
-      val responseFuture404 = pipeline(Get(http.Uri(uri404)))
-      whenReady(responseFuture404, Timeout(Span(5, Seconds))) { response ⇒
-        response.entity.asString should include (""""code":"not-found"""")
-        response.status.intValue shouldBe 404
-      }
+      val response404 = pipeline(Get(http.Uri(uri404))).futureValue
+      response404.entity.asString should include (""""code":"not-found"""")
+      response404.status.intValue shouldBe 404
 
       val uri503 = "http://localhost:54321/failed-resource"
-      val responseFuture503 = pipeline(Get(http.Uri(uri503)))
-      whenReady(responseFuture503, Timeout(Span(5, Seconds))) { response ⇒
-        response.entity.asString should include (""""code":"service-is-not-available"""")
-        response.status.intValue shouldBe 503
+      val response503 = pipeline(Get(http.Uri(uri503))).futureValue
+      response503.entity.asString should include (""""code":"service-is-not-available"""")
+      response503.status.intValue shouldBe 503
 
-        subscriptions.foreach(hyperbus.off)
-        subscriptions.clear
-        Await.result(clientActorSystem.terminate(), Duration.Inf)
-      }
+      Await.result(clientActorSystem.terminate(), Duration.Inf)
     }
 
     "http get reliable resource. Check Hyperbus-Revision" in {
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
-        Ok(DynamicBody(Text("response")), Headers(Map(Header.REVISION → Seq("1"), Header.CONTENT_TYPE → Seq("user-profile"))))) onSuccess {
-        case subscr ⇒ register(subscr)
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Text("response")), Headers(Map(Header.REVISION → Seq("1"), Header.CONTENT_TYPE → Seq("user-profile"))))
+        ).futureValue
       }
 
       val clientActorSystem = ActorSystem()
       val pipeline: HttpRequest => Future[HttpResponse] = sendReceive(clientActorSystem, ExecutionContext.fromExecutor(newPoolExecutor()))
       val uri = "http://localhost:54321/test-service/reliable"
-      val responseFuture = pipeline(Get(http.Uri(uri)))
-      whenReady(responseFuture, Timeout(Span(5, Seconds))) { response ⇒
-        println(response)
-        response.entity.asString shouldBe """"response""""
-        response.headers should contain (RawHeader("Hyperbus-Revision", "1"))
+      val response = pipeline(Get(http.Uri(uri))).futureValue
 
-        val mediaType = MediaTypes.register(MediaType.custom("application", "vnd.user-profile+json", true, false))
-        val contentType = ContentType(mediaType, `UTF-8`)
-        response.headers should contain (`Content-Type`(contentType))
+      response.entity.asString shouldBe """"response""""
+      response.headers should contain (RawHeader("Hyperbus-Revision", "1"))
 
-        subscriptions.foreach(hyperbus.off)
-        subscriptions.clear
-        Await.result(clientActorSystem.terminate(), Duration.Inf)
-      }
+      val mediaType = MediaTypes.register(MediaType.custom("application", "vnd.user-profile+json", true, false))
+      val contentType = ContentType(mediaType, `UTF-8`)
+      response.headers should contain (`Content-Type`(contentType))
+
+      Await.result(clientActorSystem.terminate(), Duration.Inf)
     }
 
     "websocket: unreliable feed" in {
+      val q = new TestQueue
+      val client = createWsClient("unreliable-feed-client", "/status/test-service", q.put)
 
-      val host = "localhost"
-      val port = 54321
-      val url = "/status/test-service"
-
-      val connect = Http.Connect(host, port)
-      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
-
-      val onClientUpgradePromise = Promise[Boolean]()
-      val resourceStatePromise = Promise[Boolean]()
-      val publishedEventPromise = Promise[Boolean]()
-
-      var clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
-      val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
-        override def onMessage(frame: TextFrame): Unit = {
-          clientMessageQueue += frame
-          clientMessageQueue.size match {
-            case 1 ⇒ resourceStatePromise.complete(Success(true))
-            case 2 ⇒ publishedEventPromise.complete(Success(true))
-            case other: Int ⇒ clientMessageQueue.foreach(frame ⇒ println(frame.payload.utf8String))
-          }
-        }
-
-        override def onUpgrade(): Unit = {
-          onClientUpgradePromise.complete(Success(true))
-        }
-      }), "unreliable-feed-client")
-
-      client ! Connect() // init websocket connection
-
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
-        Ok(DynamicBody(Obj(Map("content" → Text("fullResource")))))) onSuccess {
-        case subscr ⇒ register(subscr)
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Obj(Map("content" → Text("fullResource")))))
+        ).futureValue
       }
 
-      whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
-          Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
-            FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
-          Obj(Map("content" → Text("haha"))))
-      }
+      client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
+        Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+        Obj(Map("content" → Text("haha")))
+      )
 
-      whenReady(resourceStatePromise.future, Timeout(Span(10, Seconds))) { b ⇒
-        val resourceStateMessage = clientMessageQueue.get(0)
-        if (resourceStateMessage.isDefined) {
-          val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState should startWith("""{"status":200,"headers":{"Hyperbus-Message-Id":""")
-          resourceState should endWith("""body":{"content":"fullResource"}}""")
-        } else fail("Full resource state wasn't sent to the client")
-      }
+      val resourceState = q.next().futureValue
+      resourceState should startWith("""{"status":200,"headers":{"Hyperbus-Message-Id":""")
+      resourceState should endWith("""body":{"content":"fullResource"}}""")
 
-      testService.publish(
-        UnreliableFeedTestRequest(
+      testService.publish(UnreliableFeedTestRequest(
           FeedTestBody("haha"),
           Headers.plain(Map(
             Header.MESSAGE_ID → Seq("messageId"),
-            Header.CORRELATION_ID → Seq("correlationId")))))
+            Header.CORRELATION_ID → Seq("correlationId"))))
+      )
 
-      whenReady(publishedEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        val eventMessage = clientMessageQueue.get(1)
-        if (eventMessage.isDefined) {
-          val referenceRequest = """{"uri":"/test-service/unreliable","method":"feed:post","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
-          println(eventMessage.get.payload.utf8String)
-          eventMessage.get.payload.utf8String shouldBe referenceRequest
-        } else fail("Event wasn't sent to the client")
-      }
+      q.next().futureValue shouldBe """{"uri":"/test-service/unreliable","method":"feed:post","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
 
       client ! FacadeRequest(Uri("/test-service/unreliable"), "unsubscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
@@ -210,89 +161,29 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
     }
 
     "websocket: handle error response" in {
-      val host = "localhost"
-      val port = 54321
-      val url = "/status/test-service"
+      val q = new TestQueue
+      val client = createWsClient("error-feed-client", "/status/test-service", q.put)
 
-      val connect = Http.Connect(host, port)
-      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
-
-      val onClientUpgradePromise = Promise[Boolean]()
-      val resourceStatePromise = Promise[Boolean]()
-
-      var clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
-      val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
-        override def onMessage(frame: TextFrame): Unit = {
-          clientMessageQueue += frame
-          clientMessageQueue.size match {
-            case 1 ⇒ resourceStatePromise.complete(Success(true))
-            case 2 ⇒ fail("there should not be incoming events after error response")
-          }
-        }
-
-        override def onUpgrade(): Unit = {
-          onClientUpgradePromise.complete(Success(true))
-        }
-      }), "error-feed-client")
-
-      client ! Connect() // init websocket connection
-
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
-        eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled-exception", Some("Internal server error"), errorId = "123")))
-
-      whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
-            Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
-              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
-            Obj(Map("content" → Text("haha"))))
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
+          eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled-exception", Some("Internal server error"), errorId = "123"))
+        ).futureValue
       }
 
-      whenReady(resourceStatePromise.future, Timeout(Span(10, Seconds))) { b ⇒
-        val resourceStateMessage = clientMessageQueue.get(0)
-        if (resourceStateMessage.isDefined) {
-          val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState should startWith ("""{"status":500,"headers":""")
-          resourceState should include (""""code":"unhandled-exception"""")
-        } else fail("Full resource state wasn't sent to the client")
-      }
+      client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
+          Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+            FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+          Obj(Map("content" → Text("haha"))))
+
+      val resourceState = q.next().futureValue
+      resourceState should startWith ("""{"status":500,"headers":""")
+      resourceState should include (""""code":"unhandled-exception"""")
     }
 
     "websocket: reliable feed" in {
-
-      val host = "localhost"
-      val port = 54321
-      val url = "/status/test-service"
-
-      val connect = Http.Connect(host, port)
-      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
-
-      val onClientUpgradePromise = Promise[Boolean]()
-      val resourceStatePromise = Promise[Boolean]()
-      val queuedEventPromise = Promise[Boolean]()
-      val publishedEventPromise = Promise[Boolean]()
-      val refreshedResourceStatePromise = Promise[Boolean]()
-      val afterResubscriptionEventPromise = Promise[Boolean]()
-
-      val clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
-      val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
-        override def onMessage(frame: TextFrame): Unit = {
-          clientMessageQueue += frame
-          clientMessageQueue.size match {
-            case 1 ⇒ resourceStatePromise.complete(Success(true))
-            case 2 ⇒ queuedEventPromise.complete(Success(true))
-            case 3 ⇒ publishedEventPromise.complete(Success(true))
-            case 4 ⇒ refreshedResourceStatePromise.complete(Success(true))
-            case 5 ⇒ afterResubscriptionEventPromise.complete(Success(true))
-          }
-        }
-
-        override def onUpgrade(): Unit = {
-          onClientUpgradePromise.complete(Success(true))
-        }
-      }), "reliable-feed-client")
-
-      client ! Connect() // init websocket connection
+      val q = new TestQueue
+      val client = createWsClient("reliable-feed-client", "/status/test-service", q.put)
 
       val initialResourceState = Ok(
         DynamicBody(Obj(Map("content" → Text("fullResource")))),
@@ -335,234 +226,234 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           Header.MESSAGE_ID → Seq("messageId"),
           Header.CORRELATION_ID → Seq("correlationId"))))
 
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
-        initialResourceState,
-        // emulate latency between request for full resource state and response
-        _ ⇒ Thread.sleep(10000)) onSuccess {
-        case subscription: Subscription ⇒ register(subscription)
-      }
-
-      whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! subscriptionRequest
-        Thread.sleep(3000)
-        testService.publish(eventRev2)
-      }
-
-      whenReady(resourceStatePromise.future, Timeout(Span(150, Seconds))) { b ⇒
-        val resourceStateMessage = clientMessageQueue.get(0)
-        if (resourceStateMessage.isDefined) {
-          val resourceState = resourceStateMessage.get.payload.utf8String
-          val referenceState = """{"status":200,"headers":{"Hyperbus-Revision":["1"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
-          resourceState shouldBe referenceState
-        } else fail("Full resource state wasn't sent to the client")
-      }
-
-      whenReady(queuedEventPromise.future, Timeout(Span(20, Seconds))) { b ⇒
-        val queuedEventMessage = clientMessageQueue.get(1)
-        if (queuedEventMessage.isDefined) {
-          val receivedEvent = FacadeRequest(queuedEventMessage.get)
-
-          val queuedEvent = FacadeRequest(Uri("/test-service/reliable"), Method.FEED_POST,
-            Map(FacadeHeaders.CLIENT_REVISION → Seq("2"),
-              FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
-              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
-              ObjV("content" → Text("haha"))
-          )
-
-          receivedEvent shouldBe queuedEvent
-        } else fail("Queued event wasn't sent to the client")
-
-        testService.publish(eventRev3)
-      }
-
-      whenReady(publishedEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        val directEventMessage = clientMessageQueue.get(2)
-        if (directEventMessage.isDefined) {
-          val receivedEvent = FacadeRequest(directEventMessage.get)
-
-          val directEvent = FacadeRequest(Uri("/test-service/reliable"), Method.FEED_POST,
-            Map(FacadeHeaders.CLIENT_REVISION → Seq("3"),
-              FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
-              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
-            ObjV("content" → Text("haha"))
-          )
-
-          receivedEvent shouldBe directEvent
-        } else fail("Last event wasn't sent to the client")
-
-        subscriptions.foreach(hyperbus.off)
-        subscriptions.clear
+      register {
         testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
-          updatedResourceState) onSuccess {
-          case subscription: Subscription ⇒ register(subscription)
-        }
-        // This event should be ignored, because it's an "event from future". Resource state retrieving should be triggered
-        testService.publish(eventBadRev5)
+          initialResourceState,
+          // emulate latency between request for full resource state and response
+          _ ⇒ Thread.sleep(10000)
+        ).futureValue
       }
 
-      whenReady(refreshedResourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        val resourceUpdatedStateMessage = clientMessageQueue.get(3)
-        if (resourceUpdatedStateMessage.isDefined) {
-          val resourceUpdatedState = resourceUpdatedStateMessage.get.payload.utf8String
-          val referenceState = """{"status":200,"headers":{"Hyperbus-Revision":["4"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
-          resourceUpdatedState shouldBe referenceState
-        } else fail("Full resource state wasn't sent to the client")
+      client ! subscriptionRequest
+      Thread.sleep(3000)
+      testService.publish(eventRev2)
 
-        subscriptions.foreach(hyperbus.off)
-        subscriptions.clear
-        testService.publish(eventGoodRev5)
+      val resourceState = q.next().futureValue
+      resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Revision":["1"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
+
+      val receivedEvent1 = q.next().futureValue
+      val queuedEvent = FacadeRequest(Uri("/test-service/reliable"), Method.FEED_POST,
+        Map(FacadeHeaders.CLIENT_REVISION → Seq("2"),
+          FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+        ObjV("content" → Text("haha"))
+      )
+      receivedEvent1 shouldBe queuedEvent.toJson
+
+      testService.publish(eventRev3)
+
+      val receivedEvent2 = q.next().futureValue
+      val directEvent2 = FacadeRequest(Uri("/test-service/reliable"), Method.FEED_POST,
+        Map(FacadeHeaders.CLIENT_REVISION → Seq("3"),
+          FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+        ObjV("content" → Text("haha"))
+      )
+      receivedEvent2 shouldBe directEvent2.toJson
+
+      subscriptions.foreach(hyperbus.off)
+      subscriptions.clear
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
+          updatedResourceState
+        ).futureValue
       }
+      // This event should be ignored, because it's an "event from future". Resource state retrieving should be triggered
+      testService.publish(eventBadRev5)
 
-      whenReady(afterResubscriptionEventPromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        val directEventMessage = clientMessageQueue.get(4)
-        if (directEventMessage.isDefined) {
-          val receivedEvent = FacadeRequest(directEventMessage.get)
+      val resourceUpdatedState = q.next().futureValue
+      resourceUpdatedState shouldBe """{"status":200,"headers":{"Hyperbus-Revision":["4"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
 
-          val directEvent = FacadeRequest(Uri("/test-service/reliable"), Method.FEED_POST,
-            Map(FacadeHeaders.CLIENT_REVISION → Seq("5"),
-              FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
-              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
-            ObjV("content" → Text("haha"))
-          )
+      subscriptions.foreach(hyperbus.off)
+      subscriptions.clear
+      testService.publish(eventGoodRev5)
 
-          receivedEvent.toString shouldBe directEvent.toString
-        } else fail("Last event wasn't sent to the client")
+      val receivedEvent3 = q.next().futureValue
+      val directEvent3 = FacadeRequest(Uri("/test-service/reliable"), Method.FEED_POST,
+        Map(FacadeHeaders.CLIENT_REVISION → Seq("5"),
+          FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+        ObjV("content" → Text("haha"))
+      )
+      receivedEvent3 shouldBe directEvent3.toJson
 
-        client ! FacadeRequest(Uri("/test-service/reliable"), "unsubscribe",
-          Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
-      }
+      client ! FacadeRequest(Uri("/test-service/reliable"), "unsubscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null
+      )
     }
 
     "websocket: get request" in {
-      val host = "localhost"
-      val port = 54321
-      val url = "/status/test-service"
+      val q = new TestQueue
+      val client = createWsClient("get-client", "/status/test-service", q.put)
 
-      val connect = Http.Connect(host, port)
-      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
-
-      val onClientUpgradePromise = Promise[Boolean]()
-      val resourceStatePromise = Promise[Boolean]()
-
-      var clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
-      val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
-        override def onMessage(frame: TextFrame): Unit = {
-          clientMessageQueue += frame
-          clientMessageQueue.size match {
-            case 1 ⇒ resourceStatePromise.complete(Success(true))
-            case 2 ⇒ fail("there should not be incoming events after response")
-          }
-        }
-
-        override def onUpgrade(): Unit = {
-          onClientUpgradePromise.complete(Success(true))
-        }
-      }), "get-client")
-
-      client ! Connect() // init websocket connection
-
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
-        Ok(
-          DynamicBody(Obj(Map("content" → Text("fullResource")))),
-          Headers.plain(Map(
-            Header.REVISION → Seq("1"),
-            Header.MESSAGE_ID → Seq("messageId"),
-            Header.CORRELATION_ID → Seq("correlationId"))))) onSuccess {
-        case subscr ⇒ register(subscr)
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(
+            DynamicBody(Obj(Map("content" → Text("fullResource")))),
+            Headers.plain(Map(
+              Header.REVISION → Seq("1"),
+              Header.MESSAGE_ID → Seq("messageId"),
+              Header.CORRELATION_ID → Seq("correlationId"))))
+        ).futureValue
       }
 
-      whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! FacadeRequest(Uri("/test-service/reliable"), Method.GET,
-          Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
-            FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-            FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
-      }
+      client ! FacadeRequest(Uri("/test-service/reliable"), Method.GET,
+        Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
 
-      whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        val resourceStateMessage = clientMessageQueue.get(0)
-        if (resourceStateMessage.isDefined) {
-          val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Revision":["1"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
-        } else fail("Full resource state wasn't sent to the client")
-      }
+      val resourceState = q.next().futureValue
+      resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Revision":["1"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
     }
 
     "websocket: post request" in {
-      val host = "localhost"
-      val port = 54321
-      val url = "/status/test-service"
+      val q = new TestQueue
+      val client = createWsClient("post-client", "/status/test-service", q.put)
 
-      val connect = Http.Connect(host, port)
-      val onUpgradeGetReq = HttpRequest(HttpMethods.GET, url, upgradeHeaders(host, port))
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.POST))),
+          Ok(
+            DynamicBody(Text("got it")),
+            Headers.plain(Map(Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
+        ).futureValue
+      }
 
-      val onClientUpgradePromise = Promise[Boolean]()
-      val resourceStatePromise = Promise[Boolean]()
+      client ! FacadeRequest(Uri("/test-service/reliable"), Method.POST,
+        Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+        Obj(Map("post request" → Text("some request body"))))
 
-      var clientMessageQueue: mutable.Queue[TextFrame] = mutable.Queue()
-      val client = actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
-        override def onMessage(frame: TextFrame): Unit = {
-          clientMessageQueue += frame
-          clientMessageQueue.size match {
-            case 1 ⇒ resourceStatePromise.complete(Success(true))
-            case 2 ⇒ fail("there should not be incoming events after response")
+      val resourceState = q.next().futureValue
+      resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":"got it"}"""
+    }
+
+    "websocket: get with rewrite" in {
+      val q = new TestQueue
+      val client = createWsClient("ws-get-rewrite-client", "/test-rewrite/some-service", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Text("response"))), { request ⇒
+            request.uri shouldBe Uri("/status/test-service")
           }
-        }
-
-        override def onUpgrade(): Unit = {
-          onClientUpgradePromise.complete(Success(true))
-        }
-      }), "post-client")
-
-      client ! Connect() // init websocket connection
-
-      testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.POST))),
-        Ok(
-          DynamicBody(Text("got it")),
-          Headers.plain(Map(Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))) onSuccess {
-        case subscr ⇒ register(subscr)
+        ).futureValue
       }
 
-      whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        client ! FacadeRequest(Uri("/test-service/reliable"), Method.POST,
-            Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
-              FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
-              FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
-          Obj(Map("post request" → Text("some request body"))))
+      client ! FacadeRequest(Uri("/test-rewrite/some-service"), Method.GET,
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
+
+      val resourceState = q.next().futureValue
+      resourceState should include (""""response"""")
+    }
+
+    "websocket: get applies private response filter" in {
+      val q = new TestQueue
+      val client = createWsClient("ws-get-private-client", "/test-rewrite/some-service", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(
+            ObjV(
+              "fullName" → "John Smith",
+              "userName" → "jsmith",
+              "password" → "abyrvalg"
+            )
+          )), { request ⇒
+            request.uri shouldBe Uri("/users/{userId}", Map("userId" → "100500"))
+          }
+        ).futureValue
       }
 
-      whenReady(resourceStatePromise.future, Timeout(Span(5, Seconds))) { b ⇒
-        val resourceStateMessage = clientMessageQueue.get(0)
-        if (resourceStateMessage.isDefined) {
-          val resourceState = resourceStateMessage.get.payload.utf8String
-          resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":"got it"}"""
-        } else fail("Full resource state wasn't sent to the client")
+      client ! FacadeRequest(Uri("/users/100500"), Method.GET,
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
+
+      val resourceState = q.next().futureValue
+      resourceState should include (""""userName":"jsmith"""")
+      resourceState shouldNot include ("""password""")
+    }
+
+    "websocket: get applies private event filter" in {
+      val q = new TestQueue
+      val client = createWsClient("ws-get-private-event-client", "/test-rewrite/some-service", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(
+            ObjV(
+              "fullName" → "John Smith",
+              "userName" → "jsmith",
+              "password" → "abyrvalg"
+            )
+          )), { request ⇒
+            request.uri shouldBe Uri("/users/{userId}", Map("userId" → "100500"))
+          }
+        ).futureValue
       }
+
+      client ! FacadeRequest(Uri("/users/100500"), "subscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
+
+      val resourceState = q.next().futureValue
+      resourceState should include (""""userName":"jsmith"""")
+      resourceState shouldNot include ("""password""")
+
+      hyperbus <| DynamicRequest(Uri("/users/{userId}", Map("userId" → "100500")), "feed:put", DynamicBody(
+        ObjV("fullName" → "John Smith", "userName" → "newsmith", "password" → "neverforget")
+      ))
+
+      val event = q.next().futureValue
+      event should include (""""userName":"newsmith"""")
+      event shouldNot include ("""password""")
     }
 
     "http get with rewrite" in {
-      testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
-        Ok(DynamicBody(Text("response"))), { request ⇒
-          request.uri shouldBe Uri("/status/test-service")
-        }
-      ) onSuccess {
-        case subscr ⇒ register(subscr)
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Text("response"))), { request ⇒
+            request.uri shouldBe Uri("/status/test-service")
+          }
+        ).futureValue
       }
 
       Source.fromURL("http://localhost:54321/test-rewrite/some-service", "UTF-8").mkString shouldBe """"response""""
     }
-  }
 
-  def upgradeHeaders(host: String, port: Int) = List(
-    HttpHeaders.Host(host, port),
-    HttpHeaders.Connection("Upgrade"),
-    HttpHeaders.RawHeader("Upgrade", "websocket"),
-    HttpHeaders.RawHeader("Sec-WebSocket-Version", "13"),
-    HttpHeaders.RawHeader("Sec-WebSocket-Key", "x3JJHMbDL1EzLkh9GBhXDw=="),
-    HttpHeaders.RawHeader("Sec-WebSocket-Extensions", "permessage-deflate"))
+    "http get applies private response filter" in {
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(
+            ObjV(
+              "fullName" → "John Smith",
+              "userName" → "jsmith",
+              "password" → "abyrvalg"
+            )
+          )), { request ⇒
+            request.uri shouldBe Uri("/users/{userId}", Map("userId" → "100500"))
+          }
+        ).futureValue
+      }
+
+      val str = Source.fromURL("http://localhost:54321/users/100500", "UTF-8").mkString
+      str should include (""""userName":"jsmith"""")
+      str shouldNot include ("""password""")
+    }
+  }
 
   def testServiceHyperbus: Hyperbus = {
     val config = inject[Config]
@@ -582,7 +473,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
     subscriptions.clear
   }
 
-  def register(subscription: Subscription) = {
-    subscriptions += subscription
+  def register(s: Subscription) = {
+    subscriptions += s
   }
 }

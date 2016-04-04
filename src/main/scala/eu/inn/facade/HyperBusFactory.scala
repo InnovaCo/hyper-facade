@@ -9,7 +9,6 @@ import eu.inn.hyperbus.transport.api.{TransportConfigurationLoader, TransportMan
 import scala.concurrent.ExecutionContext
 
 class HyperbusFactory(val config: Config) {
-
   lazy val hyperbus = new Hyperbus(newTransportManager(), HyperbusFactory.defaultHyperbusGroup(config))(ExecutionContext.fromExecutor(newPoolExecutor()))
 
   private def newPoolExecutor(): Executor = {

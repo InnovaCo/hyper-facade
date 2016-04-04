@@ -8,5 +8,4 @@ import javax.xml.bind.annotation.XmlRootElement;
 
 @XmlRootElement
 public class x_client_ip extends CustomType implements RamlAnnotation {
-
 }

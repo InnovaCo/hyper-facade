@@ -11,15 +11,14 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class HttpWsResponseFilter extends ResponseFilter {
 
-  override def apply(context: ResponseFilterContext, response: FacadeResponse)
+  override def apply(context: FacadeRequestContext, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       val headersBuilder = Map.newBuilder[String, Seq[String]]
       response.headers.foreach {
         case (Header.CONTENT_TYPE, value :: tail) ⇒
-          headersBuilder += FacadeHeaders.CONTENT_TYPE → Seq(
-            FacadeHeaders.CERTAIN_CONTENT_TYPE_START + value + FacadeHeaders.CERTAIN_CONTENT_TYPE_END
-          )
+          headersBuilder += FacadeHeaders.CONTENT_TYPE →
+            FacadeHeaders.genericContentTypeToHttp(Some(value)).toSeq
 
         case (k, v) ⇒
           if (HttpWsResponseFilter.directHyperbusToFacade.contains(k)) {

@@ -6,11 +6,10 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
 import eu.inn.binders.value.{Null, Text}
-import eu.inn.facade.filter.chain.{SimpleFilterChain, FilterChain}
+import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
 import eu.inn.facade.model._
-import eu.inn.hyperbus.model.{DynamicBody, DynamicRequest, Header, Method}
-import eu.inn.hyperbus.serialization.RequestHeader
+import eu.inn.hyperbus.model.Method
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
@@ -30,7 +29,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   import scala.concurrent.ExecutionContext.Implicits.global
 
   class TestRequestFilter extends RequestFilter {
-    override def  apply(context: RequestFilterContext, input: FacadeRequest)
+    override def  apply(context: FacadeRequestContext, input: FacadeRequest)
                        (implicit ec: ExecutionContext): Future[FacadeRequest] = {
       if (input.headers.nonEmpty) {
         Future(input.copy(
@@ -47,7 +46,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
   }
 
   class TestResponseFilter extends ResponseFilter {
-    override def apply(context: ResponseFilterContext, output: FacadeResponse)
+    override def apply(context: FacadeRequestContext, output: FacadeResponse)
                       (implicit ec: ExecutionContext): Future[FacadeResponse] = {
       if (output.headers.nonEmpty) {
         Future(output.copy(

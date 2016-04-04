@@ -56,13 +56,11 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
         val ident = StringIdentifier(annotation.name)
         inj.getBinding(List(ident)) match {
           case Some(_) ⇒
-            val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
-            filterFactories.foldLeft(filterChain) { (filterChainInner, factory) ⇒
-              filterChainInner ++ factory.createFilterChain(target)
-            }
+            val filterFactory = inject[RamlFilterFactory](annotation.name)
+            filterFactory.createFilterChain(target)
 
           case None ⇒
-            log.warn(s"Annotation '${annotation.name}' has no bound filter to create")
+            log.warn(s"Annotation '${annotation.name}' is not bound")
             filterChain
         }
       }
@@ -118,7 +116,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             val fields = td.asInstanceOf[ObjectFieldImpl].properties().foldLeft(Seq.newBuilder[Field]) {
               (fieldList, ramlField) ⇒
                 val fieldName = ramlField.name
-                val fieldType = ramlField.`type`.get(0)
+                val fieldType = ramlField.`type`.headOption.getOrElse("string")
                 val field = Field(fieldName, DataType(fieldType, Seq.empty, extractAnnotations(ramlField)))
                 fieldList += field
             }.result()
@@ -126,10 +124,8 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             val filterMap = fields.foldLeft(Seq.newBuilder[(RamlFilterFactory,Field)]) { (filterSeq, field) ⇒
               field.dataType.annotations.foreach { annotation ⇒
                 try {
-                  val filterFactories = inject[Seq[RamlFilterFactory]](annotation.name)
-                  filterFactories.foreach { filterFactory: RamlFilterFactory ⇒
-                    filterSeq += (filterFactory → field)
-                  }
+                  val filterFactory = inject[RamlFilterFactory](annotation.name)
+                  filterSeq += (filterFactory → field)
                 }
                 catch {
                   case NonFatal(e) ⇒
@@ -167,7 +163,10 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
       Map(None → None)
     else {
       ramlReqRspWrapper.body.foldLeft(Map.newBuilder[Option[String], Option[String]]) { (typeNames, body) ⇒
-        val contentType = if (body.name == null || body.name == "body" || body.name.equalsIgnoreCase("none")) None else Some(body.name)
+        val contentType = Option(body.name).map(_.toLowerCase) match {
+          case None | Some("body") | Some("none") ⇒ None
+          case other ⇒ FacadeHeaders.httpContentTypeToGeneric(other)
+        }
         val typeName = body.`type`.get(0)
         typeNames += (contentType → Option(typeName))
       }

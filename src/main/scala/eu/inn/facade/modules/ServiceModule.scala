@@ -15,13 +15,13 @@ import scala.concurrent.ExecutionContext
 class ServiceModule extends Module {
   bind [HyperbusFactory]        identifiedBy 'hbFactory            to new HyperbusFactory(inject [Config])
   bind [Hyperbus]               identifiedBy 'hyperbus             to inject [HyperbusFactory].hyperbus
-  bind [StatsReporterFactory]   identifiedBy 'statsFactory         to new StatsReporterFactory(inject [Config])
+  bind [StatsReporterFactory]   identifiedBy 'statsFactory         to injected[StatsReporterFactory]
   bind [ActorSystem]            identifiedBy 'actorSystem          to ActorSystem("facade", inject [Config])
-  bind [ExecutionContext]       identifiedBy 'executionContext     to inject [ActorSystem].dispatcher
-  bind [HttpWorker]             identifiedBy 'httpWorker           to new HttpWorker
-  bind [SubscriptionsManager]   identifiedBy 'subscriptionsManager to new SubscriptionsManager
-  bind [Service]                identifiedBy 'restApp              to new WsRestServiceApp
-  bind [Console]                identifiedBy 'console              toNonLazy new StdConsole
-  bind [ServiceController]      identifiedBy 'serviceController    toNonLazy injected [ConsoleServiceController]
-  bind [ShutdownMonitor]        identifiedBy 'shutdownMonitor      toNonLazy injected [RuntimeShutdownMonitor]
+  bind [ExecutionContext]       identifiedBy 'executionContext     to inject[ActorSystem].dispatcher
+  bind [HttpWorker]             identifiedBy 'httpWorker           to injected[HttpWorker]
+  bind [SubscriptionsManager]   identifiedBy 'subscriptionsManager to injected[SubscriptionsManager]
+  bind [Service]                identifiedBy 'restApp              to injected[WsRestServiceApp]
+  bind [Console]                identifiedBy 'console              toNonLazy injected[StdConsole]
+  bind [ServiceController]      identifiedBy 'serviceController    toNonLazy injected[ConsoleServiceController]
+  bind [ShutdownMonitor]        identifiedBy 'shutdownMonitor      toNonLazy injected[RuntimeShutdownMonitor]
 }

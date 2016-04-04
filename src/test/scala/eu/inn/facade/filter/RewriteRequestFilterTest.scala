@@ -1,21 +1,20 @@
 package eu.inn.facade.filter
 
-import eu.inn.binders.value.{Null, ObjV, Text}
+import eu.inn.binders.value.{ObjV, Text}
+import eu.inn.facade.MockContext
 import eu.inn.facade.filter.raml.RewriteRequestFilter
-import eu.inn.facade.model.{FacadeRequest, FilterRestartException, RequestFilterContext}
-import eu.inn.facade.modules.{ConfigModule, FiltersModule}
+import eu.inn.facade.model.{FacadeRequest, FilterRestartException}
 import eu.inn.facade.raml._
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
-import scaldi.{Injectable, Module}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures {
+class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with MockContext {
   "RewriteFilter" - {
     "simple rewrite" in {
       val args = new rewrite()
@@ -29,10 +28,10 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         ObjV("field" → "value")
       )
 
-      val requestFilterContext = RequestFilterContext(request.uri, request.method, Map.empty, Null)
+      val requestContext = mockContext(request)
 
       val restartException = intercept[FilterRestartException]{
-        Await.result(filter.apply(requestFilterContext, request), 10.seconds)
+        Await.result(filter.apply(requestContext, request), 10.seconds)
       }
 
       val expectedRequest = FacadeRequest(
@@ -56,10 +55,9 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         ObjV("field" → "value")
       )
 
-      val requestFilterContext = RequestFilterContext(request.uri, request.method, Map.empty, Null)
-
+      val requestContext = mockContext(request)
       val restartException = intercept[FilterRestartException]{
-        Await.result(filter.apply(requestFilterContext, request), 10.seconds)
+        Await.result(filter.apply(requestContext, request), 10.seconds)
       }
 
       val expectedRequest = FacadeRequest(
