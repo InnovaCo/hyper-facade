@@ -36,13 +36,6 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
       case None ⇒ Seq()
     }
   }
-
-  private def getContentType(contentTypeName: Option[String]): Option[ContentType] = {
-    contentTypeName match {
-      case Some(contentType) ⇒ Some(ContentType(contentType))
-      case None ⇒ None
-    }
-  }
 }
 
 case class ResourceConfig(
@@ -53,13 +46,11 @@ case class ResourceConfig(
                          )
 
 case class ResourceMethod(method: Method,
-                          requests: Requests,
-                          responses: Map[Int, Responses],
-                          filters: SimpleFilterChain)
+                          requestFilterChains: FilterChains,
+                          responseFilterChains: Map[Int, FilterChains],
+                          methodFilters: SimpleFilterChain)
 
-case class Requests(dataStructures: Map[Option[ContentType], DataStructure])
-
-case class Responses(dataStructures: Map[Option[ContentType], DataStructure])
+case class FilterChains(chains: Map[Option[ContentType], SimpleFilterChain])
 
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
 
@@ -81,21 +72,20 @@ object Method {
 
 case class ContentType(mediaType: String)
 
-case class DataStructure(headers: Seq[Header], body: Option[Body], filters: SimpleFilterChain)
-
 case class Header(name: String)
 
-case class DataType(typeName: String, fields: Seq[Field], annotations: Seq[Annotation])
 object DataType {
-  def apply(): DataType = {
-    DataType(DEFAULT_TYPE_NAME, Seq.empty, Seq.empty)
-  }
   val DEFAULT_TYPE_NAME = "string"
 }
 
-case class Body(dataType: DataType)
+case class TypeDefinition(typeName: String, annotations: Seq[Annotation], fields: Seq[Field])
+object TypeDefinition {
+  def apply(): TypeDefinition = {
+    TypeDefinition(DataType.DEFAULT_TYPE_NAME, Seq.empty, Seq.empty)
+  }
+}
 
-case class Field(name: String, dataType: DataType)
+case class Field(name: String, typeName: String, annotations: Seq[Annotation], fields: Seq[Field])
 
 case class Annotation(name: String, value: Option[RamlAnnotation])
 

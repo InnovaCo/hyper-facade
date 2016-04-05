@@ -18,16 +18,16 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
             filters
 
           case Right(resourceMethod) ⇒
-            resourceMethod.responses.get(response.status) match {
-              case Some(responseDataStructures) ⇒
-                responseDataStructures.dataStructures.get(response.clientContentType.map(ContentType)) match { // todo: test this!
-                  case Some(responseDataStructure) ⇒
-                    responseDataStructure.filters
+            resourceMethod.responseFilterChains.get(response.status) match {
+              case Some(responseFilterChains) ⇒
+                responseFilterChains.chains.get(response.clientContentType.map(ContentType)) match { // todo: test this!
+                  case Some(filterChain) ⇒
+                    filterChain
                   case None ⇒
-                    resourceMethod.filters
+                    resourceMethod.methodFilters
                 }
               case None ⇒
-                resourceMethod.filters
+                resourceMethod.methodFilters
             }
         }
         result.responseFilters
@@ -52,11 +52,11 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
     filtersOrMethod(uri, method) match {
       case Left(filters) ⇒ filters
       case Right(resourceMethod) ⇒
-        resourceMethod.requests.dataStructures.get(contentType.map(ContentType)) match {
-          case Some(requestDataStructure) ⇒
-            requestDataStructure.filters
+        resourceMethod.requestFilterChains.chains.get(contentType.map(ContentType)) match {
+          case Some(filterChain) ⇒
+            filterChain
           case None ⇒
-            resourceMethod.filters
+            resourceMethod.methodFilters
         }
     }
   }

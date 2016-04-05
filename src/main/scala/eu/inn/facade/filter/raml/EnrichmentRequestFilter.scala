@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.binders.value.{Obj, Text}
+import eu.inn.binders.value.{Obj, Text, Value}
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model._
 import eu.inn.facade.raml.{Annotation, Field}
@@ -10,7 +10,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class EnrichmentFilterFactory extends RamlFilterFactory {
   def createFilterChain(target: RamlTarget): SimpleFilterChain = {
     target match {
-      case TargetFields(typeName, fields) ⇒
+      case TargetFields(fields) ⇒
         SimpleFilterChain(
           requestFilters = Seq(new EnrichRequestFilter(fields)),
           responseFilters = Seq.empty,
@@ -21,28 +21,46 @@ class EnrichmentFilterFactory extends RamlFilterFactory {
   }
 }
 
-class EnrichRequestFilter(val targetFields: Seq[Field]) extends RequestFilter {
+class EnrichRequestFilter(val fields: Seq[Field]) extends RequestFilter {
   override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
-      var bodyFields = request.body.asMap
-      // todo: iterate over fields recursively in depth when nested fields will be supported
-      targetFields.foreach { targetRamlField ⇒
-        val annotations = targetRamlField.dataType.annotations
-        annotations.foreach { annotation ⇒
-          annotation.name match {
-            case Annotation.CLIENT_IP ⇒
-              bodyFields += targetRamlField.name → Text(context.remoteAddress)
+      val enrichedFields = enrichFields(fields, request.body.asMap, context)
+      request.copy(body = Obj(enrichedFields))
+    }
+  }
 
-            case Annotation.CLIENT_LANGUAGE ⇒
-              context.requestHeaders.get(FacadeHeaders.CLIENT_LANGUAGE) match {
-                case Some(value :: _) ⇒ bodyFields += targetRamlField.name → Text(value) // todo: format of header?
-                case _ ⇒ // do nothing
-              }
-          }
+  private def enrichFields(ramlFields: Seq[Field], fields: scala.collection.Map[String, Value], context: FacadeRequestContext): scala.collection.Map[String, Value] = {
+    ramlFields.foldLeft(fields) { (notEnrichedFields, ramlField) ⇒
+      val annotations = ramlField.annotations
+      var enrichedFields = notEnrichedFields
+      annotations.foreach { annotation ⇒
+        annotation.name match {
+          case Annotation.CLIENT_IP ⇒
+            enrichedFields += ramlField.name → Text(context.remoteAddress)
+
+          case Annotation.CLIENT_LANGUAGE ⇒
+            context.requestHeaders.get(FacadeHeaders.CLIENT_LANGUAGE) match {
+              case Some(value :: _) ⇒ enrichedFields += ramlField.name → Text(value) // todo: format of header?
+              case _ ⇒ // do nothing
+            }
+
+          case _ ⇒ // do nothing, this annotation doesn't belong to enrichment filter
         }
       }
-      request.copy(body = Obj(bodyFields))
+      if (shouldFilterNestedFields(ramlField, enrichedFields)) {
+        val fieldName = ramlField.name
+        val nestedFields = enrichedFields(fieldName).asMap
+        val enrichedNestedFields = enrichFields(ramlField.fields, nestedFields, context)
+        enrichedFields + (fieldName → Obj(enrichedNestedFields))
+      } else
+        enrichedFields
     }
+  }
+
+  def shouldFilterNestedFields(ramlField: Field, fields: scala.collection.Map[String, Value]): Boolean = {
+    ramlField.fields.nonEmpty &&
+      fields.nonEmpty &&
+      fields.contains(ramlField.name)
   }
 }

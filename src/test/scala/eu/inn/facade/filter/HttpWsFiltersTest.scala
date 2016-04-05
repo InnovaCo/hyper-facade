@@ -24,7 +24,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       val request = FacadeRequest(Uri("/test"), "get", Map.empty, Null)
       val response = FacadeResponse(200, Map("messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
         ObjV(
-          "_links" → ObjV(
+        "_links" → ObjV(
             "self" → ObjV("href" → "/test/{a}", "templated" → true),
             "some-other1" → ObjV("href" → "/test/abc", "templated" → false),
             "some-other2" → ObjV("href" → "/test/xyz"),

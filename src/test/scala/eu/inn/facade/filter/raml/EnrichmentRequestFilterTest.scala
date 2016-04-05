@@ -17,8 +17,8 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
   "EnrichmentFilter" - {
     "add fields if request headers are present" in {
       val filter = new EnrichRequestFilter(Seq(
-          Field("clientIp", DataType("string", Seq.empty, Seq(Annotation(Annotation.CLIENT_IP)))),
-          Field("acceptLanguage", DataType("string", Seq.empty, Seq(Annotation(Annotation.CLIENT_LANGUAGE))))))
+          Field("clientIp", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_IP)), Seq.empty),
+          Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE)), Seq.empty)))
 
       val request = FacadeRequest(
         Uri("/resource"),
@@ -43,7 +43,7 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
 
     "don't add fields if request headers are missed" in {
       val filter = new EnrichRequestFilter(Seq(
-        Field("acceptLanguage", DataType("string", Seq.empty, Seq(Annotation(Annotation.CLIENT_LANGUAGE))))))
+        Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE)), Seq.empty)))
 
       val initialRequest = FacadeRequest(
         Uri("/resource"),

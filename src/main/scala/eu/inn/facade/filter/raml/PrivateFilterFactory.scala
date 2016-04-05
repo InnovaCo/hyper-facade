@@ -15,7 +15,7 @@ class PrivateFilterFactory(config: Config) extends RamlFilterFactory {
   def createFilterChain(target: RamlTarget): SimpleFilterChain = {
     target match {
 
-      case TargetFields(typeName, fields) ⇒
+      case TargetFields(fields) ⇒
         SimpleFilterChain(
           requestFilters = Seq.empty,
           responseFilters = Seq(new ResponsePrivateFilter(fields, privateAddresses)),

@@ -15,5 +15,4 @@ case class TargetMethod(uri: String, method: String, annotation: Annotation) ext
 //case class TargetResponse(uri: String, code: Int) extends RamlTarget
 //RequestBody
 //ResponseBody
-// todo: inner fields!
-case class TargetFields(typeName: String, fields: Seq[Field]) extends RamlTarget
+case class TargetFields(fields: Seq[Field]) extends RamlTarget
