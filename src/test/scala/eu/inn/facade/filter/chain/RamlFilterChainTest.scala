@@ -1,8 +1,8 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.chain
 
 import eu.inn.binders.value.{Null, ObjV}
 import eu.inn.facade.MockContext
-import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain}
+import eu.inn.facade.filter.NoOpFilter
 import eu.inn.facade.filter.raml.{EnrichRequestFilter, EventPrivateFilter, RequestPrivateFilter, ResponsePrivateFilter}
 import eu.inn.facade.model.{FacadeRequest, _}
 import eu.inn.facade.modules.Injectors

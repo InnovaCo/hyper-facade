@@ -1,4 +1,4 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.http
 
 import eu.inn.binders.value._
 import eu.inn.facade.MockContext

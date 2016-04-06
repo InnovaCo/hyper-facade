@@ -1,4 +1,4 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{Null, Obj, Text}
 import eu.inn.facade.MockContext

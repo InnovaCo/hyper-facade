@@ -4,10 +4,9 @@ import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Annotation
 import eu.inn.facade.raml.annotationtypes.rewrite
-import eu.inn.hyperbus.transport.api.matchers.Specific
-import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
+import eu.inn.facade.utils.UriRewriter
+import eu.inn.hyperbus.transport.api.uri.UriParser
 
-import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
 class RewriteFilterFactory extends RamlFilterFactory {
@@ -33,25 +32,15 @@ class RewriteRequestFilter(args: rewrite) extends RequestFilter {
   val uriParameters = UriParser.extractParameters(args.getUri)
 
   override def apply(context: FacadeRequestContext, request: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
-    var failures = mutable.ArrayBuffer[Throwable]()
-    val newArgs = uriParameters flatMap { uriParameter ⇒
-      request.uri.args.get(uriParameter) match {
-        case Some(matcher) ⇒
-          Some(uriParameter → matcher)
-        case None ⇒
-          failures += new IllegalArgumentException(s"No parameter argument specified for $uriParameter on ${request.uri}")
-          None
-      }
-    }
+    val rewriteResult = UriRewriter.rewrite(request.uri, args.getUri, uriParameters)
 
-    if (failures.isEmpty) {
-      val newUri = Uri(Uri(Specific(args.getUri), newArgs.toMap).formatted)
+    if (rewriteResult.failures.isEmpty) {
       val rewrittenRequest = request.copy(
-        uri = newUri
+        uri = rewriteResult.uri
       )
       Future.failed(new FilterRestartException(rewrittenRequest, "rewrite"))
     } else {
-      Future.failed(failures.head)
+      Future.failed(rewriteResult.failures.head)
     }
   }
 }

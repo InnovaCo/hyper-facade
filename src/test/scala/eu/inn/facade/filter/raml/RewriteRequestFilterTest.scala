@@ -1,8 +1,7 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{ObjV, Text}
 import eu.inn.facade.MockContext
-import eu.inn.facade.filter.raml.RewriteRequestFilter
 import eu.inn.facade.model.{FacadeRequest, FilterRestartException}
 import eu.inn.facade.raml._
 import eu.inn.facade.raml.annotationtypes.rewrite

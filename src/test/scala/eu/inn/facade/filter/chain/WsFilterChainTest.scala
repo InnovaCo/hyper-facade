@@ -1,4 +1,4 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.chain
 
 import java.util.concurrent.TimeUnit
 
@@ -6,7 +6,6 @@ import akka.actor.{Actor, ActorSystem, Props}
 import akka.io.IO
 import akka.pattern.ask
 import eu.inn.binders.value.{Null, Text}
-import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
 import eu.inn.facade.model._
 import eu.inn.hyperbus.model.Method

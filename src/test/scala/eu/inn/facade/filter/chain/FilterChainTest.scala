@@ -1,16 +1,15 @@
-package eu.inn.facade.filter
+package eu.inn.facade.filter.chain
 
 import eu.inn.binders.value.{Null, Text}
 import eu.inn.facade.MockContext
-import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.facade.model._
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 class FilterChainTest extends FreeSpec with Matchers with ScalaFutures with MockContext{
 
