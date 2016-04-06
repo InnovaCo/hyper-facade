@@ -46,13 +46,13 @@ case class ResourceConfig(
                          )
 
 case class ResourceMethod(method: Method,
-                          requests: Requests,
-                          responses: Map[Int, Responses],
+                          requests: RamlRequests,
+                          responses: Map[Int, RamlResponses],
                           methodFilters: SimpleFilterChain)
 
-case class Requests(interfaces: Map[Option[ContentType], InterfaceDefinition])
-case class Responses(interfaces: Map[Option[ContentType], InterfaceDefinition])
-case class InterfaceDefinition(headers: Seq[Header], typeDefinition: TypeDefinition, filters: SimpleFilterChain)
+case class RamlRequests(ramlContentTypes: Map[Option[ContentType], RamlContentType])
+case class RamlResponses(ramlContentTypes: Map[Option[ContentType], RamlContentType])
+case class RamlContentType(headers: Seq[Header], typeDefinition: TypeDefinition, filters: SimpleFilterChain)
 
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
 case class Trait(name: String, parameters: Map[String, String])
