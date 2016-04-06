@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.chain
 
 import eu.inn.facade.model._
-import eu.inn.facade.raml.{ContentType, Method, RamlConfig, ResourceMethod}
+import eu.inn.facade.raml.{ContentType, Method, RamlConfig, RamlResourceMethod}
 
 class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
 
@@ -19,15 +19,15 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
 
           case Right(resourceMethod) ⇒
             resourceMethod.responses.get(response.status) match {
-              case Some(responseDataStructures) ⇒
-                responseDataStructures.dataStructures.get(response.clientContentType.map(ContentType)) match { // todo: test this!
-                  case Some(responseDataStructure) ⇒
-                    responseDataStructure.filters
+              case Some(responses) ⇒
+                responses.ramlContentTypes.get(response.clientContentType.map(ContentType)) match { // todo: test this!
+                  case Some(ramlContentType) ⇒
+                    ramlContentType.filters
                   case None ⇒
-                    resourceMethod.filters
+                    resourceMethod.methodFilters
                 }
               case None ⇒
-                resourceMethod.filters
+                resourceMethod.methodFilters
             }
         }
         result.responseFilters
@@ -52,16 +52,16 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
     filtersOrMethod(uri, method) match {
       case Left(filters) ⇒ filters
       case Right(resourceMethod) ⇒
-        resourceMethod.requests.dataStructures.get(contentType.map(ContentType)) match {
-          case Some(requestDataStructure) ⇒
-            requestDataStructure.filters
+        resourceMethod.requests.ramlContentTypes.get(contentType.map(ContentType)) match {
+          case Some(interfaceDefinition) ⇒
+            interfaceDefinition.filters
           case None ⇒
-            resourceMethod.filters
+            resourceMethod.methodFilters
         }
     }
   }
 
-  private def filtersOrMethod(uri: String, method: String): Either[SimpleFilterChain, ResourceMethod] = {
+  private def filtersOrMethod(uri: String, method: String): Either[SimpleFilterChain, RamlResourceMethod] = {
     ramlConfig.resourcesByUri.get(uri) match {
       case Some(resource) ⇒
         resource.methods.get(Method(method)) match {

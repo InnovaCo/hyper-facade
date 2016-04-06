@@ -66,6 +66,31 @@ types:
         (private):
         type: string
 
+  ComplexRequestType:
+    type: object
+    properties:
+      name: string
+      value:
+        type: ComplexValue
+
+  ComplexResponseType:
+    type: object
+    properties:
+      name: string
+      value:
+        type: ComplexValue
+
+  ComplexValue:
+    type: object
+    properties:
+      address:
+        (x-client-ip):
+        type: string
+      privateField:
+        (private):
+        type: string
+      publicField: string
+
 annotationTypes:
   x-client-ip:
   x-client-language:
@@ -183,3 +208,12 @@ traits:
   put:
     (rewrite):
       uri: /revault/content/some-service
+
+/complex-resource:
+  post:
+    body:
+      type: ComplexRequestType
+    responses:
+      200:
+        body:
+          type: ComplexResponseType

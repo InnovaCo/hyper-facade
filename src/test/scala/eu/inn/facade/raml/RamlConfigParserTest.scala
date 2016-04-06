@@ -1,145 +1,61 @@
 package eu.inn.facade.raml
 
-import java.nio.file.Paths
-
-import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
-import com.typesafe.config.ConfigFactory
-import eu.inn.facade.FacadeConfig
-import eu.inn.facade.filter.chain.FilterChain
+import com.typesafe.config.Config
+import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.raml.Annotation._
-import eu.inn.facade.raml.DataType._
 import eu.inn.facade.raml.Method._
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
 class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
-  implicit val injector = Injectors()
   val ramlConfig = readConfig
 
   def readConfig: RamlConfig = {
-    val config = ConfigFactory.load()
-    val factory = new JavaNodeFactory
-    val fileRelativePath = config.getString(FacadeConfig.RAML_FILE)
-    val fileUri = Thread.currentThread().getContextClassLoader.getResource(fileRelativePath).toURI
-    val file = Paths.get(fileUri).toFile
-    val api = factory.createApi(file.getCanonicalPath)
-    RamlConfigParser(api).parseRaml
-  }
-
-  def clear(ds: DataStructure): DataStructure = {
-    ds.copy(
-      filters = FilterChain.empty, // filters are not-case classes, can't compare
-      body = ds.body.map(b ⇒ b.copy(
-          dataType = clear(b.dataType)
-        )
-      )
-    )
-  }
-
-  def clear(dt: DataType): DataType = {
-    dt.copy(
-      fields = dt.fields.map( f ⇒
-        f.copy(dataType=clear(f.dataType))
-      ),
-      annotations = clear(dt.annotations)
-    )
-  }
-
-  def clear(annotations: Seq[Annotation]): Seq[Annotation] = {
-    annotations.map(a ⇒
-      a.copy(
-        value = None // annotation is java object, can't compare
-      )
-    )
+    implicit val injector = Injectors()
+    new ConfigsFactory().ramlConfig(inject[Config])
   }
 
   "RamlConfig" - {
-    "traits" in {
-      ramlConfig.traitNames("/status", POST) shouldBe Seq("rateLimited")
-      ramlConfig.traitNames("/users/{userId}", GET) shouldBe Seq("secured", "rateLimited")
-      ramlConfig.traitNames("/users/{userId}", PUT) shouldBe Seq("secured")
+//    "traits" in {
+//      ramlConfig.traitNames("/status", POST) shouldBe Seq("rateLimited")
+//      ramlConfig.traitNames("/users/{userId}", GET) shouldBe Seq("secured", "rateLimited")
+//      ramlConfig.traitNames("/users/{userId}", PUT) shouldBe Seq("secured")
+//    }
+
+    "request filters" in {
+      val statusFilterChain = ramlConfig.resourcesByUri("/status").methods(Method(POST)).requests.ramlContentTypes(None).filters
+      statusFilterChain.requestFilters shouldBe Seq.empty
+
+      val statusServiceFilterChain = ramlConfig.resourcesByUri("/status/test-service").methods(Method(GET)).requests.ramlContentTypes(None).filters
+      statusServiceFilterChain.requestFilters.head shouldBe a[EnrichRequestFilter]
     }
 
-    "request data structure" in {
-      val usersHeaders = Seq(Header("authToken"))
-      val usersBody = Body(DataType("StatusRequest", Seq(Field("serviceType", DataType())), Seq()))
-      val dsStatus = ramlConfig.resourcesByUri("/status").methods(Method(POST)).requests.dataStructures(None)
-      clear(dsStatus) shouldBe DataStructure(usersHeaders, Some(usersBody), FilterChain.empty)
-
-      val testServiceHeaders = Seq(Header("authToken"))
-      val testServiceBody = Body(
-        DataType("TestRequest",
-          Seq(Field("mode", DataType()),
-              Field("resultType", DataType()),
-              Field("clientIp", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(CLIENT_IP)))),
-              Field("clientLanguage", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(CLIENT_LANGUAGE))))),
-          Seq()))
-
-      val ds = ramlConfig.resourcesByUri("/status/test-service").methods(Method(GET)).requests.dataStructures(None)
-      clear(ds) shouldBe
-        DataStructure(testServiceHeaders, Some(testServiceBody), FilterChain.empty)
-
-      ds.filters.requestFilters.head shouldBe a[EnrichRequestFilter]
+    "response filters" in {
+      val usersFilterChain = ramlConfig.resourcesByUri("/status").methods(Method(GET)).responses(200).ramlContentTypes(None).filters
+      usersFilterChain.responseFilters.head shouldBe a[ResponsePrivateFilter]
+      usersFilterChain.eventFilters.head shouldBe a[EventPrivateFilter]
     }
 
-    "response data structure" in {
-      val usersHeaders = Seq(Header("content-type"))
-      val statusBody = Body(
-        DataType("Status",
-          Seq(Field("statusCode", DataType("number", Seq(), Seq())),
-              Field("processedBy", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(PRIVATE))))),
-          Seq()))
-      val dsUsers = ramlConfig.resourcesByUri("/status").methods(Method(GET)).responses(200).dataStructures(None)
-      clear(dsUsers) shouldBe DataStructure(usersHeaders, Some(statusBody), FilterChain.empty)
-      dsUsers.filters.responseFilters.head shouldBe a[ResponsePrivateFilter]
-      dsUsers.filters.eventFilters.head shouldBe a[EventPrivateFilter]
-
-      val testServiceHeaders = Seq(Header("content-type"))
-      val testServiceBody = Body(
-        DataType("Status",
-          Seq(Field("statusCode", DataType("number", Seq(), Seq())),
-              Field("processedBy", DataType(DEFAULT_TYPE_NAME, Seq(), Seq(Annotation(PRIVATE))))),
-          Seq()))
-      val dsResponse = ramlConfig.resourcesByUri("/status").methods(Method(GET)).responses(200).dataStructures(None)
-      clear(dsResponse) shouldBe DataStructure(testServiceHeaders, Some(testServiceBody), FilterChain.empty)
-
-      val test404Headers = Seq[Header]()
-      val test404Body = Body(DataType())
-      val dsResponse404 = ramlConfig.resourcesByUri("/status/test-service").methods(Method(GET)).responses(404).dataStructures(None)
-      clear(dsResponse404) shouldBe DataStructure(test404Headers, Some(test404Body), FilterChain.empty)
-    }
-
-    "request data structures by contentType" in {
-      val feedHeaders = Seq()
-      val reliableResourceStateBody = Body(
-        DataType("ReliableResourceState",
-          Seq(Field("revisionId", DataType("number", Seq(), Seq())),
-              Field("content", DataType())),
-          Seq()))
-      val reliableResourceUpdateBody = Body(
-        DataType("ReliableResourceUpdate",
-          Seq(Field("revisionId", DataType("number", Seq(), Seq())),
-              Field("update", DataType())),
-          Seq()))
-      val testRequestBody = Body(
-        DataType("TestRequest",
-          Seq(Field("mode", DataType("string", Seq(), Seq())),
-              Field("resultType", DataType("string", Seq(), Seq())),
-              Field("clientIp", DataType("string", Seq(), Seq(Annotation(CLIENT_IP)))),
-              Field("clientLanguage", DataType("string", Seq(), Seq(Annotation(CLIENT_LANGUAGE))))),
-        Seq()))
+    "request filters by contentType" in {
       val resourceStateContentType = Some("app-server-status")
       val resourceUpdateContentType = Some("app-server-status-update")
 
-      val dsState = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.dataStructures(resourceStateContentType.map(ContentType))
-      clear(dsState) shouldBe DataStructure(feedHeaders, Some(reliableResourceStateBody), FilterChain.empty)
-      val dsUpdate = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.dataStructures(resourceUpdateContentType.map(ContentType))
-      clear(dsUpdate) shouldBe DataStructure(feedHeaders, Some(reliableResourceUpdateBody), FilterChain.empty)
-      val dsDefault = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.dataStructures(None)
-      clear(dsDefault) shouldBe DataStructure(feedHeaders, Some(testRequestBody), FilterChain.empty)
+      val resourceStateFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.ramlContentTypes(resourceStateContentType.map(ContentType)).filters
+      resourceStateFilters.requestFilters shouldBe Seq.empty
+      val resourceUpdateFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.ramlContentTypes(resourceUpdateContentType.map(ContentType)).filters
+      resourceUpdateFilters.requestFilters shouldBe Seq.empty
+      val defaultFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.ramlContentTypes(None).filters
+      defaultFilters.requestFilters.head shouldBe a[EnrichRequestFilter]
+    }
+
+    "nested fields" in {
+      val responseFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).responses(200).ramlContentTypes(None).filters
+      responseFilterChain.responseFilters.head shouldBe a[ResponsePrivateFilter]
+
+      val requestFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).requests.ramlContentTypes(None).filters
+      requestFilterChain.requestFilters.head shouldBe a[EnrichRequestFilter]
     }
 
     "request URI substitution" in {
@@ -161,7 +77,7 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
       rs1.filters.requestFilters shouldBe empty
 
       val rs2 = ramlConfig.resourcesByUri("/test-rewrite-method/some-service").methods(Method(PUT))
-      rs2.filters.requestFilters.head shouldBe a[RewriteRequestFilter]
+      rs2.methodFilters.requestFilters.head shouldBe a[RewriteRequestFilter]
     }
   }
 }
