@@ -3,7 +3,7 @@ package eu.inn.facade.raml
 import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.hyperbus.transport.api.uri._
 
-class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[String]) {
+class RamlConfig(val baseUri: String, val resourcesByUri: Map[String, ResourceConfig], val uris: Seq[String]) {
 
   def traitNames(uriPattern: String, method: String): Seq[String] = {
     traits(uriPattern, method).map(foundTrait ⇒ foundTrait.name).distinct

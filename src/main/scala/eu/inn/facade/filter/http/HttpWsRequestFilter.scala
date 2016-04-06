@@ -1,8 +1,11 @@
 package eu.inn.facade.filter.http
 
+import com.typesafe.config.Config
 import eu.inn.binders.value.Null
+import eu.inn.facade.FacadeConfig
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
+import eu.inn.facade.utils.{HalTransformer, UriRewriter}
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.{Header, Method, QueryBody}
 import eu.inn.hyperbus.transport.api.matchers.Specific
@@ -10,13 +13,14 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
+class HttpWsRequestFilter(ramlConfig: RamlConfig, config: Config) extends RequestFilter {
 
   override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
+      val rootPathPrefix = config.getString(FacadeConfig.RAML_ROOT_PATH)
       val httpUri = spray.http.Uri(request.uri.pattern.specific)
-      val path = httpUri.path.toString
+      val requestUri = UriRewriter.removeRootPathPrefix(Uri(Specific(httpUri.path.toString)), rootPathPrefix)
 
       val headersBuilder = Map.newBuilder[String, Seq[String]]
       var messageIdFound = false
@@ -45,10 +49,11 @@ class HttpWsRequestFilter(ramlConfig: RamlConfig) extends RequestFilter {
         case Method.DELETE ⇒
           (Null, Method.DELETE)
         case other ⇒
-          (request.body, other)
+          val transformedBody = HalTransformer.transformEmbeddedObject(request.body)
+          (transformedBody, other)
       }
 
-      FacadeRequest(Uri(Specific(path)), newMethod, headersBuilder.result(), newBody)
+      FacadeRequest(requestUri, newMethod, headersBuilder.result(), newBody)
     }
   }
 }

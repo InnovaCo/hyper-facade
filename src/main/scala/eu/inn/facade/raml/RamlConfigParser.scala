@@ -22,14 +22,13 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   var dataTypes: Map[String, TypeDefinition] = parseDataTypes()
 
   def parseRaml: RamlConfig = {
-
     val (resourcesByUri, uris) = api.resources()
       .foldLeft((Map.newBuilder[String, ResourceConfig], Seq.newBuilder[String])) { (accumulator, resource) ⇒
         val (resourceMap, uris) = accumulator
         val currentRelativeUri = resource.relativeUri().value()
         (resourceMap ++= parseResource(currentRelativeUri, resource), uris += currentRelativeUri)
       }
-    new RamlConfig(resourcesByUri.result(), uris.result())
+    new RamlConfig(api.baseUri().value(), resourcesByUri.result(), uris.result())
   }
 
   private def parseDataTypes(): Map[String, TypeDefinition] = {

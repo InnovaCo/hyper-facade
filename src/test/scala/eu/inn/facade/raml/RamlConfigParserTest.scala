@@ -24,6 +24,10 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
 //      ramlConfig.traitNames("/users/{userId}", PUT) shouldBe Seq("secured")
 //    }
 
+    "base URI" in {
+      ramlConfig.baseUri shouldBe "https://meta.inn.eu/revault"
+    }
+
     "request filters" in {
       val statusFilterChain = ramlConfig.resourcesByUri("/status").methods(Method(POST)).requests.ramlContentTypes(None).filters
       statusFilterChain.requestFilters shouldBe Seq.empty

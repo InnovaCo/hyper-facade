@@ -1,8 +1,10 @@
 package eu.inn.facade.filter.http
 
+import com.typesafe.config.Config
 import eu.inn.binders.value._
+import eu.inn.facade.FacadeConfig
 import eu.inn.facade.model._
-import eu.inn.facade.utils.HalTransformer
+import eu.inn.facade.utils.{HalTransformer, UriRewriter}
 import eu.inn.hyperbus.model.Links._
 import eu.inn.hyperbus.model.{DefLink, Header}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -10,7 +12,7 @@ import spray.http.HttpHeaders
 
 import scala.concurrent.ExecutionContext
 
-class OutputFilter {
+class OutputFilter(config: Config) {
   def filterMessage(context: FacadeRequestContext, message: FacadeMessage)
                    (implicit ec: ExecutionContext): FacadeMessage = {
     val headersBuilder = Map.newBuilder[String, Seq[String]]
@@ -39,8 +41,9 @@ class OutputFilter {
 
     message match {
       case request: FacadeRequest ⇒
+        val rootPathPrefix = config.getString(FacadeConfig.RAML_ROOT_PATH)
         request.copy(
-          uri = Uri(request.uri.formatted),
+          uri = UriRewriter.addRootPathPrefix(Uri(request.uri.formatted), rootPathPrefix),
           headers = headersBuilder.result(),
           body = newBody
         )

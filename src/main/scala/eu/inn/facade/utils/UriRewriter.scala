@@ -21,6 +21,15 @@ object UriRewriter {
     val newUri = Uri(Uri(Specific(toUri), newArgs.toMap).formatted)
     RewriteResult(newUri, failures)
   }
+
+  def addRootPathPrefix(uri: Uri, rootPathPrefix: String): Uri = {
+    Uri(Specific(rootPathPrefix + uri.pattern.specific), uri.args)
+  }
+
+  def removeRootPathPrefix(uri: Uri, rootPathPrefix: String): Uri = {
+    val newPattern = uri.pattern.specific.substring(rootPathPrefix.length)
+    Uri(Specific(newPattern), uri.args)
+  }
 }
 
 case class RewriteResult(uri: Uri, failures: Seq[Throwable])
