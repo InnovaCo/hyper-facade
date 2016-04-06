@@ -156,7 +156,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
         case Some(name) ⇒ Some(ContentType(name))
         case None ⇒ None
       }
-      val interfaceDef: RamlContentType = typeName match {
+      val ramlContentType = typeName match {
         case Some(name) ⇒ dataTypes.get(name) match {
           case Some(typeDef) ⇒
             val filterMap = typeDef.fields.foldLeft(Seq.newBuilder[(RamlFilterFactory, Field)]) { (filterSeq, field) ⇒
@@ -166,7 +166,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             }
 
             val filterChain = filterMap.map { case (factory, filteredFields) ⇒
-              val target = TargetFields(typeDef.fields) // we should pass all fields to support nested fields filtering
+              val target = TargetFields(typeDef.typeName, typeDef.fields) // we should pass all fields to support nested fields filtering
               factory.createFilterChain(target)
             }.foldLeft (parentFilters) { (filterChain, next) ⇒
               filterChain ++ next
@@ -178,7 +178,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
 
         case None ⇒ RamlContentType(headers, TypeDefinition(), parentFilters)
       }
-      typeDefinitions += (contentType → interfaceDef)
+      typeDefinitions += (contentType → ramlContentType)
     }.result()
   }
 

@@ -21,8 +21,8 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
             resourceMethod.responses.get(response.status) match {
               case Some(responses) ⇒
                 responses.ramlContentTypes.get(response.clientContentType.map(ContentType)) match { // todo: test this!
-                  case Some(interfaceDefinition) ⇒
-                    interfaceDefinition.filters
+                  case Some(ramlContentType) ⇒
+                    ramlContentType.filters
                   case None ⇒
                     resourceMethod.methodFilters
                 }

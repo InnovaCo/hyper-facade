@@ -10,7 +10,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class EnrichmentFilterFactory extends RamlFilterFactory {
   def createFilterChain(target: RamlTarget): SimpleFilterChain = {
     target match {
-      case TargetFields(fields) ⇒
+      case TargetFields(typeName, fields) ⇒
         SimpleFilterChain(
           requestFilters = Seq(new EnrichRequestFilter(fields)),
           responseFilters = Seq.empty,
