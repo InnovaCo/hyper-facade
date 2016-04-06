@@ -131,32 +131,32 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     val methodAnnotations = extractAnnotations(ramlMethod)
     val methodFilters = parentFilters ++ createFilters(currentUri, Some(method.name), methodAnnotations)
 
-    val requestFilterChains = FilterChains(buildFilterChains(RamlRequestResponseWrapper(ramlMethod), methodFilters))
+    val requestFilterChains = Requests(extractInterfaceDefinitions(RamlRequestResponseWrapper(ramlMethod), methodFilters))
 
-    val responseFilterChainsBuilder = Map.newBuilder[Int, FilterChains]
+    val responseFilterChainsBuilder = Map.newBuilder[Int, Responses]
     ramlMethod.responses.foreach { ramlResponse ⇒
       val statusCode = ramlResponse.code.value.toInt
-      val responseFilterChains = buildFilterChains(RamlRequestResponseWrapper(ramlResponse), methodFilters)
-      responseFilterChainsBuilder += statusCode → FilterChains(responseFilterChains)
+      val responseFilterChains = extractInterfaceDefinitions(RamlRequestResponseWrapper(ramlResponse), methodFilters)
+      responseFilterChainsBuilder += statusCode → Responses(responseFilterChains)
     }
 
     ResourceMethod(method, requestFilterChains, responseFilterChainsBuilder.result(), methodFilters)
   }
 
-  private def buildFilterChains(ramlReqRspWrapper: RamlRequestResponseWrapper,
-                                     parentFilters: SimpleFilterChain): Map[Option[ContentType], SimpleFilterChain] = {
+  private def extractInterfaceDefinitions(ramlReqRspWrapper: RamlRequestResponseWrapper,
+                                     parentFilters: SimpleFilterChain): Map[Option[ContentType], InterfaceDefinition] = {
     val headers = ramlReqRspWrapper.headers.foldLeft(Seq.newBuilder[Header]) { (headerList, ramlHeader) ⇒
       headerList += Header(ramlHeader.name())
     }.result()
     val typeNames: Map[Option[String], Option[String]] = getTypeNamesByContentType(ramlReqRspWrapper)
 
-    typeNames.foldLeft(Map.newBuilder[Option[ContentType], SimpleFilterChain]) { (typeDefinitions, typeDefinition) ⇒
+    typeNames.foldLeft(Map.newBuilder[Option[ContentType], InterfaceDefinition]) { (typeDefinitions, typeDefinition) ⇒
       val (contentTypeName, typeName) = typeDefinition
       val contentType: Option[ContentType] = contentTypeName match {
         case Some(name) ⇒ Some(ContentType(name))
         case None ⇒ None
       }
-      val chain = typeName match {
+      val interfaceDef: InterfaceDefinition = typeName match {
         case Some(name) ⇒ dataTypes.get(name) match {
           case Some(typeDef) ⇒
             val filterMap = typeDef.fields.foldLeft(Seq.newBuilder[(RamlFilterFactory, Field)]) { (filterSeq, field) ⇒
@@ -171,14 +171,14 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             }.foldLeft (parentFilters) { (filterChain, next) ⇒
               filterChain ++ next
             }
-            filterChain
+            InterfaceDefinition(headers, typeDef, filterChain)
 
-          case None ⇒ parentFilters
+          case None ⇒ InterfaceDefinition(headers, TypeDefinition(), parentFilters)
         }
 
-        case None ⇒ parentFilters
+        case None ⇒ InterfaceDefinition(headers, TypeDefinition(), parentFilters)
       }
-      typeDefinitions += (contentType → chain)
+      typeDefinitions += (contentType → interfaceDef)
     }.result()
   }
 

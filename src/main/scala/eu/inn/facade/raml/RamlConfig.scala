@@ -46,14 +46,15 @@ case class ResourceConfig(
                          )
 
 case class ResourceMethod(method: Method,
-                          requestFilterChains: FilterChains,
-                          responseFilterChains: Map[Int, FilterChains],
+                          requests: Requests,
+                          responses: Map[Int, Responses],
                           methodFilters: SimpleFilterChain)
 
-case class FilterChains(chains: Map[Option[ContentType], SimpleFilterChain])
+case class Requests(interfaces: Map[Option[ContentType], InterfaceDefinition])
+case class Responses(interfaces: Map[Option[ContentType], InterfaceDefinition])
+case class InterfaceDefinition(headers: Seq[Header], typeDefinition: TypeDefinition, filters: SimpleFilterChain)
 
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
-
 case class Trait(name: String, parameters: Map[String, String])
 object Trait {
   def apply(name: String): Trait = {

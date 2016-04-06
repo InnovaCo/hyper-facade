@@ -25,15 +25,15 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
 //    }
 
     "request filters" in {
-      val statusFilterChain = ramlConfig.resourcesByUri("/status").methods(Method(POST)).requestFilterChains.chains(None)
+      val statusFilterChain = ramlConfig.resourcesByUri("/status").methods(Method(POST)).requests.interfaces(None).filters
       statusFilterChain.requestFilters shouldBe Seq.empty
 
-      val statusServiceFilterChain = ramlConfig.resourcesByUri("/status/test-service").methods(Method(GET)).requestFilterChains.chains(None)
+      val statusServiceFilterChain = ramlConfig.resourcesByUri("/status/test-service").methods(Method(GET)).requests.interfaces(None).filters
       statusServiceFilterChain.requestFilters.head shouldBe a[EnrichRequestFilter]
     }
 
     "response filters" in {
-      val usersFilterChain = ramlConfig.resourcesByUri("/status").methods(Method(GET)).responseFilterChains(200).chains(None)
+      val usersFilterChain = ramlConfig.resourcesByUri("/status").methods(Method(GET)).responses(200).interfaces(None).filters
       usersFilterChain.responseFilters.head shouldBe a[ResponsePrivateFilter]
       usersFilterChain.eventFilters.head shouldBe a[EventPrivateFilter]
     }
@@ -42,19 +42,19 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
       val resourceStateContentType = Some("app-server-status")
       val resourceUpdateContentType = Some("app-server-status-update")
 
-      val resourceStateFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requestFilterChains.chains(resourceStateContentType.map(ContentType))
+      val resourceStateFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.interfaces(resourceStateContentType.map(ContentType)).filters
       resourceStateFilters.requestFilters shouldBe Seq.empty
-      val resourceUpdateFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requestFilterChains.chains(resourceUpdateContentType.map(ContentType))
+      val resourceUpdateFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.interfaces(resourceUpdateContentType.map(ContentType)).filters
       resourceUpdateFilters.requestFilters shouldBe Seq.empty
-      val defaultFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requestFilterChains.chains(None)
+      val defaultFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.interfaces(None).filters
       defaultFilters.requestFilters.head shouldBe a[EnrichRequestFilter]
     }
 
     "nested fields" in {
-      val responseFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).responseFilterChains(200).chains(None)
+      val responseFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).responses(200).interfaces(None).filters
       responseFilterChain.responseFilters.head shouldBe a[ResponsePrivateFilter]
 
-      val requestFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).requestFilterChains.chains(None)
+      val requestFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).requests.interfaces(None).filters
       requestFilterChain.requestFilters.head shouldBe a[EnrichRequestFilter]
     }
 
