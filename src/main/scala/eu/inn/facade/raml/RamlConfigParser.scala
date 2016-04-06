@@ -118,15 +118,15 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     }
   }
 
-  private def extractResourceMethods(currentUri: String, resource: Resource, parentFilters: SimpleFilterChain): Map[Method, ResourceMethod] = {
-    val builder = Map.newBuilder[Method, ResourceMethod]
+  private def extractResourceMethods(currentUri: String, resource: Resource, parentFilters: SimpleFilterChain): Map[Method, RamlResourceMethod] = {
+    val builder = Map.newBuilder[Method, RamlResourceMethod]
     resource.methods.foreach { ramlMethod ⇒
       builder += Method(ramlMethod.method) → extractResourceMethod(currentUri, ramlMethod, resource, parentFilters)
     }
     builder.result()
   }
 
-  private def extractResourceMethod(currentUri: String, ramlMethod: methodsAndResources.Method, resource: Resource, parentFilters: SimpleFilterChain): ResourceMethod = {
+  private def extractResourceMethod(currentUri: String, ramlMethod: methodsAndResources.Method, resource: Resource, parentFilters: SimpleFilterChain): RamlResourceMethod = {
     val method = Method(ramlMethod.method())
     val methodAnnotations = extractAnnotations(ramlMethod)
     val methodFilters = parentFilters ++ createFilters(currentUri, Some(method.name), methodAnnotations)
@@ -140,7 +140,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
       responseFilterChainsBuilder += statusCode → RamlResponses(responseFilterChains)
     }
 
-    ResourceMethod(method, requestFilterChains, responseFilterChainsBuilder.result(), methodFilters)
+    RamlResourceMethod(method, requestFilterChains, responseFilterChainsBuilder.result(), methodFilters)
   }
 
   private def extractInterfaceDefinitions(ramlReqRspWrapper: RamlRequestResponseWrapper,

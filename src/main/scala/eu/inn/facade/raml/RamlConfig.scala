@@ -41,14 +41,14 @@ class RamlConfig(val resourcesByUri: Map[String, ResourceConfig], uris: Seq[Stri
 case class ResourceConfig(
                            traits: Traits,
                            annotations: Seq[Annotation],
-                           methods: Map[Method, ResourceMethod],
+                           methods: Map[Method, RamlResourceMethod],
                            filters: SimpleFilterChain
                          )
 
-case class ResourceMethod(method: Method,
-                          requests: RamlRequests,
-                          responses: Map[Int, RamlResponses],
-                          methodFilters: SimpleFilterChain)
+case class RamlResourceMethod(method: Method,
+                              requests: RamlRequests,
+                              responses: Map[Int, RamlResponses],
+                              methodFilters: SimpleFilterChain)
 
 case class RamlRequests(ramlContentTypes: Map[Option[ContentType], RamlContentType])
 case class RamlResponses(ramlContentTypes: Map[Option[ContentType], RamlContentType])
