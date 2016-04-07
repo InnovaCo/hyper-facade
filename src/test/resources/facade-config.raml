@@ -209,6 +209,12 @@ traits:
     (rewrite):
       uri: /revault/content/some-service
 
+/test-rewrite/some-service/{serviceId}:
+  (rewrite):
+    uri: /rewritten/some-service/{serviceId}
+
+/rewritten/some-service/{serviceId}:
+
 /complex-resource:
   post:
     body:
@@ -217,3 +223,4 @@ traits:
       200:
         body:
           type: ComplexResponseType
+
