@@ -1,6 +1,6 @@
 package eu.inn.facade
 
-import java.io.{File, IOException}
+import java.io.{File, FileNotFoundException}
 
 import com.mulesoft.raml.webpack.holders.JSConsole
 import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
@@ -19,7 +19,7 @@ class ConfigsFactory {
     val ramlConfigPath = ramlFilePath(appConfig)
     val apiFile = new File(ramlConfigPath)
     if (!apiFile.exists()) {
-      throw new IOException(s"File ${apiFile.getAbsolutePath} doesn't exists")
+      throw new FileNotFoundException(s"File ${apiFile.getAbsolutePath} doesn't exists")
     }
     val api = ramlFactory.createApi(apiFile.getAbsolutePath)
     RamlConfigParser(api).parseRaml

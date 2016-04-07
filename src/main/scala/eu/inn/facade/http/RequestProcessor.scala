@@ -58,7 +58,8 @@ trait RequestProcessor extends Injectable {
           if (log.isDebugEnabled) {
             log.debug(s"Request $requestContext is restarted from $facadeRequest to ${e.request}")
           }
-          processRequestWithRaml(requestContext, e.request, tryNum + 1)
+          val (preparedContext, preparedRequest) = prepareContextAndRequestBeforeRaml(requestContext, e.request)
+          processRequestWithRaml(preparedContext, preparedRequest, tryNum + 1)
       }
     }
   }

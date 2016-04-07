@@ -6,7 +6,7 @@ import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import eu.inn.binders.json._
 import eu.inn.binders.value.{Null, Obj, ObjV, Text}
-import eu.inn.facade.model.{FacadeHeaders, FacadeRequest, UriSpecificDeserializer, UriSpecificSerializer}
+import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
 import eu.inn.hyperbus.Hyperbus
@@ -343,19 +343,19 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":"got it"}"""
     }
 
-    "websocket: get with rewrite" in {
+    "websocket: get with rewrite with arguments" in {
       val q = new TestQueue
-      val client = createWsClient("ws-get-rewrite-client", "/test-rewrite/some-service", q.put)
+      val client = createWsClient("ws-get-rewrite-args-client", "/test-rewrite/some-service/{serviceId}", q.put)
 
       register {
-        testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
+        testService.onCommand(RequestMatcher(Some(Uri("/rewritten/some-service/{serviceId}")), Map(Header.METHOD → Specific(Method.GET))),
           Ok(DynamicBody(Text("response"))), { request ⇒
-            request.uri shouldBe Uri("/status/test-service")
+            request.uri shouldBe Uri("/rewritten/some-service/{serviceId}", Map("serviceId" → "100500"))
           }
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/test-rewrite/some-service"), Method.GET,
+      client ! FacadeRequest(Uri("/test-rewrite/some-service/100500"), Method.GET,
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
 
       val resourceState = q.next().futureValue
@@ -432,6 +432,18 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       }
 
       Source.fromURL("http://localhost:54321/test-rewrite/some-service", "UTF-8").mkString shouldBe """"response""""
+    }
+
+    "http get with rewrite with arguments" in {
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/rewritten/some-service/{serviceId}")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Text("response-with-args"))), { request ⇒
+            request.uri shouldBe Uri("/rewritten/some-service/{serviceId}", Map("serviceId" → "100501"))
+          }
+        ).futureValue
+      }
+
+      Source.fromURL("http://localhost:54321/test-rewrite/some-service/100501", "UTF-8").mkString shouldBe """"response-with-args""""
     }
 
     "http get applies private response filter" in {
