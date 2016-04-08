@@ -2,7 +2,7 @@ package eu.inn.facade.modules
 
 import akka.actor.ActorSystem
 import com.typesafe.config.Config
-import eu.inn.facade.{HyperbusFactory, StatsReporterFactory}
+import eu.inn.facade.HyperbusFactory
 import eu.inn.facade.events.SubscriptionsManager
 import eu.inn.facade.http.{HttpWorker, WsRestServiceApp}
 import eu.inn.hyperbus.Hyperbus
@@ -15,7 +15,6 @@ import scala.concurrent.ExecutionContext
 class ServiceModule extends Module {
   bind [HyperbusFactory]        identifiedBy 'hbFactory            to new HyperbusFactory(inject [Config])
   bind [Hyperbus]               identifiedBy 'hyperbus             to inject [HyperbusFactory].hyperbus
-  bind [StatsReporterFactory]   identifiedBy 'statsFactory         to injected[StatsReporterFactory]
   bind [ActorSystem]            identifiedBy 'actorSystem          to ActorSystem("facade", inject [Config])
   bind [ExecutionContext]       identifiedBy 'executionContext     to inject[ActorSystem].dispatcher
   bind [HttpWorker]             identifiedBy 'httpWorker           to injected[HttpWorker]
