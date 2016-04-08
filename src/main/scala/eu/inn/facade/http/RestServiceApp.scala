@@ -13,7 +13,7 @@ import eu.inn.metrics.{Metrics, ProcessMetrics}
 import eu.inn.metrics.loaders.MetricsReporterLoader
 import eu.inn.servicecontrol.api.Service
 import org.slf4j.LoggerFactory
-import scaldi.{Injectable, Injector}
+import scaldi.{Injectable, Injector, TypeTagIdentifier}
 import spray.can.server.ServerSettings
 import spray.http._
 import spray.routing._
@@ -51,13 +51,16 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   val port = restConfig.getInt("port")
 
   def start(initRoutes: ⇒ Route) {
-    try {
-      inject[MetricsReporterLoader].run()
-      ProcessMetrics.startReporting(metrics)
-    } catch {
-      case NonFatal(e) ⇒
-        log.error("Can't start metrics reporter.", e)
+    import scala.reflect.runtime.universe._
+    inj.getBinding(List(TypeTagIdentifier(typeOf[MetricsReporterLoader]))) match {
+      case Some(_) ⇒
+        inject[MetricsReporterLoader].run()
+        ProcessMetrics.startReporting(metrics)
+
+      case None ⇒
+        log.warn("Metric reporter is not configured.")
     }
+
     startServer(interface, port, settings = Some(ServerSettings(rootConf))) {
       startWithDirectives(initRoutes)
     } onComplete {
