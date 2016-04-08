@@ -5,6 +5,7 @@ import akka.pattern.pipe
 import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfig
 import eu.inn.facade.http.{FacadeRequestWithContext, RequestProcessor}
+import eu.inn.facade.metrics.MetricKeys
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Method
 import eu.inn.hyperbus.Hyperbus
@@ -109,6 +110,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     implicit val ec = executionContext
 
+    val trackRequestTime = metrics.timer(MetricKeys.REQUEST_PROCESS_TIME).time()
     processRequestWithRaml(requestContext, facadeRequest, 0) map { filteredRequest ⇒
       val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
         filteredRequest.headers(Header.MESSAGE_ID)).head
@@ -117,7 +119,9 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
       hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
         handleHyperbusExceptions(requestContext)
-      }  pipeTo self
+      } andThen { case _ ⇒
+        trackRequestTime.stop
+      } pipeTo self
     }
   }
 

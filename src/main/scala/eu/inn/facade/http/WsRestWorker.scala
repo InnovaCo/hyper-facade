@@ -4,9 +4,11 @@ import akka.actor._
 import eu.inn.binders.value.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.metrics.MetricKeys
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.{Hyperbus, IdGenerator}
+import eu.inn.metrics.Metrics
 import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
 import spray.can.websocket.frame.Frame
@@ -27,6 +29,10 @@ class WsRestWorker(val serverConnection: ActorRef,
   with ActorLogging
   with Injectable {
 
+  val metrics = inject[Metrics]
+  val trackWsTimeToLive = metrics.timer(MetricKeys.WS_LIFE_TIME).time()
+  val trackWsMessages = metrics.meter(MetricKeys.WS_MESSAGE_COUNT)
+  val trackHeartbeat = metrics.meter(MetricKeys.HEARTBEAT)
   var isConnectionTerminated = false
   var remoteAddress = clientAddress
   var httpRequest: Option[HttpRequest] = None
@@ -43,6 +49,10 @@ class WsRestWorker(val serverConnection: ActorRef,
     }
   }
 
+  override def postStop(): Unit = {
+    super.postStop()
+    trackWsTimeToLive.stop()
+  }
   // order is really important, watchConnection should be before httpRequests, otherwise there is a memory leak
   override def receive = watchConnection orElse handshaking orElse httpRequests
 
@@ -75,6 +85,8 @@ class WsRestWorker(val serverConnection: ActorRef,
   def businessLogic: Receive = {
     case message: Frame ⇒
       try {
+        trackWsMessages.mark()
+        trackHeartbeat.mark()
         val originalRequest = FacadeRequest(message)
         val uriPattern = originalRequest.uri.pattern.specific
         val uri = spray.http.Uri()

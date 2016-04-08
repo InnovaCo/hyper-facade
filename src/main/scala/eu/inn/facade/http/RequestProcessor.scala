@@ -2,11 +2,13 @@ package eu.inn.facade.http
 
 import akka.pattern.AskTimeoutException
 import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.metrics.MetricKeys
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.NoTransportRouteException
 import eu.inn.hyperbus.{Hyperbus, IdGenerator, model}
+import eu.inn.metrics.Metrics
 import org.slf4j.Logger
 import scaldi.{Injectable, Injector}
 
@@ -28,21 +30,24 @@ trait RequestProcessor extends Injectable {
   val ramlFilterChain = inject[FilterChain]("ramlFilterChain")
   val afterFilterChain = inject[FilterChain]("afterFilterChain")
   val maxRestarts = 5 // todo: move to config
+  val metrics = inject[Metrics]
 
   def processRequestToFacade(requestContext: FacadeRequestContext, request: FacadeRequest): Future[FacadeResponse] = {
-    beforeFilterChain.filterRequest(requestContext, request) flatMap { unpreparedRequest ⇒
-      val (preparedContext, preparedRequest) = prepareContextAndRequestBeforeRaml(requestContext, unpreparedRequest)
-      processRequestWithRaml(preparedContext, preparedRequest, 0) flatMap { filteredRequest ⇒
-        hyperbus <~ filteredRequest.toDynamicRequest recover {
-          handleHyperbusExceptions(preparedContext)
-        } flatMap { response ⇒
-          ramlFilterChain.filterResponse(preparedContext, FacadeResponse(response)) flatMap { r ⇒
-            afterFilterChain.filterResponse(preparedContext, r)
+    metrics.timerOfFuture(MetricKeys.REQUEST_PROCESS_TIME) {
+      beforeFilterChain.filterRequest(requestContext, request) flatMap { unpreparedRequest ⇒
+        val (preparedContext, preparedRequest) = prepareContextAndRequestBeforeRaml(requestContext, unpreparedRequest)
+        processRequestWithRaml(preparedContext, preparedRequest, 0) flatMap { filteredRequest ⇒
+          hyperbus <~ filteredRequest.toDynamicRequest recover {
+            handleHyperbusExceptions(preparedContext)
+          } flatMap { response ⇒
+            ramlFilterChain.filterResponse(preparedContext, FacadeResponse(response)) flatMap { r ⇒
+              afterFilterChain.filterResponse(preparedContext, r)
+            }
           }
         }
+      } recover handleFilterExceptions(requestContext) { response ⇒
+        response
       }
-    } recover handleFilterExceptions(requestContext) { response ⇒
-      response
     }
   }
 

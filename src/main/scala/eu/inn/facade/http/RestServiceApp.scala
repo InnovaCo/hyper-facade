@@ -9,6 +9,8 @@ import com.typesafe.config.Config
 import eu.inn.config.ConfigExtenders._
 import eu.inn.facade.FacadeConfig
 import eu.inn.hyperbus.Hyperbus
+import eu.inn.metrics.{Metrics, ProcessMetrics}
+import eu.inn.metrics.loaders.MetricsReporterLoader
 import eu.inn.servicecontrol.api.Service
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
@@ -20,7 +22,8 @@ import spray.routing.directives.LogEntry
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
-import scala.util.{Failure, Success}
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   with Service
@@ -35,6 +38,8 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
 
   val config = inject [Config]
+  val metrics = inject[Metrics]
+
   val restConfig = config.getConfig(FacadeConfig.HTTP)
   //val handleErrorsDirectives = inject [HandleErrorsDirectives]
   val shutdownTimeout = config.getFiniteDuration(FacadeConfig.SHUTDOWN_TIMEOUT)
@@ -46,6 +51,13 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   val port = restConfig.getInt("port")
 
   def start(initRoutes: ⇒ Route) {
+    try {
+      inject[MetricsReporterLoader].run()
+      ProcessMetrics.startReporting(metrics)
+    } catch {
+      case NonFatal(e) ⇒
+        log.error("Can't start metrics reporter.", e)
+    }
     startServer(interface, port, settings = Some(ServerSettings(rootConf))) {
       startWithDirectives(initRoutes)
     } onComplete {
@@ -71,8 +83,8 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   }
 
   override def stopService(controlBreak: Boolean): Unit = {
-    log.info("Stopping HyperBus Facade...")
-    println("Stopping HyperBus Facade...")
+    log.info("Stopping Hyperbus Facade...")
+    println("Stopping Hyperbus Facade...")
     try {
       Await.result(actorSystem.terminate(), shutdownTimeout)
     } catch {
@@ -83,9 +95,9 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
       Await.result(hyperBus.shutdown(shutdownTimeout*4/5), shutdownTimeout)
     } catch {
       case t: Throwable ⇒
-        log.error("HyperBus didn't shutdown gracefully", t)
+        log.error("Hyperbus didn't shutdown gracefully", t)
     }
-    log.info("HyperBus Facade stopped")
+    log.info("Hyperbus Facade stopped")
   }
 
   private def respondWithCORSHeaders(allowedOrigins: Seq[String], allowedPaths: Seq[Pattern] = Nil): Directive0 =
