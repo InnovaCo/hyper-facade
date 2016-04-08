@@ -39,8 +39,6 @@ object Build extends sbt.Build {
         ),
 
         libraryDependencies ++= Seq(
-          "io.dropwizard.metrics"          % "metrics-core"                 % "3.1.2",
-          "io.dropwizard.metrics"          % "metrics-graphite"             % "3.1.2",
           "ch.qos.logback"                 % "logback-classic"              % "1.1.2",
           "ch.qos.logback"                 % "logback-core"                 % "1.1.2",
           "com.typesafe.akka"              %% "akka-actor"                  % "2.4.1",
@@ -56,7 +54,7 @@ object Build extends sbt.Build {
           "eu.inn"                         % "javascript-module-holders"    % "0.0.30",
           "eu.inn"                         %% "service-control"             % "0.2.17",
           "eu.inn"                         %% "service-config"              % "0.1.6",
-          "eu.inn"                         %% "service-metrics-graphite"    % "0.1.3",
+          "eu.inn"                         %% "service-metrics"             % "0.1.6",
           "jline"                          % "jline"                        % "2.12.1",
           "io.spray"                       %% "spray-can"                   % "1.3.3",
           "io.spray"                       %% "spray-routing-shapeless2"    % "1.3.3",
