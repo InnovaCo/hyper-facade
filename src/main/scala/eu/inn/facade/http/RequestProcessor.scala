@@ -56,9 +56,26 @@ trait RequestProcessor extends Injectable {
       ramlFilterChain.filterRequest(requestContext, facadeRequest) recoverWith {
         case e : FilterRestartException ⇒
           if (log.isDebugEnabled) {
-            log.debug(s"Request $requestContext is restarted from $facadeRequest to ${e.request}")
+            log.debug(s"Request $requestContext is restarted from $facadeRequest to ${e.facadeMessage}")
           }
-          processRequestWithRaml(requestContext, e.request, tryNum + 1)
+          processRequestWithRaml(requestContext, e.facadeMessage.asInstanceOf[FacadeRequest], tryNum + 1)
+      }
+    }
+  }
+
+  def processEventWithRaml(requestContext: FacadeRequestContext, facadeRequest: FacadeRequest, tryNum: Int): Future[FacadeRequest] = {
+    if (tryNum > maxRestarts) {
+      Future.failed(
+        new RestartLimitReachedException(tryNum, maxRestarts)
+      )
+    }
+    else {
+      ramlFilterChain.filterEvent(requestContext, facadeRequest) recoverWith {
+        case e : FilterRestartException ⇒
+          if (log.isDebugEnabled) {
+            log.debug(s"Event $requestContext is restarted from $facadeRequest to ${e.facadeMessage}")
+          }
+          processEventWithRaml(requestContext, e.facadeMessage.asInstanceOf[FacadeRequest], tryNum + 1)
       }
     }
   }

@@ -39,7 +39,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         Map.empty,
         Map("field" → Text("value")))
 
-      restartException.request shouldBe expectedRequest
+      restartException.facadeMessage shouldBe expectedRequest
     }
 
     "rewrite with arguments" in {
@@ -66,7 +66,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         ObjV("field" → "value")
       )
 
-      restartException.request shouldBe expectedRequest
+      restartException.facadeMessage shouldBe expectedRequest
     }
   }
 }

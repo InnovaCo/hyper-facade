@@ -1,9 +1,13 @@
 package eu.inn.facade.raml
 
 import eu.inn.facade.filter.chain.SimpleFilterChain
-import eu.inn.hyperbus.transport.api.uri._
+import eu.inn.hyperbus.transport.api.uri.Uri
 
-class RamlConfig(val baseUri: String, val resourcesByUri: Map[String, ResourceConfig], val uris: Seq[String]) {
+class RamlConfig(
+                  val baseUri: String,
+                  val resourcesByUri: Map[String, ResourceConfig],
+                  val uris: Seq[String],
+                  val rewriteIndex: RewriteIndex) {
 
   def traitNames(uriPattern: String, method: String): Seq[String] = {
     traits(uriPattern, method).map(foundTrait ⇒ foundTrait.name).distinct
@@ -46,6 +50,7 @@ case class ResourceConfig(
                          )
 
 case class RamlResourceMethod(method: Method,
+                              annotations: Seq[Annotation],
                               requests: RamlRequests,
                               responses: Map[Int, RamlResponses],
                               methodFilters: SimpleFilterChain)
@@ -94,6 +99,7 @@ object Annotation {
   val PRIVATE = "private"
   val CLIENT_LANGUAGE = "x-client-language"
   val CLIENT_IP = "x-client-ip"
+  val REWRITE = "rewrite"
 
   def apply(name: String): Annotation = Annotation(name, None)
 }

@@ -157,8 +157,8 @@ class FilterInterruptException(val response: FacadeResponse,
                                message: String,
                                cause: Throwable = null) extends Exception (message, cause)
 
-class FilterRestartException(val request: FacadeRequest,
-                               message: String,
-                               cause: Throwable = null) extends Exception (message, cause)
+class FilterRestartException(val facadeMessage: FacadeMessage,
+                             message: String,
+                             cause: Throwable = null) extends Exception (message, cause)
 
 class RestartLimitReachedException(num: Int, max: Int) extends Exception (s"Maximum ($max) restart limits exceeded ($num)")

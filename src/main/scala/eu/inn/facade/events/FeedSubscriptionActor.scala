@@ -117,7 +117,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
       hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
         handleHyperbusExceptions(requestContext)
-      }  pipeTo self
+      } pipeTo self
     }
   }
 
@@ -174,7 +174,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       log.trace(s"Processing unreliable event $event for ${requestContext.pathAndQuery}")
     }
     implicit val ec = executionContext
-    ramlFilterChain.filterEvent(requestContext, FacadeRequest(event)) flatMap { e ⇒
+    processEventWithRaml(requestContext, FacadeRequest(event), 0) flatMap { e ⇒
       afterFilterChain.filterEvent(requestContext, e) map { filteredRequest ⇒
         websocketWorker ! filteredRequest
       }
@@ -201,7 +201,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           context.become(subscribedReliable(requestContext, originalRequest, lastRevisionId + 1, 0) orElse stopStartSubscription)
 
           implicit val ec = executionContext
-          ramlFilterChain.filterEvent(requestContext, FacadeRequest(event)) flatMap { e ⇒
+          processEventWithRaml(requestContext, FacadeRequest(event), 0) flatMap { e ⇒
             afterFilterChain.filterEvent(requestContext, e) map { filteredRequest ⇒
               websocketWorker ! filteredRequest
             }

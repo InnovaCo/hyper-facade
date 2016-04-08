@@ -1,7 +1,5 @@
 package eu.inn.facade.raml
 
-import com.typesafe.config.Config
-import eu.inn.facade.ConfigsFactory
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml.Method._
@@ -10,12 +8,8 @@ import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
 class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
-  val ramlConfig = readConfig
-
-  def readConfig: RamlConfig = {
-    implicit val injector = Injectors()
-    new ConfigsFactory().ramlConfig(inject[Config])
-  }
+  implicit val injector = Injectors()
+  val ramlConfig = inject[RamlConfig]
 
   "RamlConfig" - {
 //    "traits" in {

@@ -2,6 +2,7 @@ package eu.inn.facade.http
 
 import akka.actor.ActorSystem
 import eu.inn.facade.model._
+import eu.inn.facade.raml.RamlConfig
 import org.slf4j.LoggerFactory
 import scaldi.Injector
 import spray.http._
@@ -30,7 +31,8 @@ class HttpWorker(implicit val injector: Injector) extends RequestProcessor {
     val requestContext = FacadeRequestContext.create(
         remoteAddress,
         request,
-        facadeRequest
+        facadeRequest,
+        ramlConfig.rewriteIndex
       )
     processRequestToFacade(requestContext, facadeRequest) map { response ⇒
       response.toHttpResponse

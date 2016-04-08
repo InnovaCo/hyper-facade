@@ -9,6 +9,7 @@ import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model._
+import eu.inn.facade.raml.annotationtypes.rewrite
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector, StringIdentifier}
 
@@ -19,19 +20,30 @@ import scala.util.control.NonFatal
 class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable {
   val log = LoggerFactory.getLogger(getClass)
 
-  var dataTypes: Map[String, TypeDefinition] = parseDataTypes()
+  var dataTypes: Map[String, TypeDefinition] = parseTypeDefinitions()
 
   def parseRaml: RamlConfig = {
-    val (resourcesByUri, uris) = api.resources()
-      .foldLeft((Map.newBuilder[String, ResourceConfig], Seq.newBuilder[String])) { (accumulator, resource) ⇒
-        val (resourceMap, uris) = accumulator
+    val resourcesByUriAcc = Map.newBuilder[String, ResourceConfig]
+    val urisAcc = Seq.newBuilder[String]
+    val rewriteIndexBuilder = RewriteIndexBuilder()
+    api.resources()
+      .foldLeft((resourcesByUriAcc, urisAcc, rewriteIndexBuilder)) { (accumulator, resource) ⇒
+        val (resourceMap, uris, rewriteIndexBuilder) = accumulator
         val currentRelativeUri = resource.relativeUri().value()
-        (resourceMap ++= parseResource(currentRelativeUri, resource), uris += currentRelativeUri)
+        val resourceData = parseResource(currentRelativeUri, resource)
+        (resourceMap ++= resourceData._1,
+          uris += currentRelativeUri,
+          rewriteIndexBuilder.append(resourceData._2)
+        )
       }
-    new RamlConfig(api.baseUri().value(), resourcesByUri.result(), uris.result())
+    new RamlConfig(
+      api.baseUri().value(),
+      resourcesByUriAcc.result(),
+      urisAcc.result(),
+      rewriteIndexBuilder.build())
   }
 
-  private def parseDataTypes(): Map[String, TypeDefinition] = {
+  private def parseTypeDefinitions(): Map[String, TypeDefinition] = {
     val typeDefinitions = api.types().foldLeft(Map.newBuilder[String, TypeDefinition]) { (typesMap, ramlTypeRaw) ⇒
       val ramlType = ramlTypeRaw.asInstanceOf[ObjectFieldImpl]
       val fields = ramlType.properties().foldLeft(Seq.newBuilder[Field]) { (parsedFields, ramlField) ⇒
@@ -73,7 +85,28 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     field
   }
 
-  private def parseResource(currentUri: String, resource: Resource): Map[String, ResourceConfig] = {
+  def buildRewriteIndex(resourceUri: String, resourceAnnotations: Seq[Annotation], resourceMethods: Map[Method, RamlResourceMethod]): RewriteIndexBuilder = {
+    val rewriteIndexBuilder = RewriteIndexBuilder()
+    resourceAnnotations foreach {
+      case Annotation(Annotation.REWRITE, Some(value: rewrite)) ⇒
+        rewriteIndexBuilder.addInverted( (None, value.getUri) → resourceUri )
+        rewriteIndexBuilder.addForward( (None, resourceUri) → value.getUri )
+      case _ ⇒
+    }
+    resourceMethods foreach {
+      case (_, ramlResourceMethod) ⇒ ramlResourceMethod.annotations foreach {
+        case Annotation(Annotation.REWRITE, Some(value: rewrite)) ⇒
+          val method = ramlResourceMethod.method
+          val uri = value.getUri
+          rewriteIndexBuilder.addInverted( (Some(method), uri) → resourceUri )
+          rewriteIndexBuilder.addForward( (Some(method), resourceUri) → uri )
+        case _ ⇒
+      }
+    }
+    rewriteIndexBuilder
+  }
+
+  private def parseResource(currentUri: String, resource: Resource): (Map[String, ResourceConfig], RewriteIndexBuilder) = {
     val traits = extractResourceTraits(resource) // todo: eliminate?
 
     val resourceAnnotations = extractAnnotations(resource)
@@ -82,12 +115,18 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
 
     val resourceConfig = ResourceConfig(traits, resourceAnnotations, resourceMethods, resourceFilters)
 
+
     val configuration = Map.newBuilder[String, ResourceConfig]
     configuration += (currentUri → resourceConfig)
-    resource.resources().foldLeft(configuration) { (configuration, resource) ⇒
+    val rewriteIndexBuilder = RewriteIndexBuilder()
+    rewriteIndexBuilder.append(buildRewriteIndex(currentUri, resourceAnnotations, resourceMethods))
+    resource.resources().foldLeft(configuration, rewriteIndexBuilder) { (accumulator, resource) ⇒
+      val (configuration, rewriteIndexBuilder) = accumulator
       val childResourceRelativeUri = resource.relativeUri().value()
-      configuration ++= parseResource(currentUri + childResourceRelativeUri, resource)
-    }.result()
+      val resourceData = parseResource(currentUri + childResourceRelativeUri, resource)
+      (configuration ++= resourceData._1, rewriteIndexBuilder.append(resourceData._2))
+    }
+    (configuration.result(), rewriteIndexBuilder)
   }
 
   private def createFilters(uri: String, method: Option[String], annotations: Seq[Annotation]) = {
@@ -126,8 +165,8 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   }
 
   private def extractResourceMethod(currentUri: String, ramlMethod: methodsAndResources.Method, resource: Resource, parentFilters: SimpleFilterChain): RamlResourceMethod = {
-    val method = Method(ramlMethod.method())
     val methodAnnotations = extractAnnotations(ramlMethod)
+    val method = Method(ramlMethod.method())
     val methodFilters = parentFilters ++ createFilters(currentUri, Some(method.name), methodAnnotations)
 
     val requestFilterChains = RamlRequests(extractInterfaceDefinitions(RamlRequestResponseWrapper(ramlMethod), methodFilters))
@@ -139,7 +178,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
       responseFilterChainsBuilder += statusCode → RamlResponses(responseFilterChains)
     }
 
-    RamlResourceMethod(method, requestFilterChains, responseFilterChainsBuilder.result(), methodFilters)
+    RamlResourceMethod(method, methodAnnotations, requestFilterChains, responseFilterChainsBuilder.result(), methodFilters)
   }
 
   private def extractInterfaceDefinitions(ramlReqRspWrapper: RamlRequestResponseWrapper,
@@ -210,17 +249,6 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
         typeNames += (contentType → Option(typeName))
       }
     }.result()
-  }
-
-  private def getTypeDefinition(typeName: String): Option[DataElement] = {
-    api.types.foldLeft[Option[DataElement]](None) { (matchedType, typeDef) ⇒
-      matchedType match {
-        case Some(foundType) ⇒ Some(foundType)
-        case None ⇒
-          if (typeDef.name == typeName) Some(typeDef)
-          else None
-      }
-    }
   }
 
   private def extractAnnotations(ramlField: RAMLLanguageElement): Seq[Annotation] = {

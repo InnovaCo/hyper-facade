@@ -9,7 +9,7 @@ import eu.inn.facade.raml.{RamlConfig, RamlConfigParser}
 import eu.inn.facade.utils.raml.JsToLogConsole
 import scaldi.Injector
 
-class ConfigsFactory {
+object ConfigsFactory {
 
   def ramlConfig(appConfig: Config)(implicit inj: Injector): RamlConfig = {
     val ramlFactory = new JavaNodeFactory()
@@ -48,7 +48,7 @@ object FacadeConfig {
   val PRIVATE_NETWORKS = ROOT + "private.networks"
   val LOGGERS = ROOT + "loggers"
   val RAML_FILE = ROOT + "raml.file"
-  val RAML_ROOT_PATH = ROOT + "raml.root-path"
+  val RAML_ROOT_PATH_PREFIX = ROOT + "raml.root-path"
   val HYPERBUS_GROUP = ROOT + "hyperbus.group-name"
   val GRAPHITE = ROOT + "graphite"
   val INJECT_MODULES = ROOT + "inject-modules"
