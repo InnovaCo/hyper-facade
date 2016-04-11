@@ -5,15 +5,15 @@ import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
 
 object HalTransformer {
 
-  def transformAndFormatEmbeddedObject(obj: Value, transformUri: (Uri ⇒ Uri) = (uri ⇒ uri)): Value = {
+  def transformAndFormatEmbeddedObject(obj: Value, transformUri: (Uri ⇒ Uri) = uri ⇒ uri): Value = {
     transformEmbeddedObj(obj, formatLinks = true, transformUri)
   }
 
-  def transformEmbeddedObject(obj: Value, transformUri: (Uri ⇒ Uri) = (uri ⇒ uri)): Value = {
+  def transformEmbeddedObject(obj: Value, transformUri: (Uri ⇒ Uri) = uri ⇒ uri): Value = {
     transformEmbeddedObj(obj, formatLinks = false, transformUri)
   }
 
-  private def transformEmbeddedObj(obj: Value, formatLinks: Boolean, transformUri: (Uri ⇒ Uri) = (uri ⇒ uri)): Value = {
+  private def transformEmbeddedObj(obj: Value, formatLinks: Boolean, transformUri: (Uri ⇒ Uri) = uri ⇒ uri): Value = {
     if (obj.isInstanceOf[Obj]) {
       Obj(obj.asMap.map {
         case ("_links", value) ⇒

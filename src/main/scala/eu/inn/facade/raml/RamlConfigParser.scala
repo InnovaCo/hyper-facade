@@ -9,7 +9,6 @@ import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model._
-import eu.inn.facade.raml.annotationtypes.rewrite
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector, StringIdentifier}
 
@@ -25,22 +24,18 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   def parseRaml: RamlConfig = {
     val resourcesByUriAcc = Map.newBuilder[String, ResourceConfig]
     val urisAcc = Seq.newBuilder[String]
-    val rewriteIndexBuilder = RewriteIndexBuilder()
     api.resources()
-      .foldLeft((resourcesByUriAcc, urisAcc, rewriteIndexBuilder)) { (accumulator, resource) ⇒
-        val (resourceMap, uris, rewriteIndexBuilder) = accumulator
+      .foldLeft((resourcesByUriAcc, urisAcc)) { (accumulator, resource) ⇒
+        val (resourceMap, uris) = accumulator
         val currentRelativeUri = resource.relativeUri().value()
         val resourceData = parseResource(currentRelativeUri, resource)
-        (resourceMap ++= resourceData._1,
-          uris += currentRelativeUri,
-          rewriteIndexBuilder.append(resourceData._2)
-        )
+        (resourceMap ++= resourceData,
+          uris += currentRelativeUri)
       }
     new RamlConfig(
       api.baseUri().value(),
       resourcesByUriAcc.result(),
-      urisAcc.result(),
-      rewriteIndexBuilder.build())
+      urisAcc.result())
   }
 
   private def parseTypeDefinitions(): Map[String, TypeDefinition] = {
@@ -85,28 +80,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     field
   }
 
-  def buildRewriteIndex(resourceUri: String, resourceAnnotations: Seq[Annotation], resourceMethods: Map[Method, RamlResourceMethod]): RewriteIndexBuilder = {
-    val rewriteIndexBuilder = RewriteIndexBuilder()
-    resourceAnnotations foreach {
-      case Annotation(Annotation.REWRITE, Some(value: rewrite)) ⇒
-        rewriteIndexBuilder.addInverted( (None, value.getUri) → resourceUri )
-        rewriteIndexBuilder.addForward( (None, resourceUri) → value.getUri )
-      case _ ⇒
-    }
-    resourceMethods foreach {
-      case (_, ramlResourceMethod) ⇒ ramlResourceMethod.annotations foreach {
-        case Annotation(Annotation.REWRITE, Some(value: rewrite)) ⇒
-          val method = ramlResourceMethod.method
-          val uri = value.getUri
-          rewriteIndexBuilder.addInverted( (Some(method), uri) → resourceUri )
-          rewriteIndexBuilder.addForward( (Some(method), resourceUri) → uri )
-        case _ ⇒
-      }
-    }
-    rewriteIndexBuilder
-  }
-
-  private def parseResource(currentUri: String, resource: Resource): (Map[String, ResourceConfig], RewriteIndexBuilder) = {
+  private def parseResource(currentUri: String, resource: Resource): (Map[String, ResourceConfig]) = {
     val traits = extractResourceTraits(resource) // todo: eliminate?
 
     val resourceAnnotations = extractAnnotations(resource)
@@ -118,15 +92,12 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
 
     val configuration = Map.newBuilder[String, ResourceConfig]
     configuration += (currentUri → resourceConfig)
-    val rewriteIndexBuilder = RewriteIndexBuilder()
-    rewriteIndexBuilder.append(buildRewriteIndex(currentUri, resourceAnnotations, resourceMethods))
-    resource.resources().foldLeft(configuration, rewriteIndexBuilder) { (accumulator, resource) ⇒
-      val (configuration, rewriteIndexBuilder) = accumulator
+    resource.resources().foldLeft(configuration) { (configuraion, resource) ⇒
       val childResourceRelativeUri = resource.relativeUri().value()
       val resourceData = parseResource(currentUri + childResourceRelativeUri, resource)
-      (configuration ++= resourceData._1, rewriteIndexBuilder.append(resourceData._2))
+      configuration ++= resourceData
     }
-    (configuration.result(), rewriteIndexBuilder)
+    configuration.result()
   }
 
   private def createFilters(uri: String, method: Option[String], annotations: Seq[Annotation]) = {

@@ -1,26 +1,30 @@
 package eu.inn.facade.utils
 
-import eu.inn.facade.raml.RewriteIndex
+import eu.inn.facade.filter.raml.RewriteIndexHolder
 import eu.inn.hyperbus.transport.api.matchers.Specific
 import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
 import spray.http.Uri.Path
 
 object UriTransformer {
 
-  def rewriteToOriginal(method: String, rewriteIndex: Option[RewriteIndex])(from: Uri): Uri = {
-    rewriteIndex match {
-      case Some(index) ⇒
-        val to = index.findOriginal(from, method)
-        rewrite(from, to)
-      case None ⇒
-        from
-    }
+  def rewriteToOriginal(method: String)(from: Uri): Uri = {
+    val normalizedUri = spray.http.Uri(from.pattern.specific)
+    if (normalizedUri.scheme.nonEmpty)
+      from
+    else
+      RewriteIndexHolder.rewriteIndex match {
+        case Some(rewriteIndex) ⇒
+          val to = rewriteIndex.findOriginal(from, method)
+          rewrite(from, to)
+        case None ⇒
+          from
+      }
   }
 
-  def rewriteOneStepBack(method: String, rewriteIndex: Option[RewriteIndex])(from: Uri): Uri = {
-    rewriteIndex match {
-      case Some(index) ⇒
-        val to = index.findNextBack(from, method)
+  def rewriteOneStepBack(method: String)(from: Uri): Uri = {
+    RewriteIndexHolder.rewriteIndex match {
+      case Some(rewriteIndex) ⇒
+        val to = rewriteIndex.findNextBack(from, method)
         rewrite(from, to)
       case None ⇒
         from
@@ -31,14 +35,18 @@ object UriTransformer {
     rewrite(from, Uri(toUri))
   }
 
-  def rewriteForward(method: String, rewriteIndex: Option[RewriteIndex])(from: Uri): Uri = {
-    rewriteIndex match {
-      case Some(index) ⇒
-        val to = index.findFinalDestination(from, method)
-        rewrite(from, to)
-      case None ⇒
-        from
-    }
+  def rewriteForward(method: String)(from: Uri): Uri = {
+    val normalizedUri = spray.http.Uri(from.pattern.specific)
+    if (normalizedUri.scheme.nonEmpty)
+      from
+    else
+      RewriteIndexHolder.rewriteIndex match {
+        case Some(rewriteIndex) ⇒
+          val to = rewriteIndex.findFinalDestination(from, method)
+          rewrite(from, to)
+        case None ⇒
+          from
+      }
   }
 
   private def rewrite(from: Uri, to: Uri): Uri = {

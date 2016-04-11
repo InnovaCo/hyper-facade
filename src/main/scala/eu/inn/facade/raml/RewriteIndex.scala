@@ -61,6 +61,12 @@ case class RewriteIndex(inverted: Map[(Option[Method], String), String], forward
   }
 }
 
+object RewriteIndex {
+  def apply(): RewriteIndex = {
+    new RewriteIndex(Map.empty, Map.empty)
+  }
+}
+
 class RewriteIndexBuilder(val invertedIndexBuilder: mutable.Builder[((Option[Method], String), String), Map[(Option[Method], String), String]],
                           val forwardIndexBuilder: mutable.Builder[((Option[Method], String), String), Map[(Option[Method], String), String]]) {
   def append(other: RewriteIndexBuilder): RewriteIndexBuilder = {

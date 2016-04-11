@@ -88,7 +88,7 @@ class WsRestWorker(val serverConnection: ActorRef,
         else {
           httpRequest match {
             case Some(h) ⇒
-              val requestContext = FacadeRequestContext.create(remoteAddress, h, originalRequest, ramlConfig.rewriteIndex )
+              val requestContext = FacadeRequestContext.create(remoteAddress, h, originalRequest)
               processRequest(requestContext, originalRequest.copy(headers = requestContext.requestHeaders))
 
             case None ⇒

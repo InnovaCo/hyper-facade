@@ -12,7 +12,6 @@ case class FacadeRequestContext(
                                  pathAndQuery: String,
                                  method: String,
                                  requestHeaders: Map[String, Seq[String]],
-                                 rewriteIndex: Option[RewriteIndex],
                                  prepared: Option[PreparedRequestContext]
                                )
 {
@@ -31,7 +30,7 @@ case class FacadeRequestContext(
 }
 
 object FacadeRequestContext {
-  def create(remoteAddress: String, httpRequest: HttpRequest, facadeRequest: FacadeRequest, rewriteIndex: RewriteIndex) = {
+  def create(remoteAddress: String, httpRequest: HttpRequest, facadeRequest: FacadeRequest) = {
     FacadeRequestContext(
       remoteAddress,
       httpRequest.uri,
@@ -42,7 +41,6 @@ object FacadeRequestContext {
       facadeRequest.headers ++ httpRequest.headers.groupBy(_.name).map { kv ⇒
         kv._1 → kv._2.map(_.value)
       },
-      Some(rewriteIndex),
       None
     )
   }

@@ -56,9 +56,9 @@ trait RequestProcessor extends Injectable {
       ramlFilterChain.filterRequest(requestContext, facadeRequest) recoverWith {
         case e : FilterRestartException ⇒
           if (log.isDebugEnabled) {
-            log.debug(s"Request $requestContext is restarted from $facadeRequest to ${e.facadeMessage}")
+            log.debug(s"Request $requestContext is restarted from $facadeRequest to ${e.facadeRequest}")
           }
-          processRequestWithRaml(requestContext, e.facadeMessage.asInstanceOf[FacadeRequest], tryNum + 1)
+          processRequestWithRaml(requestContext, e.facadeRequest.asInstanceOf[FacadeRequest], tryNum + 1)
       }
     }
   }
@@ -73,9 +73,9 @@ trait RequestProcessor extends Injectable {
       ramlFilterChain.filterEvent(requestContext, facadeRequest) recoverWith {
         case e : FilterRestartException ⇒
           if (log.isDebugEnabled) {
-            log.debug(s"Event $requestContext is restarted from $facadeRequest to ${e.facadeMessage}")
+            log.debug(s"Event $requestContext is restarted from $facadeRequest to ${e.facadeRequest}")
           }
-          processEventWithRaml(requestContext, e.facadeMessage.asInstanceOf[FacadeRequest], tryNum + 1)
+          processEventWithRaml(requestContext, e.facadeRequest.asInstanceOf[FacadeRequest], tryNum + 1)
       }
     }
   }

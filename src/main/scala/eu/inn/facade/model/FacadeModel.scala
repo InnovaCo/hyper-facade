@@ -157,7 +157,7 @@ class FilterInterruptException(val response: FacadeResponse,
                                message: String,
                                cause: Throwable = null) extends Exception (message, cause)
 
-class FilterRestartException(val facadeMessage: FacadeMessage,
+class FilterRestartException(val facadeRequest: FacadeRequest,
                              message: String,
                              cause: Throwable = null) extends Exception (message, cause)
 
