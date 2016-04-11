@@ -4,7 +4,6 @@ import com.typesafe.config.Config
 import eu.inn.binders.value.Null
 import eu.inn.facade.FacadeConfig
 import eu.inn.facade.model._
-import eu.inn.facade.raml.RamlConfig
 import eu.inn.facade.utils.{HalTransformer, UriTransformer}
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.{Header, Method, QueryBody}
@@ -13,13 +12,13 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class HttpWsRequestFilter(ramlConfig: RamlConfig, config: Config) extends RequestFilter {
+class HttpWsRequestFilter(config: Config) extends RequestFilter {
 
   override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfig.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer: (Uri ⇒ Uri) = UriTransformer.removeRootPathPrefix(ramlConfig.baseUri, rootPathPrefix)
+      val uriTransformer: (Uri ⇒ Uri) = UriTransformer.removeRootPathPrefix(rootPathPrefix)
       val httpUri = spray.http.Uri(request.uri.pattern.specific)
       val requestUri = uriTransformer(Uri(Specific(httpUri.path.toString)))
 

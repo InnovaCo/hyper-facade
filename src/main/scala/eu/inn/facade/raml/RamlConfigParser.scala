@@ -33,7 +33,6 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
           uris += currentRelativeUri)
       }
     new RamlConfig(
-      api.baseUri().value(),
       resourcesByUriAcc.result(),
       urisAcc.result())
   }

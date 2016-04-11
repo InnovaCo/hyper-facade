@@ -12,7 +12,7 @@ class RewriteRequestFilter(args: rewrite) extends RequestFilter {
     val rewrittenUri = UriTransformer.rewriteOneStepForward(request.uri, args.getUri)
 
     val uriTransformer: (Uri ⇒ Uri) = UriTransformer.rewriteForward(request.method)
-    val transformedBody = HalTransformer.transformAndFormatEmbeddedObject(request.body, uriTransformer)
+    val transformedBody = HalTransformer.transformEmbeddedObject(request.body, uriTransformer)
 
     val rewrittenRequest = request.copy(
       uri = rewrittenUri,

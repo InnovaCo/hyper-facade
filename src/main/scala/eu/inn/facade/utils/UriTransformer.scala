@@ -63,29 +63,23 @@ object UriTransformer {
     Uri(Uri(Specific(toUriPath), newArgs.toMap).formatted)
   }
 
-  def addRootPathPrefix(baseUri: String, rootPathPrefix: String)(uri: Uri): Uri = {
+  def addRootPathPrefix(rootPathPrefix: String)(uri: Uri): Uri = {
     val normalizedUri = spray.http.Uri(uri.pattern.specific)
-    if (normalizedUri.path.startsWith(Path(baseUri))) {
-      val prefixOffset = normalizedUri.scheme.length + baseUri.length
-      val pathOffset = prefixOffset + rootPathPrefix.length
-      val oldPattern = uri.pattern.specific
-      val newPattern = oldPattern.substring(0, prefixOffset) + rootPathPrefix + oldPattern.substring(pathOffset)
+    if (normalizedUri.scheme.isEmpty) {
+      val newPattern = rootPathPrefix + uri.pattern.specific
       Uri(Specific(newPattern), uri.args)
     } else
       uri
   }
 
-  def removeRootPathPrefix(baseUri: String, rootPathPrefix: String)(uri: Uri): Uri = {
+  def removeRootPathPrefix(rootPathPrefix: String)(uri: Uri): Uri = {
     val normalizedUri = spray.http.Uri(uri.pattern.specific)
-    if (normalizedUri.path.startsWith(Path(baseUri + rootPathPrefix))) {
-      val prefixOffset = normalizedUri.scheme.length + baseUri.length
-      val pathOffset = prefixOffset + rootPathPrefix.length
+    if (normalizedUri.scheme.isEmpty && normalizedUri.path.startsWith(Path(rootPathPrefix + "/"))) {
+      val pathOffset = rootPathPrefix.length
       val oldPattern = uri.pattern.specific
-      val newPattern = oldPattern.substring(0, prefixOffset) + oldPattern.substring(pathOffset)
+      val newPattern = oldPattern.substring(pathOffset)
       Uri(Specific(newPattern), uri.args)
     } else
       uri
   }
 }
-
-case class RewriteResult(uri: Uri, failures: Seq[Throwable])

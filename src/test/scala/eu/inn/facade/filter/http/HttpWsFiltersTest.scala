@@ -20,7 +20,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
   val afterFilters = inject[FilterChain]("afterFilterChain")
 
   "HttpWsFiltersTest " - {
-    "_links formatting" in {
+    "_links formatting (response)" in {
       val request = FacadeRequest(Uri("/test"), "get", Map.empty, Null)
       val response = FacadeResponse(200, Map("messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
         ObjV(
@@ -42,11 +42,43 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       val context = mockContext(request)
       val filteredResponse = afterFilters.filterResponse(context, response).futureValue
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
-      linksMap("self") shouldBe Left(Link(href="/test/1"))
-      linksMap("some-other1") shouldBe Left(Link(href="/test/abc"))
-      linksMap("some-other2") shouldBe Left(Link(href="/test/xyz"))
+      linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
+      linksMap("some-other1") shouldBe Left(Link(href="/v3/test/abc"))
+      linksMap("some-other2") shouldBe Left(Link(href="/v3/test/xyz"))
       linksMap("some-other3") shouldBe Right(
-        Seq(Link(href="/test/abc1"), Link(href="/test/abc2"), Link(href="/test/2"))
+        Seq(Link(href="/v3/test/abc1"), Link(href="/v3/test/abc2"), Link(href="/v3/test/2"))
+      )
+    }
+
+    "_links formatting (event)" in {
+      val request = FacadeRequest(Uri("/test"), "get", Map.empty, Null)
+      val event = FacadeRequest(Uri("/test"), "get", Map.empty,
+        ObjV(
+          "_links" → ObjV(
+            "self" → ObjV("href" → "/test/{a}", "templated" → true),
+            "some-other1" → ObjV("href" → "/test/abc", "templated" → false),
+            "some-other2" → ObjV("href" → "/test/xyz"),
+            "some-other3" → List(
+              ObjV("href" → "/test/abc1"),
+              ObjV("href" → "/test/abc2"),
+              ObjV("href" → "/test/{b}", "templated" → true)
+            )
+          ),
+          "a" → 1,
+          "b" → 2
+        )
+      )
+
+      val context = mockContext(request)
+      val filteredEvent = afterFilters.filterEvent(context, event).futureValue
+      filteredEvent.uri shouldBe Uri("/v3/test")
+
+      val linksMap = filteredEvent.body.__links.fromValue[LinksMap] // binders deserialization magic
+      linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
+      linksMap("some-other1") shouldBe Left(Link(href="/v3/test/abc"))
+      linksMap("some-other2") shouldBe Left(Link(href="/v3/test/xyz"))
+      linksMap("some-other3") shouldBe Right(
+        Seq(Link(href="/v3/test/abc1"), Link(href="/v3/test/abc2"), Link(href="/v3/test/2"))
       )
     }
 
@@ -66,13 +98,13 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       val context = mockContext(request)
       val filteredResponse = afterFilters.filterResponse(context, response).futureValue
 
-      filteredResponse.headers("Location") shouldBe Seq("/test-factory/100500")
+      filteredResponse.headers("Location") shouldBe Seq("/v3/test-factory/100500")
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
-      linksMap("self") shouldBe Left(Link(href="/test/1"))
-      linksMap("location") shouldBe Left(Link(href="/test-factory/100500"))
+      linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
+      linksMap("location") shouldBe Left(Link(href="/v3/test-factory/100500"))
     }
 
-    "_embedded/_links formatting" in {
+    "_embedded/_links formatting (response)" in {
       val request = FacadeRequest(Uri("/test"), "get", Map.empty, Null)
       val response = FacadeResponse(200, Map("messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
         ObjV(
@@ -109,24 +141,87 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       val context = mockContext(request)
       val filteredResponse = afterFilters.filterResponse(context, response).futureValue
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
-      linksMap("self") shouldBe Left(Link(href="/test/1"))
+      linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
 
       val e = filteredResponse.body.asMap("_embedded")
       val x = e.asMap("x")
       val innerLinksMap = x.__links.fromValue[LinksMap]
-      innerLinksMap("self") shouldBe Left(Link(href="/inner-test/9"))
+      innerLinksMap("self") shouldBe Left(Link(href="/v3/inner-test/9"))
 
       val y = e.asMap("y")
       y shouldBe LstV(
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/inner-test-x/123")
+            "self" → ObjV("href" → "/v3/inner-test-x/123")
           ),
           "b" → 123
         ),
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/inner-test-y/567")
+            "self" → ObjV("href" → "/v3/inner-test-y/567")
+          ),
+          "c" → 567
+        )
+      )
+    }
+
+    "_embedded/_links formatting (event)" in {
+      val request = FacadeRequest(Uri("/test"), "get", Map.empty, Null)
+      val event = FacadeRequest(Uri("/test"), "get", Map.empty,
+        ObjV(
+          "_embedded" → ObjV(
+            "x" → ObjV(
+              "_links" → ObjV(
+                "self" → ObjV("href" → "/inner-test/{a}", "templated" → true)
+              ),
+              "a" → 9
+            ),
+            "y" → LstV(
+              ObjV(
+                "_links" → ObjV(
+                  "self" → ObjV("href" → "/inner-test-x/{b}", "templated" → true)
+                ),
+                "b" → 123
+              ),
+              ObjV(
+                "_links" → ObjV(
+                  "self" → ObjV("href" → "/inner-test-y/{c}", "templated" → true)
+                ),
+                "c" → 567
+              )
+            )
+          ),
+          "_links" → ObjV(
+            "self" → ObjV("href" → "/test/{a}", "templated" → true)
+          ),
+          "a" → 1,
+          "b" → 2
+        )
+      )
+
+      val context = mockContext(request)
+      val filteredEvent = afterFilters.filterEvent(context, event).futureValue
+      filteredEvent.uri shouldBe Uri("/v3/test")
+
+      val linksMap = filteredEvent.body.__links.fromValue[LinksMap] // binders deserialization magic
+      linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
+
+      val e = filteredEvent.body.asMap("_embedded")
+      val x = e.asMap("x")
+      val innerLinksMap = x.__links.fromValue[LinksMap]
+      innerLinksMap("self") shouldBe Left(Link(href="/v3/inner-test/9"))
+
+      val y = e.asMap("y")
+      y shouldBe LstV(
+        ObjV(
+          "_links" → ObjV(
+            "self" → ObjV("href" → "/v3/inner-test-x/123")
+          ),
+          "b" → 123
+        ),
+        ObjV(
+          "_links" → ObjV(
+            "self" → ObjV("href" → "/v3/inner-test-y/567")
           ),
           "c" → 567
         )

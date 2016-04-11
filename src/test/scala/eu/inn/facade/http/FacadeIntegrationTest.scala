@@ -153,7 +153,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
             Header.CORRELATION_ID → Seq("correlationId"))))
       )
 
-      q.next().futureValue shouldBe """{"uri":"/test-service/unreliable","method":"feed:post","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
+      q.next().futureValue shouldBe """{"uri":"/v3/test-service/unreliable","method":"feed:post","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
 
       client ! FacadeRequest(Uri("/test-service/unreliable"), "unsubscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
@@ -242,7 +242,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Revision":["1"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
 
       val receivedEvent1 = q.next().futureValue
-      val queuedEvent = FacadeRequest(Uri("/test-service/reliable"), Method.FEED_POST,
+      val queuedEvent = FacadeRequest(Uri("/v3/test-service/reliable"), Method.FEED_POST,
         Map(FacadeHeaders.CLIENT_REVISION → Seq("2"),
           FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
@@ -254,7 +254,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       testService.publish(eventRev3)
 
       val receivedEvent2 = q.next().futureValue
-      val directEvent2 = FacadeRequest(Uri("/test-service/reliable"), Method.FEED_POST,
+      val directEvent2 = FacadeRequest(Uri("/v3/test-service/reliable"), Method.FEED_POST,
         Map(FacadeHeaders.CLIENT_REVISION → Seq("3"),
           FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
@@ -282,7 +282,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       testService.publish(eventGoodRev5)
 
       val receivedEvent3 = q.next().futureValue
-      val directEvent3 = FacadeRequest(Uri("/test-service/reliable"), Method.FEED_POST,
+      val directEvent3 = FacadeRequest(Uri("/v3/test-service/reliable"), Method.FEED_POST,
         Map(FacadeHeaders.CLIENT_REVISION → Seq("5"),
           FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),

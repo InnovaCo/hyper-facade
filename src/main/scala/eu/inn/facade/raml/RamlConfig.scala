@@ -4,7 +4,6 @@ import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.hyperbus.transport.api.uri.Uri
 
 class RamlConfig(
-                  val baseUri: String,
                   val resourcesByUri: Map[String, ResourceConfig],
                   val uris: Seq[String]) {
 
