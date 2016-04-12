@@ -5,6 +5,7 @@ import eu.inn.facade.MockContext
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
+import eu.inn.facade.raml.Method
 import eu.inn.hyperbus.model.Link
 import eu.inn.hyperbus.model.Links.LinksMap
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -21,7 +22,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
 
   "HttpWsFiltersTest " - {
     "_links formatting (response)" in {
-      val request = FacadeRequest(Uri("/test"), "get", Map.empty, Null)
+      val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
       val response = FacadeResponse(200, Map("messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
         ObjV(
         "_links" → ObjV(
@@ -51,8 +52,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
     }
 
     "_links formatting (event)" in {
-      val request = FacadeRequest(Uri("/test"), "get", Map.empty, Null)
-      val event = FacadeRequest(Uri("/test"), "get", Map.empty,
+      val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
+      val event = FacadeRequest(Uri("/test"), Method.POST, Map.empty,
         ObjV(
           "_links" → ObjV(
             "self" → ObjV("href" → "/test/{a}", "templated" → true),
@@ -83,7 +84,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
     }
 
     "location header for 201" in {
-      val request = FacadeRequest(Uri("/test"), "post", Map.empty, Null)
+      val request = FacadeRequest(Uri("/test"), Method.POST, Map.empty, Null)
       val response = FacadeResponse(201, Map("messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
         ObjV(
           "_links" → ObjV(
@@ -105,7 +106,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
     }
 
     "_embedded/_links formatting (response)" in {
-      val request = FacadeRequest(Uri("/test"), "get", Map.empty, Null)
+      val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
       val response = FacadeResponse(200, Map("messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
         ObjV(
           "_embedded" → ObjV(
@@ -166,8 +167,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
     }
 
     "_embedded/_links formatting (event)" in {
-      val request = FacadeRequest(Uri("/test"), "get", Map.empty, Null)
-      val event = FacadeRequest(Uri("/test"), "get", Map.empty,
+      val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
+      val event = FacadeRequest(Uri("/test"), Method.POST, Map.empty,
         ObjV(
           "_embedded" → ObjV(
             "x" → ObjV(

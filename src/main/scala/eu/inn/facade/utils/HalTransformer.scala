@@ -70,10 +70,11 @@ object HalTransformer {
         arg → body.asMap(arg).asString             // todo: support inner fields + handle exception if not exists?
       } toMap
       val uri = transformUri(Uri(href, args))
-      if (formatLinks)
+      if (formatLinks) {
         ObjV("href" → uri.formatted)
-      else
+      } else {
         ObjV("href" → uri.pattern.specific, "templated" → true)
+      }
     } else {
       val uri = transformUri(Uri(href))
       ObjV("href" → uri.pattern.specific, "templated" → false)

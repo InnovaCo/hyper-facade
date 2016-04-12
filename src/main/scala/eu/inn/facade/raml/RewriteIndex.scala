@@ -2,8 +2,6 @@ package eu.inn.facade.raml
 
 import eu.inn.hyperbus.transport.api.uri.Uri
 
-import scala.collection.mutable
-
 case class RewriteIndex(inverted: Map[(Option[Method], String), String], forward: Map[(Option[Method], String), String]) {
   def findOriginal(uri: Uri, requestMethod: String): Uri = {
     var found = false
@@ -11,18 +9,18 @@ case class RewriteIndex(inverted: Map[(Option[Method], String), String], forward
     val method = Method(requestMethod)
 
     while(!found) {
-      findInIndex(inverted, method, originalUri) match {
+      findMostSpecificRewriteRule(inverted, method, originalUri) match {
         case Some(foundUri) ⇒
           originalUri = foundUri
         case None ⇒
-          found = false
+          found = true
       }
     }
     Uri(originalUri)
   }
 
   def findNextBack(uri: Uri, requestMethod: String): Uri = {
-    findInIndex(inverted, Method(requestMethod), uri.pattern.specific) match {
+    findMostSpecificRewriteRule(inverted, Method(requestMethod), uri.pattern.specific) match {
       case Some(foundUri) ⇒
         Uri(foundUri)
       case None ⇒
@@ -36,61 +34,42 @@ case class RewriteIndex(inverted: Map[(Option[Method], String), String], forward
     val method = Method(requestMethod)
 
     while(!found) {
-      findInIndex(forward, method, rewrittenUri) match {
+      findMostSpecificRewriteRule(forward, method, rewrittenUri) match {
         case Some(foundUri) ⇒
           rewrittenUri = foundUri
         case None ⇒
-          found = false
+          found = true
       }
     }
     Uri(rewrittenUri)
   }
 
-  private def findInIndex(index: Map[(Option[Method], String), String], method: Method, originalUri: String): Option[String] = {
-    index.get(Some(method), originalUri) match {
-      case foundUri @ Some(_) ⇒
-        foundUri
-      case None ⇒
-        index.get(None, originalUri) match {
-          case foundUri @ Some(_) ⇒
-            foundUri
-          case None ⇒
-            None
-        }
+  private def findMostSpecificRewriteRule(index: Map[(Option[Method], String), String], method: Method, originalUri: String): Option[String] = {
+    var result: Option[String] = None
+    var segmentToRewrite = originalUri
+    var slashPosition = segmentToRewrite.length
+    while (result.isEmpty && slashPosition != -1) { // exit if we found result or checked all possible URI segments
+      segmentToRewrite = segmentToRewrite.substring(0, slashPosition)
+      slashPosition = segmentToRewrite.lastIndexOf('/')
+      result = findInIndex(index, method, segmentToRewrite)
     }
+    result match {
+      case Some(rewrittenSegment) ⇒
+        val originalSegmentLength = segmentToRewrite.length
+        val rewrittenUri = rewrittenSegment + originalUri.substring(originalSegmentLength)
+        Some(rewrittenUri)
+      case None ⇒
+        None
+    }
+  }
+
+  private def findInIndex(index: Map[(Option[Method], String), String], method: Method, originalUri: String): Option[String] = {
+    index.get(Some(method), originalUri) orElse index.get(None, originalUri)
   }
 }
 
 object RewriteIndex {
   def apply(): RewriteIndex = {
     new RewriteIndex(Map.empty, Map.empty)
-  }
-}
-
-class RewriteIndexBuilder(val invertedIndexBuilder: mutable.Builder[((Option[Method], String), String), Map[(Option[Method], String), String]],
-                          val forwardIndexBuilder: mutable.Builder[((Option[Method], String), String), Map[(Option[Method], String), String]]) {
-  def append(other: RewriteIndexBuilder): RewriteIndexBuilder = {
-    invertedIndexBuilder ++= other.invertedIndexBuilder.result()
-    forwardIndexBuilder ++= other.forwardIndexBuilder.result()
-    this
-  }
-
-  def addInverted(entry: ((Option[Method], String), String)): RewriteIndexBuilder = {
-    invertedIndexBuilder += entry
-    this
-  }
-
-  def addForward(entry: ((Option[Method], String), String)): RewriteIndexBuilder = {
-    forwardIndexBuilder += entry
-    this
-  }
-
-  def build(): RewriteIndex = {
-    new RewriteIndex(invertedIndexBuilder.result(), forwardIndexBuilder.result())
-  }
-}
-object RewriteIndexBuilder {
-  def apply(): RewriteIndexBuilder = {
-    new RewriteIndexBuilder(Map.newBuilder[(Option[Method], String), String], Map.newBuilder[(Option[Method], String), String])
   }
 }

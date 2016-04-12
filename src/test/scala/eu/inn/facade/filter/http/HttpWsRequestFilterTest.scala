@@ -54,7 +54,7 @@ class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures  
       )
     }
 
-    "_embedded/_links formatting (event)" in {
+    "_embedded/_links formatting" in {
       val request = FacadeRequest(Uri("/v3/test"), "post", Map.empty,
         ObjV(
           "_embedded" → ObjV(

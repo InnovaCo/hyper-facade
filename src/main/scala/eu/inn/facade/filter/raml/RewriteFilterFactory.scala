@@ -3,7 +3,7 @@ package eu.inn.facade.filter.raml
 import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.raml.annotationtypes.rewrite
-import eu.inn.facade.raml.{Annotation, Method, RamlConfigException}
+import eu.inn.facade.raml.{Annotation, Method, RamlConfigException, RewriteIndexHolder}
 
 class RewriteFilterFactory extends RamlFilterFactory {
   override def createFilterChain(target: RamlTarget): SimpleFilterChain = {

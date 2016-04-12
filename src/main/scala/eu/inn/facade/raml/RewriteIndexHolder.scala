@@ -1,6 +1,4 @@
-package eu.inn.facade.filter.raml
-
-import eu.inn.facade.raml.{Method, RewriteIndex}
+package eu.inn.facade.raml
 
 object RewriteIndexHolder {
 

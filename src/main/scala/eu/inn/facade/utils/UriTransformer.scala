@@ -1,6 +1,6 @@
 package eu.inn.facade.utils
 
-import eu.inn.facade.filter.raml.RewriteIndexHolder
+import eu.inn.facade.raml.RewriteIndexHolder
 import eu.inn.hyperbus.transport.api.matchers.Specific
 import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
 import spray.http.Uri.Path
@@ -60,7 +60,7 @@ object UriTransformer {
           throw new IllegalArgumentException(s"No parameter argument specified for $uriParameter on $from")
       }
     }
-    Uri(Uri(Specific(toUriPath), newArgs.toMap).formatted)
+    Uri(Specific(toUriPath), newArgs.toMap)
   }
 
   def addRootPathPrefix(rootPathPrefix: String)(uri: Uri): Uri = {

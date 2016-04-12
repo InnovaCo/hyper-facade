@@ -91,7 +91,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
 
     val configuration = Map.newBuilder[String, ResourceConfig]
     configuration += (currentUri → resourceConfig)
-    resource.resources().foldLeft(configuration) { (configuraion, resource) ⇒
+    resource.resources().foldLeft(configuration) { (configuration, resource) ⇒
       val childResourceRelativeUri = resource.relativeUri().value()
       val resourceData = parseResource(currentUri + childResourceRelativeUri, resource)
       configuration ++= resourceData

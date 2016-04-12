@@ -17,7 +17,12 @@ class HttpWsResponseFilter(config: Config) extends ResponseFilter {
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfig.RAML_ROOT_PATH_PREFIX)
-      HttpWsFilter.filterMessage(response, rootPathPrefix).asInstanceOf[FacadeResponse]
+      val uriTransformer: (Uri ⇒ Uri) = UriTransformer.addRootPathPrefix(rootPathPrefix)
+      val (newHeaders, newBody) = HttpWsFilter.filterMessage(response, uriTransformer)
+      response.copy(
+        headers = newHeaders,
+        body = newBody
+      )
     }
   }
 }
@@ -27,7 +32,13 @@ class WsEventFilter(config: Config) extends EventFilter {
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfig.RAML_ROOT_PATH_PREFIX)
-      HttpWsFilter.filterMessage(request, rootPathPrefix).asInstanceOf[FacadeRequest]
+      val uriTransformer: (Uri ⇒ Uri) = UriTransformer.addRootPathPrefix(rootPathPrefix)
+      val (newHeaders, newBody) = HttpWsFilter.filterMessage(request, uriTransformer)
+      request.copy(
+        uri = uriTransformer(Uri(request.uri.formatted)),
+        headers = newHeaders,
+        body = newBody
+      )
     }
   }
 }
@@ -35,7 +46,7 @@ class WsEventFilter(config: Config) extends EventFilter {
 object HttpWsFilter {
   val directHyperbusToFacade = FacadeHeaders.directHeaderMapping.map(kv ⇒ kv._2 → kv._1).toMap
 
-  def filterMessage(message: FacadeMessage, rootPathPrefix: String): FacadeMessage = {
+  def filterMessage(message: FacadeMessage, uriTransformer: (Uri ⇒ Uri)): (Map[String, Seq[String]], Value) = {
     val headersBuilder = Map.newBuilder[String, Seq[String]]
     message.headers.foreach {
       case (Header.CONTENT_TYPE, value :: tail) ⇒
@@ -47,8 +58,6 @@ object HttpWsFilter {
           headersBuilder += directHyperbusToFacade(k) → v
         }
     }
-
-    val uriTransformer: (Uri ⇒ Uri) = UriTransformer.addRootPathPrefix(rootPathPrefix)
 
     val newBody = HalTransformer.transformAndFormatEmbeddedObject(message.body, uriTransformer)
     if (newBody.isInstanceOf[Obj] /* && response.status == 201*/ ) {
@@ -64,19 +73,6 @@ object HttpWsFilter {
       }
     }
 
-    message match {
-      case request: FacadeRequest ⇒
-        request.copy(
-          uri = uriTransformer(Uri(request.uri.formatted)),
-          headers = headersBuilder.result(),
-          body = newBody
-        )
-
-      case response: FacadeResponse ⇒
-        response.copy(
-          headers = headersBuilder.result(),
-          body = newBody
-        )
-    }
+    (headersBuilder.result(), newBody)
   }
 }
