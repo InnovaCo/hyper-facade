@@ -13,21 +13,7 @@ class RamlConfig(
 
   def resourceUri(requestUriString: String): Uri = {
     val requestUri = Uri(requestUriString)
-    matchUri(requestUri) match {
-      case Some(uri) ⇒ uri
-      case None ⇒ requestUri
-    }
-  }
-
-  def matchUri(requestUri: Uri): Option[Uri] = {
-    var foundUri: Option[Uri] = None
-    for (uri ← uris if foundUri.isEmpty) {
-      UriMatcher.matchUri(uri, requestUri) match {
-        case uri @ Some(_) ⇒ foundUri = uri
-        case None ⇒
-      }
-    }
-    foundUri
+    UriMatcher.matchUri(requestUri, uris).getOrElse(requestUri)
   }
 
   private def traits(uriPattern: String, method: String): Seq[Trait] = {
@@ -43,19 +29,19 @@ class RamlConfig(
 case class ResourceConfig(
                            traits: Traits,
                            annotations: Seq[Annotation],
-                           methods: Map[Method, RamlResourceMethod],
+                           methods: Map[Method, RamlResourceMethodConfig],
                            filters: SimpleFilterChain
                          )
 
-case class RamlResourceMethod(method: Method,
-                              annotations: Seq[Annotation],
-                              requests: RamlRequests,
-                              responses: Map[Int, RamlResponses],
-                              methodFilters: SimpleFilterChain)
+case class RamlResourceMethodConfig(method: Method,
+                                    annotations: Seq[Annotation],
+                                    requests: RamlRequests,
+                                    responses: Map[Int, RamlResponses],
+                                    methodFilters: SimpleFilterChain)
 
-case class RamlRequests(ramlContentTypes: Map[Option[ContentType], RamlContentType])
-case class RamlResponses(ramlContentTypes: Map[Option[ContentType], RamlContentType])
-case class RamlContentType(headers: Seq[Header], typeDefinition: TypeDefinition, filters: SimpleFilterChain)
+case class RamlRequests(ramlContentTypes: Map[Option[ContentType], RamlContentTypeConfig])
+case class RamlResponses(ramlContentTypes: Map[Option[ContentType], RamlContentTypeConfig])
+case class RamlContentTypeConfig(headers: Seq[Header], typeDefinition: TypeDefinition, filters: SimpleFilterChain)
 
 case class Traits(commonTraits: Seq[Trait], methodSpecificTraits: Map[Method, Seq[Trait]])
 case class Trait(name: String, parameters: Map[String, String])

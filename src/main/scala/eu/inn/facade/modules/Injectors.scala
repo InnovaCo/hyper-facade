@@ -1,7 +1,7 @@
 package eu.inn.facade.modules
 
 import eu.inn.config.ConfigLoader
-import eu.inn.facade.FacadeConfig
+import eu.inn.facade.FacadeConfigPaths
 import scaldi.Injector
 
 import scala.collection.JavaConversions._
@@ -15,9 +15,9 @@ object Injectors {
   def loadConfigInjectedModules(previous: Injector): Injector = {
     val config = ConfigLoader() // todo: replace with inject  if possible
 
-    if (config.hasPath(FacadeConfig.INJECT_MODULES)) {
+    if (config.hasPath(FacadeConfigPaths.INJECT_MODULES)) {
       var module = previous
-      config.getStringList(FacadeConfig.INJECT_MODULES).foreach { injectModuleClassName ⇒
+      config.getStringList(FacadeConfigPaths.INJECT_MODULES).foreach { injectModuleClassName ⇒
         module = module :: Class.forName(injectModuleClassName).newInstance().asInstanceOf[Injector]
       }
       module

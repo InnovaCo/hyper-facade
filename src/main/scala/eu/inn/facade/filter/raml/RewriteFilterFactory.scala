@@ -5,7 +5,8 @@ import eu.inn.facade.model._
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.facade.raml.{Annotation, Method, RamlConfigException, RewriteIndexHolder}
 
-class RewriteFilterFactory extends RamlFilterFactory {
+class RewriteRequestFilterFactory extends RamlFilterFactory {
+
   override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
     val (rewriteArgs, originalUri, ramlMethod) = target match {
       case TargetResource(uri, Annotation(_, Some(rewriteArgs: rewrite))) ⇒ (rewriteArgs, uri, None)
@@ -15,7 +16,18 @@ class RewriteFilterFactory extends RamlFilterFactory {
     RewriteIndexHolder.updateRewriteIndex(originalUri, rewriteArgs.getUri, ramlMethod)
     SimpleFilterChain(
       requestFilters = Seq(new RewriteRequestFilter(rewriteArgs)),
-      responseFilters = Seq(new RewriteResponseFilter),
+      responseFilters = Seq.empty,
+      eventFilters = Seq.empty
+    )
+  }
+}
+
+class RewriteEventFilterFactory extends RamlFilterFactory {
+
+  override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
+    SimpleFilterChain(
+      requestFilters = Seq.empty,
+      responseFilters = Seq.empty,
       eventFilters = Seq(new RewriteEventFilter)
     )
   }

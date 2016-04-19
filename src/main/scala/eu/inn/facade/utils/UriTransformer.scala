@@ -7,25 +7,28 @@ import spray.http.Uri.Path
 
 object UriTransformer {
 
-  def rewriteToOriginal(method: String)(from: Uri): Uri = {
-    val normalizedUri = spray.http.Uri(from.pattern.specific)
-    if (normalizedUri.scheme.nonEmpty)
+  def rewriteToOriginal(from: Uri): Uri = {
+    if (spray.http.Uri(from.pattern.specific).scheme.nonEmpty)
       from
-    else
-      RewriteIndexHolder.rewriteIndex match {
-        case Some(rewriteIndex) ⇒
-          val to = rewriteIndex.findOriginal(from, method)
-          rewrite(from, to)
-        case None ⇒
-          from
+    else {
+      var found = false
+      var rewrittenUri = from
+      while (!found) {
+        RewriteIndexHolder.rewriteIndex.findNextBack(rewrittenUri, None) match {
+          case Some(uri) ⇒
+            rewrittenUri = rewrite(rewrittenUri, uri)
+          case None ⇒
+            found = true
+        }
       }
+      rewrittenUri
+    }
   }
 
   def rewriteOneStepBack(method: String)(from: Uri): Uri = {
-    RewriteIndexHolder.rewriteIndex match {
-      case Some(rewriteIndex) ⇒
-        val to = rewriteIndex.findNextBack(from, method)
-        rewrite(from, to)
+    RewriteIndexHolder.rewriteIndex.findNextBack(from, Some(method)) match {
+      case Some(foundUri) ⇒
+        rewrite(from, foundUri)
       case None ⇒
         from
     }
@@ -35,32 +38,22 @@ object UriTransformer {
     rewrite(from, Uri(toUri))
   }
 
-  def rewriteForward(method: String)(from: Uri): Uri = {
-    val normalizedUri = spray.http.Uri(from.pattern.specific)
-    if (normalizedUri.scheme.nonEmpty)
+  def rewriteForward(from: Uri): Uri = {
+    if (spray.http.Uri(from.pattern.specific).scheme.nonEmpty)
       from
-    else
-      RewriteIndexHolder.rewriteIndex match {
-        case Some(rewriteIndex) ⇒
-          val to = rewriteIndex.findFinalDestination(from, method)
-          rewrite(from, to)
-        case None ⇒
-          from
+    else {
+      var found = false
+      var rewrittenUri = from
+      while (!found) {
+        RewriteIndexHolder.rewriteIndex.findNextForward(rewrittenUri, None) match {
+          case Some(uri) ⇒
+            rewrittenUri = rewrite(rewrittenUri, uri)
+          case None ⇒
+            found = true
+        }
       }
-  }
-
-  private def rewrite(from: Uri, to: Uri): Uri = {
-    val toUriPath = to.pattern.specific
-    val toUriParams = UriParser.extractParameters(to.pattern.specific)
-    val newArgs = toUriParams flatMap { uriParameter ⇒
-      from.args.get(uriParameter) match {
-        case Some(matcher) ⇒
-          Some(uriParameter → matcher)
-        case None ⇒
-          throw new IllegalArgumentException(s"No parameter argument specified for $uriParameter on $from")
-      }
+      rewrittenUri
     }
-    Uri(Specific(toUriPath), newArgs.toMap)
   }
 
   def addRootPathPrefix(rootPathPrefix: String)(uri: Uri): Uri = {
@@ -81,5 +74,19 @@ object UriTransformer {
       Uri(Specific(newPattern), uri.args)
     } else
       uri
+  }
+
+  private def rewrite(from: Uri, to: Uri): Uri = {
+    val toUriPath = to.pattern.specific
+    val toUriParams = UriParser.extractParameters(to.pattern.specific)
+    val newArgs = toUriParams flatMap { uriParameter ⇒
+      from.args.get(uriParameter) match {
+        case Some(matcher) ⇒
+          Some(uriParameter → matcher)
+        case None ⇒
+          throw new IllegalArgumentException(s"No parameter argument specified for $uriParameter on $from")
+      }
+    }
+    Uri(Uri(Specific(toUriPath), newArgs.toMap).formatted)
   }
 }

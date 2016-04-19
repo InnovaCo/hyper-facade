@@ -9,17 +9,18 @@ import scaldi.Module
 
 class FiltersModule extends Module {
 
-  bind [RamlFilterFactory]        identifiedBy "private"                              to injected[PrivateFilterFactory]
-  bind [RamlFilterFactory]        identifiedBy "x-client-ip" and "x-client-language"  to injected[EnrichmentFilterFactory]
-  bind [RamlFilterFactory]        identifiedBy "rewrite"                              to injected[RewriteFilterFactory]
-  bind [RamlFilterFactory]        identifiedBy "feed"                                 to injected[EmptyFilterFactory]
+  bind [RamlFilterFactory]          identifiedBy "private"                              to injected[PrivateFilterFactory]
+  bind [RamlFilterFactory]          identifiedBy "x-client-ip" and "x-client-language"  to injected[EnrichmentFilterFactory]
+  bind [RamlFilterFactory]          identifiedBy "rewrite"                              to injected[RewriteRequestFilterFactory]
+  bind [RewriteEventFilterFactory]  identifiedBy "rewrite-back"                         to injected[RewriteEventFilterFactory]
+  bind [RamlFilterFactory]          identifiedBy "feed"                                 to injected[EmptyFilterFactory]
 
-  bind [FilterChain]              identifiedBy "beforeFilterChain"                    to new SimpleFilterChain(
+  bind [FilterChain]                identifiedBy "beforeFilterChain"                    to new SimpleFilterChain(
     requestFilters            = Seq(injected[HttpWsRequestFilter])
   )
-  bind [FilterChain]              identifiedBy "afterFilterChain"                     to new SimpleFilterChain(
+  bind [FilterChain]                identifiedBy "afterFilterChain"                     to new SimpleFilterChain(
     responseFilters           = Seq(injected[HttpWsResponseFilter]),
     eventFilters              = Seq(injected[WsEventFilter])
   )
-  bind [FilterChain]              identifiedBy "ramlFilterChain"                      to injected[RamlFilterChain]
+  bind [FilterChain]                identifiedBy "ramlFilterChain"                      to injected[RamlFilterChain]
 }

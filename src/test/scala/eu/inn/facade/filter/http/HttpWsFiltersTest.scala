@@ -5,11 +5,13 @@ import eu.inn.facade.MockContext
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.raml.Method
+import eu.inn.facade.raml.{Method, RewriteIndexHolder}
 import eu.inn.hyperbus.model.Link
 import eu.inn.hyperbus.model.Links.LinksMap
 import eu.inn.hyperbus.transport.api.uri.Uri
+import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
@@ -19,20 +21,22 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
 
   implicit val injector = Injectors()
   val afterFilters = inject[FilterChain]("afterFilterChain")
+  RewriteIndexHolder.updateRewriteIndex("/test", "/test-rewritten", None)
+  RewriteIndexHolder.updateRewriteIndex("/inner-test", "/inner-test-rewritten", None)
 
   "HttpWsFiltersTest " - {
-    "_links formatting (response)" in {
+    "_links rewriting and formatting (response)" in {
       val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
       val response = FacadeResponse(200, Map("messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
         ObjV(
         "_links" → ObjV(
-            "self" → ObjV("href" → "/test/{a}", "templated" → true),
-            "some-other1" → ObjV("href" → "/test/abc", "templated" → false),
-            "some-other2" → ObjV("href" → "/test/xyz"),
+            "self" → ObjV("href" → "/test-rewritten/{a}", "templated" → true),
+            "some-other1" → ObjV("href" → "/test-rewritten/abc", "templated" → false),
+            "some-other2" → ObjV("href" → "/test-rewritten/xyz"),
             "some-other3" → List(
-              ObjV("href" → "/test/abc1"),
-              ObjV("href" → "/test/abc2"),
-              ObjV("href" → "/test/{b}", "templated" → true)
+              ObjV("href" → "/test-rewritten/abc1"),
+              ObjV("href" → "/test-rewritten/abc2"),
+              ObjV("href" → "/test-rewritten/{b}", "templated" → true)
             )
           ),
           "a" → 1,
@@ -41,7 +45,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       )
 
       val context = mockContext(request)
-      val filteredResponse = afterFilters.filterResponse(context, response).futureValue
+      val filteredResponse = afterFilters.filterResponse(context, response).futureValue(Timeout(Span(300, Seconds)))
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
       linksMap("some-other1") shouldBe Left(Link(href="/v3/test/abc"))
@@ -51,7 +55,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       )
     }
 
-    "_links formatting (event)" in {
+    "_links rewriting and formatting (event)" in {
       val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
       val event = FacadeRequest(Uri("/test"), Method.POST, Map.empty,
         ObjV(
@@ -105,34 +109,34 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       linksMap("location") shouldBe Left(Link(href="/v3/test-factory/100500"))
     }
 
-    "_embedded/_links formatting (response)" in {
+    "_embedded/_links rewriting and formatting (response)" in {
       val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
       val response = FacadeResponse(200, Map("messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
         ObjV(
           "_embedded" → ObjV(
             "x" → ObjV(
               "_links" → ObjV(
-                "self" → ObjV("href" → "/inner-test/{a}", "templated" → true)
+                "self" → ObjV("href" → "/inner-test-rewritten/{a}", "templated" → true)
               ),
               "a" → 9
             ),
             "y" → LstV(
               ObjV(
                 "_links" → ObjV(
-                  "self" → ObjV("href" → "/inner-test-x/{b}", "templated" → true)
+                  "self" → ObjV("href" → "/inner-test-rewritten/{b}", "templated" → true)
                 ),
                 "b" → 123
               ),
               ObjV(
                 "_links" → ObjV(
-                  "self" → ObjV("href" → "/inner-test-y/{c}", "templated" → true)
+                  "self" → ObjV("href" → "/inner-test-rewritten/{c}", "templated" → true)
                 ),
                 "c" → 567
               )
             )
           ),
           "_links" → ObjV(
-            "self" → ObjV("href" → "/test/{a}", "templated" → true)
+            "self" → ObjV("href" → "/test-rewritten/{a}", "templated" → true)
           ),
           "a" → 1,
           "b" → 2
@@ -153,47 +157,47 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       y shouldBe LstV(
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/v3/inner-test-x/123")
+            "self" → ObjV("href" → "/v3/inner-test/123")
           ),
           "b" → 123
         ),
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/v3/inner-test-y/567")
+            "self" → ObjV("href" → "/v3/inner-test/567")
           ),
           "c" → 567
         )
       )
     }
 
-    "_embedded/_links formatting (event)" in {
+    "_embedded/_links rewriting and formatting (event)" in {
       val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
-      val event = FacadeRequest(Uri("/test"), Method.POST, Map.empty,
+      val event = FacadeRequest(Uri("/test-rewritten"), Method.POST, Map.empty,
         ObjV(
           "_embedded" → ObjV(
             "x" → ObjV(
               "_links" → ObjV(
-                "self" → ObjV("href" → "/inner-test/{a}", "templated" → true)
+                "self" → ObjV("href" → "/inner-test-rewritten/{a}", "templated" → true)
               ),
               "a" → 9
             ),
             "y" → LstV(
               ObjV(
                 "_links" → ObjV(
-                  "self" → ObjV("href" → "/inner-test-x/{b}", "templated" → true)
+                  "self" → ObjV("href" → "/inner-test-rewritten/{b}", "templated" → true)
                 ),
                 "b" → 123
               ),
               ObjV(
                 "_links" → ObjV(
-                  "self" → ObjV("href" → "/inner-test-y/{c}", "templated" → true)
+                  "self" → ObjV("href" → "/inner-test-rewritten/{c}", "templated" → true)
                 ),
                 "c" → 567
               )
             )
           ),
           "_links" → ObjV(
-            "self" → ObjV("href" → "/test/{a}", "templated" → true)
+            "self" → ObjV("href" → "/test-rewritten/{a}", "templated" → true)
           ),
           "a" → 1,
           "b" → 2
@@ -216,13 +220,13 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       y shouldBe LstV(
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/v3/inner-test-x/123")
+            "self" → ObjV("href" → "/v3/inner-test/123")
           ),
           "b" → 123
         ),
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/v3/inner-test-y/567")
+            "self" → ObjV("href" → "/v3/inner-test/567")
           ),
           "c" → 567
         )

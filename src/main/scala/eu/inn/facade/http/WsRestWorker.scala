@@ -3,9 +3,7 @@ package eu.inn.facade.http
 import akka.actor._
 import eu.inn.binders.value.Text
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
-import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
-import eu.inn.facade.raml.RamlConfig
 import eu.inn.hyperbus.{Hyperbus, IdGenerator}
 import scaldi.{Injectable, Injector}
 import spray.can.websocket.FrameCommandFailed
@@ -30,9 +28,6 @@ class WsRestWorker(val serverConnection: ActorRef,
   var isConnectionTerminated = false
   var remoteAddress = clientAddress
   var httpRequest: Option[HttpRequest] = None
-
-  val filterChainComposer = inject[FilterChain]
-  val ramlConfig = inject[RamlConfig]
 
   override def preStart(): Unit = {
     super.preStart()

@@ -3,7 +3,7 @@ package eu.inn.facade.filter.chain
 import eu.inn.binders.value.{Null, ObjV}
 import eu.inn.facade.MockContext
 import eu.inn.facade.filter.NoOpFilter
-import eu.inn.facade.filter.raml.{EnrichRequestFilter, EventPrivateFilter, RequestPrivateFilter, ResponsePrivateFilter}
+import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
 import eu.inn.facade.modules.Injectors
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -41,8 +41,8 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
       val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepare(request)
       val filters = filterChain.findResponseFilters(context, response)
 
-      filters.head shouldBe a[ResponsePrivateFilter]
-      filters.tail.head shouldBe a[NoOpFilter]
+      filters.head shouldBe a[NoOpFilter]
+      filters.tail.head shouldBe a[ResponsePrivateFilter]
     }
 
     "response filter chain (annotation fields)" in {
@@ -50,8 +50,8 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
       val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepare(request)
       val response = FacadeResponse(200, Map.empty, ObjV("statusCode" → 100500, "processedBy" → "John"))
       val filters = filterChain.findResponseFilters(context, response)
-      filters.head shouldBe a[ResponsePrivateFilter]
-      filters.tail.head shouldBe a[NoOpFilter]
+      filters.head shouldBe a[NoOpFilter]
+      filters.tail.head shouldBe a[ResponsePrivateFilter]
       filters.length should equal(2)
     }
 
@@ -64,6 +64,32 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
       val filters = filterChain.findEventFilters(context, event)
       filters.head shouldBe a[EventPrivateFilter]
       filters.length should equal(1)
+    }
+
+    "rewrite filters. forward request filters, inverted event filters" in {
+      val request = FacadeRequest(Uri("/test-rewrite/some-service"), "get", Map.empty, Null)
+      val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepare(request)
+      val event = FacadeRequest(Uri("/status/test-service"), "feed:put", Map.empty,
+        ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
+      )
+      val requestFilters = filterChain.findRequestFilters(context, request)
+      val eventFilters = filterChain.findEventFilters(context, event)
+
+      requestFilters.head shouldBe a[RewriteRequestFilter]
+      eventFilters.head shouldBe a[RewriteEventFilter]
+    }
+
+    "rewrite filters. forward request filters, inverted event filters with patterns" in {
+      val request = FacadeRequest(Uri("/test-rewrite-method/some-service"), "put", Map.empty, Null)
+      val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepare(request)
+      val event = FacadeRequest(Uri("/revault/content/{path:*}"), "feed:put", Map.empty,
+        ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
+      )
+      val requestFilters = filterChain.findRequestFilters(context, request)
+      val eventFilters = filterChain.findEventFilters(context, event)
+
+      requestFilters.head shouldBe a[RewriteRequestFilter]
+      eventFilters.head shouldBe a[RewriteEventFilter]
     }
   }
 }

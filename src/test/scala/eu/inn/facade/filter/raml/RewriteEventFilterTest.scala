@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.binders.value.{LstV, Null, ObjV}
+import eu.inn.binders.value.{Null, ObjV}
 import eu.inn.facade.MockContext
 import eu.inn.facade.model.{FacadeRequest, FilterRestartException}
 import eu.inn.facade.raml.{Method, RewriteIndexHolder}
@@ -13,44 +13,16 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 class RewriteEventFilterTest extends FreeSpec with Matchers with ScalaFutures with MockContext {
+  RewriteIndexHolder.updateRewriteIndex("/test-rewrite", "/rewritten", None)
+  RewriteIndexHolder.updateRewriteIndex("/rewritten", "/rewritten-twice", None)
+
   "RewriteEventFilter" - {
     "rewrite links" in {
-      RewriteIndexHolder.updateRewriteIndex("/test-rewrite", "/rewritten", None)
-      RewriteIndexHolder.updateRewriteIndex("/rewritten", "/rewritten-twice", None)
       val filter = new RewriteEventFilter
 
       val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
       val event = FacadeRequest(
-        Uri("/test-rewrite/some-service"), Method.POST, Map.empty,
-        ObjV(
-          "_embedded" → ObjV(
-            "x" → ObjV(
-              "_links" → ObjV(
-                "self" → ObjV("href" → "/rewritten/inner-test/{a}", "templated" → true)
-              ),
-              "a" → 9
-            ),
-            "y" → LstV(
-              ObjV(
-                "_links" → ObjV(
-                  "self" → ObjV("href" → "/rewritten/inner-test-x/{b}", "templated" → true)
-                ),
-                "b" → 123
-              ),
-              ObjV(
-                "_links" → ObjV(
-                  "self" → ObjV("href" → "/rewritten/inner-test-y/{c}", "templated" → true)
-                ),
-                "c" → 567
-              )
-            )
-          ),
-          "_links" → ObjV(
-            "self" → ObjV("href" → "/rewritten/test/{a}", "templated" → true)
-          ),
-          "a" → 1,
-          "b" → 2
-        )
+        Uri("/rewritten/some-service"), Method.POST, Map.empty, ObjV("field" → "content")
       )
 
       val requestContext = mockContext(request)
@@ -61,35 +33,7 @@ class RewriteEventFilterTest extends FreeSpec with Matchers with ScalaFutures wi
 
       val expectedEvent = FacadeRequest(
         Uri("/test-rewrite/some-service"), Method.POST, Map.empty,
-        ObjV(
-          "_embedded" → ObjV(
-            "x" → ObjV(
-              "_links" → ObjV(
-                "self" → ObjV("href" → "/test-rewrite/inner-test/{a}", "templated" → true)
-              ),
-              "a" → 9
-            ),
-            "y" → LstV(
-              ObjV(
-                "_links" → ObjV(
-                  "self" → ObjV("href" → "/test-rewrite/inner-test-x/{b}", "templated" → true)
-                ),
-                "b" → 123
-              ),
-              ObjV(
-                "_links" → ObjV(
-                  "self" → ObjV("href" → "/test-rewrite/inner-test-y/{c}", "templated" → true)
-                ),
-                "c" → 567
-              )
-            )
-          ),
-          "_links" → ObjV(
-            "self" → ObjV("href" → "/test-rewrite/test/{a}", "templated" → true)
-          ),
-          "a" → 1,
-          "b" → 2
-        ))
+        ObjV("field" → "content"))
 
       restartException.facadeRequest shouldBe expectedEvent
     }

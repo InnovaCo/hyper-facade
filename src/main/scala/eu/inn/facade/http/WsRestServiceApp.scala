@@ -4,7 +4,7 @@ import akka.actor._
 import akka.io.{IO, Inet, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
-import eu.inn.facade.{FacadeConfig, StatsReporterFactory}
+import eu.inn.facade.{FacadeConfigPaths, StatsReporterFactory}
 import eu.inn.facade.events.SubscriptionsManager
 import eu.inn.hyperbus.Hyperbus
 import scaldi.{Injectable, Injector}
@@ -34,7 +34,7 @@ class WsRestServiceApp(implicit inj: Injector)
                            settings: Option[ServerSettings])(route: ⇒ Route)(implicit system: ActorSystem, sslEngineProvider: ServerSSLEngineProvider,
                                                                              bindingTimeout: Timeout): Future[Http.Bound] = {
 
-    val maxConnectionCount = config.getInt(s"${FacadeConfig.HTTP}.max-connections")
+    val maxConnectionCount = config.getInt(s"${FacadeConfigPaths.HTTP}.max-connections")
 
     val serviceActor = system.actorOf(
       props = Props {

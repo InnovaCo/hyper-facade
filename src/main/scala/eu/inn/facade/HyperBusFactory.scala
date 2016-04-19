@@ -23,8 +23,8 @@ class HyperbusFactory(val config: Config) {
 
 object HyperbusFactory {
   def defaultHyperbusGroup(config: Config) = {
-    if (config.hasPath(FacadeConfig.HYPERBUS_GROUP))
-      Some(config.getString(FacadeConfig.HYPERBUS_GROUP))
+    if (config.hasPath(FacadeConfigPaths.HYPERBUS_GROUP))
+      Some(config.getString(FacadeConfigPaths.HYPERBUS_GROUP))
     else None
   }
 }

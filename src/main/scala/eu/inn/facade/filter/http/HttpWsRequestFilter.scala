@@ -2,9 +2,10 @@ package eu.inn.facade.filter.http
 
 import com.typesafe.config.Config
 import eu.inn.binders.value.Null
-import eu.inn.facade.FacadeConfig
+import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.model._
-import eu.inn.facade.utils.{HalTransformer, UriTransformer}
+import eu.inn.facade.utils.HalTransformer
+import eu.inn.facade.utils.UriTransformer._
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.{Header, Method, QueryBody}
 import eu.inn.hyperbus.transport.api.matchers.Specific
@@ -17,10 +18,10 @@ class HttpWsRequestFilter(config: Config) extends RequestFilter {
   override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
-      val rootPathPrefix = config.getString(FacadeConfig.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer: (Uri ⇒ Uri) = UriTransformer.removeRootPathPrefix(rootPathPrefix)
+      val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
+      val uriTransformer = removeRootPathPrefix(rootPathPrefix) _ andThen rewriteForward _
       val httpUri = spray.http.Uri(request.uri.pattern.specific)
-      val requestUri = uriTransformer(Uri(Specific(httpUri.path.toString)))
+      val requestUri = removeRootPathPrefix(rootPathPrefix)(Uri(Specific(httpUri.path.toString)))
 
       val headersBuilder = Map.newBuilder[String, Seq[String]]
       var messageIdFound = false

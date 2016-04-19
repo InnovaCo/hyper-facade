@@ -44,12 +44,22 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
       defaultFilters.requestFilters.head shouldBe a[EnrichRequestFilter]
     }
 
-    "nested fields" in {
+    "annotations on nested fields" in {
       val responseFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).responses(200).ramlContentTypes(None).filters
       responseFilterChain.responseFilters.head shouldBe a[ResponsePrivateFilter]
 
       val requestFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).requests.ramlContentTypes(None).filters
       requestFilterChain.requestFilters.head shouldBe a[EnrichRequestFilter]
+    }
+
+    "annotations on parent resource" in {
+      val parentRewriteFilter = ramlConfig.resourcesByUri("/parent").filters.requestFilters.head
+      parentRewriteFilter shouldBe a[RewriteRequestFilter]
+      parentRewriteFilter.asInstanceOf[RewriteRequestFilter].args.getUri shouldBe "/revault/content/some-service"
+
+      val childRewriteFilter = ramlConfig.resourcesByUri("/parent/child").filters.requestFilters.head
+      childRewriteFilter shouldBe a[RewriteRequestFilter]
+      childRewriteFilter.asInstanceOf[RewriteRequestFilter].args.getUri shouldBe "/revault/content/some-service/child"
     }
 
     "request URI substitution" in {

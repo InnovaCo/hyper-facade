@@ -7,7 +7,21 @@ import scala.annotation.tailrec
 object UriMatcher {
 
   /**
-    * Matches URI pattern from RAML configuration with request URI
+    * Matches uri against sequence of uri templates
+    * @param uri - uri
+    * @param uriTemplates - sequence uri templates
+    * @return
+    */
+  def matchUri(uri: Uri, uriTemplates: Seq[String]): Option[Uri] = {
+    var foundUri: Option[Uri] = None
+    for (uriTemplate ← uriTemplates if foundUri.isEmpty) {
+      foundUri = matchUri(uriTemplate, uri)
+    }
+    foundUri
+  }
+
+  /**
+    * Matches URI pattern with request URI
     * @param pattern - URI pattern from RAML configuration
     * @param uri - request URI
     * @return if request URI matches pattern then Some of constructed URI with parameters will be returned, None otherwise
@@ -18,7 +32,7 @@ object UriMatcher {
     val patternTokens = UriParser.tokens(pattern)
     val patternTokenIter = patternTokens.iterator
     val reqUriTokenIter = requestUriTokens.iterator
-    var matchesCorrectly = true
+    var matchesCorrectly = patternTokenIter.hasNext && reqUriTokenIter.hasNext
     var previousReqUriToken: Option[Token] = None
     while(patternTokenIter.hasNext && reqUriTokenIter.hasNext && matchesCorrectly) {
       val reqUriToken = getRequestUriToken(reqUriTokenIter, previousReqUriToken)
@@ -27,15 +41,25 @@ object UriMatcher {
           matchesCorrectly = (patternToken == reqUriToken) &&
                  (patternTokenIter.hasNext == reqUriTokenIter.hasNext)
 
-        case ParameterToken(paramName, RegularMatchType) ⇒ reqUriToken match {
-          case requestUriToken @ TextToken(value) ⇒
-            args += paramName → value
-            matchesCorrectly = patternTokenIter.hasNext == reqUriTokenIter.hasNext
-        }
-
-        case patternToken @ ParameterToken(paramName, PathMatchType) ⇒
+        case ParameterToken(paramName, RegularMatchType) ⇒
           reqUriToken match {
-            case requestUriToken @ TextToken(value) ⇒ args += paramName → foldUriTail(value, reqUriTokenIter)
+            case requestUriToken@TextToken(value) ⇒
+              args += paramName → value
+              matchesCorrectly = patternTokenIter.hasNext == reqUriTokenIter.hasNext
+            case requestUriToken@ParameterToken(_, RegularMatchType) ⇒
+              matchesCorrectly = true
+            case _ ⇒
+              matchesCorrectly = false
+          }
+
+        case ParameterToken(paramName, PathMatchType) ⇒
+          reqUriToken match {
+            case requestUriToken @ TextToken(value) ⇒
+              args += paramName → foldUriTail(value, reqUriTokenIter)
+            case requestUriToken @ ParameterToken(_, PathMatchType) ⇒
+              matchesCorrectly = true
+            case _ ⇒
+              matchesCorrectly = false
           }
       }
       previousReqUriToken = Some(reqUriToken)

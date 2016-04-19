@@ -58,7 +58,8 @@ trait RequestProcessor extends Injectable {
           if (log.isDebugEnabled) {
             log.debug(s"Request $requestContext is restarted from $facadeRequest to ${e.facadeRequest}")
           }
-          processRequestWithRaml(requestContext, e.facadeRequest.asInstanceOf[FacadeRequest], tryNum + 1)
+          val templatedRequest = withTemplatedUri(e.facadeRequest)
+          processRequestWithRaml(requestContext, templatedRequest, tryNum + 1)
       }
     }
   }
@@ -75,7 +76,8 @@ trait RequestProcessor extends Injectable {
           if (log.isDebugEnabled) {
             log.debug(s"Event $requestContext is restarted from $facadeRequest to ${e.facadeRequest}")
           }
-          processEventWithRaml(requestContext, e.facadeRequest.asInstanceOf[FacadeRequest], tryNum + 1)
+          val templatedEvent = withTemplatedUri(e.facadeRequest)
+          processEventWithRaml(requestContext, templatedEvent, tryNum + 1)
       }
     }
   }
@@ -85,6 +87,11 @@ trait RequestProcessor extends Injectable {
     val facadeRequestWithRamlUri = request.copy(uri = ramlParsedUri)
     val preparedContext = requestContext.prepare(facadeRequestWithRamlUri)
     (preparedContext, facadeRequestWithRamlUri)
+  }
+
+  def withTemplatedUri(request: FacadeRequest): FacadeRequest = {
+    val ramlParsedUri = ramlConfig.resourceUri(request.uri.pattern.specific)
+    request.copy(uri = ramlParsedUri)
   }
 
   def handleHyperbusExceptions(requestContext: FacadeRequestContext) : PartialFunction[Throwable, Response[DynamicBody]] = {

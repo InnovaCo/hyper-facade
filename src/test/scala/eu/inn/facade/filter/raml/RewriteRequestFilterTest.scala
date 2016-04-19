@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.raml
 
-import eu.inn.binders.value.{LstV, ObjV, Text}
+import eu.inn.binders.value.{ObjV, Text}
 import eu.inn.facade.MockContext
 import eu.inn.facade.model.{FacadeRequest, FilterRestartException}
 import eu.inn.facade.raml._
@@ -60,7 +60,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       }
 
       val expectedRequest = FacadeRequest(
-        Uri("/test-rewrite/some-service/{serviceId}", Map("serviceId" → "100500")),
+        Uri("/test-rewrite/some-service/100500"),
         Method.GET,
         Map.empty,
         ObjV("field" → "value")
@@ -78,36 +78,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       RewriteIndexHolder.updateRewriteIndex("/rewritten", "/rewritten-twice", None)
 
       val request = FacadeRequest(
-        Uri("/test-rewrite/some-service"), Method.POST, Map.empty,
-        ObjV(
-          "_embedded" → ObjV(
-            "x" → ObjV(
-              "_links" → ObjV(
-                "self" → ObjV("href" → "/test-rewrite/inner-test/{a}", "templated" → true)
-              ),
-              "a" → 9
-            ),
-            "y" → LstV(
-              ObjV(
-                "_links" → ObjV(
-                  "self" → ObjV("href" → "/test-rewrite/inner-test-x/{b}", "templated" → true)
-                ),
-                "b" → 123
-              ),
-              ObjV(
-                "_links" → ObjV(
-                  "self" → ObjV("href" → "/test-rewrite/inner-test-y/{c}", "templated" → true)
-                ),
-                "c" → 567
-              )
-            )
-          ),
-          "_links" → ObjV(
-            "self" → ObjV("href" → "/test-rewrite/test/{a}", "templated" → true)
-          ),
-          "a" → 1,
-          "b" → 2
-        )
+        Uri("/test-rewrite/some-service"), Method.POST, Map.empty, ObjV("field" → "content")
       )
 
       val requestContext = mockContext(request)
@@ -117,36 +88,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       }
 
       val expectedRequest = FacadeRequest(
-        Uri("/rewritten/some-service"), Method.POST, Map.empty,
-        ObjV(
-          "_embedded" → ObjV(
-            "x" → ObjV(
-              "_links" → ObjV(
-                "self" → ObjV("href" → "/rewritten-twice/inner-test/{a}", "templated" → true)
-              ),
-              "a" → 9
-            ),
-            "y" → LstV(
-              ObjV(
-                "_links" → ObjV(
-                  "self" → ObjV("href" → "/rewritten-twice/inner-test-x/{b}", "templated" → true)
-                ),
-                "b" → 123
-              ),
-              ObjV(
-                "_links" → ObjV(
-                  "self" → ObjV("href" → "/rewritten-twice/inner-test-y/{c}", "templated" → true)
-                ),
-                "c" → 567
-              )
-            )
-          ),
-          "_links" → ObjV(
-            "self" → ObjV("href" → "/rewritten-twice/test/{a}", "templated" → true)
-          ),
-          "a" → 1,
-          "b" → 2
-        ))
+        Uri("/rewritten/some-service"), Method.POST, Map.empty, ObjV("field" → "content"))
 
       restartException.facadeRequest shouldBe expectedRequest
     }

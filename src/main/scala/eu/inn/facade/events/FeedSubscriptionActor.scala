@@ -3,7 +3,7 @@ package eu.inn.facade.events
 import akka.actor._
 import akka.pattern.pipe
 import com.typesafe.config.Config
-import eu.inn.facade.FacadeConfig
+import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.http.{FacadeRequestWithContext, RequestProcessor}
 import eu.inn.facade.model._
 import eu.inn.facade.raml.Method
@@ -24,7 +24,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   with Stash
   with RequestProcessor {
 
-  val maxResubscriptionsCount = inject[Config].getInt(FacadeConfig.MAX_RESUBSCRIPTIONS)
+  val maxResubscriptionsCount = inject[Config].getInt(FacadeConfigPaths.MAX_RESUBSCRIPTIONS)
   val log = LoggerFactory.getLogger(getClass)
   val executionContext = inject[ExecutionContext] // don't make this implicit
 

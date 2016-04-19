@@ -26,7 +26,7 @@ object ConfigsFactory {
   }
 
   private def ramlFilePath(config: Config): String = {
-    val filePath = config.getString(FacadeConfig.RAML_FILE)
+    val filePath = config.getString(FacadeConfigPaths.RAML_FILE)
 
     // it means that config contains absolute file path
     if (filePath.startsWith("/"))
@@ -42,7 +42,7 @@ object ConfigsFactory {
   }
 }
 
-object FacadeConfig {
+object FacadeConfigPaths {
   val ROOT = "hyperbus-facade."
   val PRIVATE_ADDRESSES = ROOT + "private.addresses"
   val PRIVATE_NETWORKS = ROOT + "private.networks"

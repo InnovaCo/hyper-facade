@@ -2,9 +2,10 @@ package eu.inn.facade.filter.http
 
 import com.typesafe.config.Config
 import eu.inn.binders.value._
-import eu.inn.facade.FacadeConfig
+import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.model._
-import eu.inn.facade.utils.{HalTransformer, UriTransformer}
+import eu.inn.facade.utils.HalTransformer
+import eu.inn.facade.utils.UriTransformer._
 import eu.inn.hyperbus.model.Links._
 import eu.inn.hyperbus.model.{DefLink, Header}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -16,8 +17,8 @@ class HttpWsResponseFilter(config: Config) extends ResponseFilter {
   override def apply(context: FacadeRequestContext, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
-      val rootPathPrefix = config.getString(FacadeConfig.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer: (Uri ⇒ Uri) = UriTransformer.addRootPathPrefix(rootPathPrefix)
+      val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
+      val uriTransformer = rewriteToOriginal _ andThen addRootPathPrefix(rootPathPrefix) _
       val (newHeaders, newBody) = HttpWsFilter.filterMessage(response, uriTransformer)
       response.copy(
         headers = newHeaders,
@@ -31,8 +32,8 @@ class WsEventFilter(config: Config) extends EventFilter {
   override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
-      val rootPathPrefix = config.getString(FacadeConfig.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer: (Uri ⇒ Uri) = UriTransformer.addRootPathPrefix(rootPathPrefix)
+      val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
+      val uriTransformer = rewriteToOriginal _ andThen addRootPathPrefix(rootPathPrefix) _
       val (newHeaders, newBody) = HttpWsFilter.filterMessage(request, uriTransformer)
       request.copy(
         uri = uriTransformer(Uri(request.uri.formatted)),
@@ -59,7 +60,7 @@ object HttpWsFilter {
         }
     }
 
-    val newBody = HalTransformer.transformAndFormatEmbeddedObject(message.body, uriTransformer)
+    val newBody = HalTransformer.transformEmbeddedObject(message.body, uriTransformer)
     if (newBody.isInstanceOf[Obj] /* && response.status == 201*/ ) {
       // Created, set header value
       newBody.__links.fromValue[Option[LinksMap]].flatMap(_.get(DefLink.LOCATION)) match {

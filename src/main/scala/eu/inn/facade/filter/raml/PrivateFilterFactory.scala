@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.raml
 
 import com.typesafe.config.Config
-import eu.inn.facade.FacadeConfig
+import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.model._
 import org.slf4j.LoggerFactory
@@ -35,8 +35,8 @@ class PrivateFilterFactory(config: Config) extends RamlFilterFactory {
   }
 
   def extractPrivateAddresses(config: Config): PrivateAddresses = {
-    val addresses = for (ip ← config.getStringList(FacadeConfig.PRIVATE_ADDRESSES)) yield ip
-    val networks = for (rangeConfig ← config.getConfigList(FacadeConfig.PRIVATE_NETWORKS)) yield NetworkRange(rangeConfig.getString("from"), rangeConfig.getString("to"))
+    val addresses = for (ip ← config.getStringList(FacadeConfigPaths.PRIVATE_ADDRESSES)) yield ip
+    val networks = for (rangeConfig ← config.getConfigList(FacadeConfigPaths.PRIVATE_NETWORKS)) yield NetworkRange(rangeConfig.getString("from"), rangeConfig.getString("to"))
 
     PrivateAddresses(addresses, networks)
   }
