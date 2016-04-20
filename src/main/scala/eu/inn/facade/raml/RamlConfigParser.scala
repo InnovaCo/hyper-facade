@@ -132,7 +132,6 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
         val adjustedRewrittenUri = rewriteAnnotation.getUri + childResourceRelativeUri
         val adjustedRewriteAnn = new rewrite()
         adjustedRewriteAnn.setUri(adjustedRewrittenUri)
-        println(adjustedRewrittenUri)
         adjustedAnnotations += Annotation(Annotation.REWRITE, Some(adjustedRewriteAnn))
       case _ ⇒
     }
