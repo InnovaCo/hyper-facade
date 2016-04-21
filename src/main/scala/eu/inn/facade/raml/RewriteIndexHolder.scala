@@ -9,4 +9,8 @@ object RewriteIndexHolder {
     val forwardIndex = rewriteIndex.forward + (IndexKey(originalUri, method) → rewrittenUri)
     rewriteIndex = RewriteIndex(invertedIndex, forwardIndex)
   }
+
+  def clearIndex(): Unit = {
+    rewriteIndex = RewriteIndex()
+  }
 }

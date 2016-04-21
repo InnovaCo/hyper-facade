@@ -7,13 +7,20 @@ import eu.inn.facade.raml._
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
 import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
-class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with MockContext {
+class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with BeforeAndAfterAll with MockContext {
+
+  override def beforeAll() = {
+    RewriteIndexHolder.clearIndex()
+    RewriteIndexHolder.updateRewriteIndex("/test-rewrite", "/rewritten", None)
+    RewriteIndexHolder.updateRewriteIndex("/rewritten", "/rewritten-twice", None)
+  }
+
   "RewriteRequestFilter" - {
     "simple rewrite" in {
       val args = new rewrite()
@@ -72,21 +79,16 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
     "rewrite links" in {
       val args = new rewrite()
       args.setUri("/rewritten/some-service")
+
       val filter = new RewriteRequestFilter(args)
-
-      RewriteIndexHolder.updateRewriteIndex("/test-rewrite", "/rewritten", None)
-      RewriteIndexHolder.updateRewriteIndex("/rewritten", "/rewritten-twice", None)
-
       val request = FacadeRequest(
         Uri("/test-rewrite/some-service"), Method.POST, Map.empty, ObjV("field" → "content")
       )
-
       val requestContext = mockContext(request)
 
       val restartException = intercept[FilterRestartException]{
         Await.result(filter.apply(requestContext, request), 10.seconds)
       }
-
       val expectedRequest = FacadeRequest(
         Uri("/rewritten/some-service"), Method.POST, Map.empty, ObjV("field" → "content"))
 

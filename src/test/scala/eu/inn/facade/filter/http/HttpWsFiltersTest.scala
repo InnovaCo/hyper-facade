@@ -12,17 +12,23 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 import scaldi.Injectable
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with Injectable with MockContext {
+class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with BeforeAndAfterAll with Injectable with MockContext {
 
   implicit val injector = Injectors()
   val afterFilters = inject[FilterChain]("afterFilterChain")
-  RewriteIndexHolder.updateRewriteIndex("/test", "/test-rewritten", None)
-  RewriteIndexHolder.updateRewriteIndex("/inner-test", "/inner-test-rewritten", None)
+
+  override def beforeAll() = {
+    RewriteIndexHolder.clearIndex()
+    RewriteIndexHolder.updateRewriteIndex("/test", "/test-rewritten", None)
+    RewriteIndexHolder.updateRewriteIndex("/test/{a}", "/test-rewritten/{a}", None)
+    RewriteIndexHolder.updateRewriteIndex("/test/xyz", "/test-rewritten/xyz", None)
+    RewriteIndexHolder.updateRewriteIndex("/inner-test/{a}", "/inner-test-rewritten/{a}", None)
+  }
 
   "HttpWsFiltersTest " - {
     "_links rewriting and formatting (response)" in {
@@ -48,10 +54,10 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       val filteredResponse = afterFilters.filterResponse(context, response).futureValue(Timeout(Span(300, Seconds)))
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
-      linksMap("some-other1") shouldBe Left(Link(href="/v3/test/abc"))
+      linksMap("some-other1") shouldBe Left(Link(href="/v3/test-rewritten/abc"))
       linksMap("some-other2") shouldBe Left(Link(href="/v3/test/xyz"))
       linksMap("some-other3") shouldBe Right(
-        Seq(Link(href="/v3/test/abc1"), Link(href="/v3/test/abc2"), Link(href="/v3/test/2"))
+        Seq(Link(href="/v3/test-rewritten/abc1"), Link(href="/v3/test-rewritten/abc2"), Link(href="/v3/test-rewritten/2"))
       )
     }
 
@@ -157,13 +163,13 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       y shouldBe LstV(
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/v3/inner-test/123")
+            "self" → ObjV("href" → "/v3/inner-test-rewritten/123")
           ),
           "b" → 123
         ),
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/v3/inner-test/567")
+            "self" → ObjV("href" → "/v3/inner-test-rewritten/567")
           ),
           "c" → 567
         )
@@ -220,13 +226,13 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures  with I
       y shouldBe LstV(
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/v3/inner-test/123")
+            "self" → ObjV("href" → "/v3/inner-test-rewritten/123")
           ),
           "b" → 123
         ),
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/v3/inner-test/567")
+            "self" → ObjV("href" → "/v3/inner-test-rewritten/567")
           ),
           "c" → 567
         )

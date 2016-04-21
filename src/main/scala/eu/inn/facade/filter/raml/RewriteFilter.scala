@@ -20,13 +20,10 @@ class RewriteEventFilter extends EventFilter {
   override def apply(context: FacadeRequestContext, event: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
     context.prepared match {
       case Some(preparedContext) ⇒
-        if (preparedContext.requestUri == event.uri)
+        if (preparedContext.requestUri.formatted == event.uri.formatted)
           Future(event)
         else
           rewrite(context, event)
-
-      case None ⇒
-        rewrite(context, event)
     }
   }
 

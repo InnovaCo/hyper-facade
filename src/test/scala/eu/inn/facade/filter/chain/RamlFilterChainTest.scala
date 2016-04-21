@@ -82,14 +82,18 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
     "rewrite filters. forward request filters, inverted event filters with patterns" in {
       val request = FacadeRequest(Uri("/test-rewrite-method/some-service"), "put", Map.empty, Null)
       val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepare(request)
-      val event = FacadeRequest(Uri("/revault/content/{path:*}"), "feed:put", Map.empty,
-        ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
-      )
+      val event = FacadeRequest(Uri("/revault/content/{path:*}", Map("path" → "some-service")), "feed:put", Map.empty, Null)
+      val notMatchedEvent = FacadeRequest(Uri("/revault/content/{path:*}", Map("path" → "other-service")), "feed:put", Map.empty, Null)
+
       val requestFilters = filterChain.findRequestFilters(context, request)
       val eventFilters = filterChain.findEventFilters(context, event)
+      val notMatchedEventFilters = filterChain.findEventFilters(context, notMatchedEvent)
 
       requestFilters.head shouldBe a[RewriteRequestFilter]
       eventFilters.head shouldBe a[RewriteEventFilter]
+      notMatchedEventFilters.head shouldBe a[RewriteEventFilter]  // we assign filter chain on templated URI, not on formatted one, so despite
+                                                                  // formatted URI of this event doesn't match rewritten URI from RAML config,
+                                                                  // rewrite filter will be assigned to this event, but will do nothing
     }
   }
 }

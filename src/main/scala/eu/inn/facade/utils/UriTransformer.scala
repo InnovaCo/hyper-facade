@@ -21,21 +21,21 @@ object UriTransformer {
             found = true
         }
       }
-      rewrittenUri
+      Uri(rewrittenUri.formatted)
     }
   }
 
   def rewriteOneStepBack(method: String)(from: Uri): Uri = {
     RewriteIndexHolder.rewriteIndex.findNextBack(from, Some(method)) match {
       case Some(foundUri) ⇒
-        rewrite(from, foundUri)
+        Uri(rewrite(from, foundUri).formatted)
       case None ⇒
-        from
+        Uri(from.formatted)
     }
   }
 
   def rewriteOneStepForward(from: Uri, toUri: String): Uri = {
-    rewrite(from, Uri(toUri))
+    Uri(rewrite(from, Uri(toUri)).formatted)
   }
 
   def rewriteForward(from: Uri): Uri = {
@@ -87,6 +87,6 @@ object UriTransformer {
           throw new IllegalArgumentException(s"No parameter argument specified for $uriParameter on $from")
       }
     }
-    Uri(Uri(Specific(toUriPath), newArgs.toMap).formatted)
+    Uri(Specific(toUriPath), newArgs.toMap)
   }
 }

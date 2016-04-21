@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import eu.inn.binders.value.Null
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.model._
+import eu.inn.facade.utils.FunctionUtils.chain
 import eu.inn.facade.utils.HalTransformer
 import eu.inn.facade.utils.UriTransformer._
 import eu.inn.hyperbus.IdGenerator
@@ -19,7 +20,7 @@ class HttpWsRequestFilter(config: Config) extends RequestFilter {
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer = removeRootPathPrefix(rootPathPrefix) _ andThen rewriteForward _
+      val uriTransformer = chain(removeRootPathPrefix(rootPathPrefix), rewriteForward)
       val httpUri = spray.http.Uri(request.uri.pattern.specific)
       val requestUri = removeRootPathPrefix(rootPathPrefix)(Uri(Specific(httpUri.path.toString)))
 
