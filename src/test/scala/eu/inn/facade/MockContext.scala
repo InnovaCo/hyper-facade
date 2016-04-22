@@ -1,13 +1,13 @@
 package eu.inn.facade
 
-import eu.inn.facade.model.{FacadeRequest, FacadeRequestContext, PreparedRequestContext}
+import eu.inn.facade.model.{FacadeRequest, FacadeRequestContext, RequestStage}
 
 trait MockContext {
   def mockContext(request: FacadeRequest) = FacadeRequestContext(
     "127.0.0.1", spray.http.Uri(request.uri.formatted), request.uri.formatted, request.method, request.headers, Seq.empty
-  ).prepareNext(request)
+  ).withNextStage(request)
 
-  def mockPreparedContext(request: FacadeRequest) = PreparedRequestContext(
+  def mockStage(request: FacadeRequest) = RequestStage(
     request.uri, request.method, request.headers
   )
 }

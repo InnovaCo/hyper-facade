@@ -50,3 +50,6 @@ case class RequestStage(
                        requestMethod: String,
                        requestHeaders: Map[String, Seq[String]]
                        )
+
+// todo: name
+case class FCT(context: FacadeRequestContext, request: FacadeRequest)

@@ -62,6 +62,11 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
       childRewriteFilter.asInstanceOf[RewriteRequestFilter].args.getUri shouldBe "/revault/content/some-service/child"
     }
 
+    "annotations on external child resource" in {
+      val childRewriteFilters = ramlConfig.resourcesByUri("/parent/external-child").filters.requestFilters
+      childRewriteFilters shouldBe empty
+    }
+
     "request URI substitution" in {
       val parameterRegularMatch = ramlConfig.resourceUri("/unreliable-feed/someContent")
       parameterRegularMatch shouldBe Uri("/unreliable-feed/{content}", Map("content" → "someContent"))

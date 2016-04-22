@@ -39,10 +39,14 @@ class EventPrivateFilter(val fields: Seq[Field], val privateAddresses: PrivateAd
   override def apply(context: FacadeRequestContext, response: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
-      if (isAllowedAddress(context.requestHeaders, privateAddresses)) response
-      else response.copy(
-        body = PrivateFilter.filterBody(fields, response.body)
-      )
+      if (isAllowedAddress(context.requestHeaders, privateAddresses)) {
+        response
+      }
+      else {
+        response.copy(
+          body = PrivateFilter.filterBody(fields, response.body)
+        )
+      }
     }
   }
 }
@@ -50,8 +54,14 @@ class EventPrivateFilter(val fields: Seq[Field], val privateAddresses: PrivateAd
 object PrivateFilter {
 
   def filterBody(fields: Seq[Field], body: Value): Value = {
-    val filteredFields = filterFields(fields, body.asMap)
-    Obj(filteredFields)
+    body match {
+      case obj: Obj ⇒
+        val filteredFields = filterFields(fields, body.asMap)
+        Obj(filteredFields)
+
+      case other ⇒
+        other
+    }
   }
 
   def filterFields(ramlFields: Seq[Field], fields: scala.collection.Map[String, Value]): scala.collection.Map[String, Value] = {

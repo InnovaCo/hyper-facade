@@ -5,8 +5,9 @@ import akka.pattern.pipe
 import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.http.{FacadeRequestWithContext, RequestProcessor}
-import eu.inn.facade.model._
+import eu.inn.facade.model.{FacadeResponse, _}
 import eu.inn.facade.raml.Method
+import eu.inn.facade.utils.FutureUtils
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, TextMatcher}
@@ -92,7 +93,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     implicit val ec = executionContext
     beforeFilterChain.filterRequest(requestContext, originalRequest) map { unpreparedRequest ⇒
-      val (preparedContext, preparedRequest) = prepareContextAndRequestBeforeRaml(requestContext, unpreparedRequest)
+      val FCT(preparedContext, preparedRequest) = prepareContextAndRequestBeforeRaml(requestContext, unpreparedRequest)
       BeforeFilterComplete(preparedContext, preparedRequest)
     } recover handleFilterExceptions(requestContext) { response ⇒
       websocketWorker ! response
@@ -109,13 +110,13 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     implicit val ec = executionContext
 
-    processRequestWithRaml(requestContext, facadeRequest, 0) map { filteredRequest ⇒
-      val correlationId = filteredRequest.headers.getOrElse(Header.CORRELATION_ID,
-        filteredRequest.headers(Header.MESSAGE_ID)).head
-      val subscriptionUri = getSubscriptionUri(filteredRequest)
+    processRequestWithRaml(FCT(requestContext, facadeRequest)) map { fct ⇒
+      val correlationId = fct.request.headers.getOrElse(Header.CORRELATION_ID,
+        fct.request.headers(Header.MESSAGE_ID)).head
+      val subscriptionUri = getSubscriptionUri(fct.request)
       subscriptionManager.subscribe(self, subscriptionUri, correlationId)
       implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
-      hyperbus <~ filteredRequest.copy(method = Method.GET).toDynamicRequest recover {
+      hyperbus <~ fct.request.copy(method = Method.GET).toDynamicRequest recover {
         handleHyperbusExceptions(requestContext)
       } pipeTo self
     }
@@ -145,8 +146,10 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
 
     implicit val ec = executionContext
-    ramlFilterChain.filterResponse(requestContext, facadeResponse) flatMap { filteredResponse ⇒
-      afterFilterChain.filterResponse(requestContext, filteredResponse) map { finalResponse ⇒
+    FutureUtils.chain(facadeResponse, requestContext.stages.map { stage ⇒
+      ramlFilterChain.filterResponse(requestContext, stage, _ : FacadeResponse)
+    }) flatMap { filteredResponse ⇒
+      afterFilterChain.filterResponse(requestContext, requestContext.stages.head, filteredResponse) map { finalResponse ⇒
         websocketWorker ! finalResponse
         if (finalResponse.status > 399) { // failed
           PoisonPill
@@ -174,8 +177,11 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       log.trace(s"Processing unreliable event $event for ${requestContext.pathAndQuery}")
     }
     implicit val ec = executionContext
-    processEventWithRaml(requestContext, FacadeRequest(event), 0) flatMap { e ⇒
-      afterFilterChain.filterEvent(requestContext, e) map { filteredRequest ⇒
+
+    FutureUtils.chain(FacadeRequest(event), requestContext.stages.map { stage ⇒
+      ramlFilterChain.filterEvent(requestContext, stage, _ : FacadeRequest)
+    }) flatMap { e ⇒
+      afterFilterChain.filterEvent(requestContext, requestContext.stages.head, e) map { filteredRequest ⇒
         websocketWorker ! filteredRequest
       }
     } recover handleFilterExceptions(requestContext) { response ⇒
@@ -201,8 +207,11 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           context.become(subscribedReliable(requestContext, originalRequest, lastRevisionId + 1, 0) orElse stopStartSubscription)
 
           implicit val ec = executionContext
-          processEventWithRaml(requestContext, FacadeRequest(event), 0) flatMap { e ⇒
-            afterFilterChain.filterEvent(requestContext, e) map { filteredRequest ⇒
+
+          FutureUtils.chain(FacadeRequest(event), requestContext.stages.map { stage ⇒
+            ramlFilterChain.filterEvent(requestContext, stage, _ : FacadeRequest)
+          }) flatMap { e ⇒
+            afterFilterChain.filterEvent(requestContext, requestContext.stages.head, e) map { filteredRequest ⇒
               websocketWorker ! filteredRequest
             }
           } recover handleFilterExceptions(requestContext) { response ⇒

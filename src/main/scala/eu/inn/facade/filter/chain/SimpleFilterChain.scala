@@ -20,7 +20,7 @@ case class SimpleFilterChain(
 
   override def findRequestFilters(request: FacadeRequest): Seq[RequestFilter] = requestFilters
 
-  override def findResponseFilters(preparedRequestContext: PreparedRequestContext, response: FacadeResponse): Seq[ResponseFilter] = responseFilters
+  override def findResponseFilters(stage: RequestStage, response: FacadeResponse): Seq[ResponseFilter] = responseFilters
 
-  override def findEventFilters(preparedRequestContext: PreparedRequestContext, event: FacadeRequest): Seq[EventFilter] = eventFilters
+  override def findEventFilters(stage: RequestStage, event: FacadeRequest): Seq[EventFilter] = eventFilters
 }
