@@ -11,20 +11,20 @@ trait FilterChain {
     FutureUtils.chain(request, findRequestFilters(request).map(f ⇒ f.apply(context, _ : FacadeRequest)))
   }
 
-  def filterResponse(context: FacadeRequestContext, response: FacadeResponse)
+  def filterResponse(context: FacadeRequestContext, stage: RequestStage, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
 
-    FutureUtils.chain(response, findResponseFilters(context.prepared.head, response).map(f ⇒ f.apply(context, _ : FacadeResponse)))
+    FutureUtils.chain(response, findResponseFilters(stage, response).map(f ⇒ f.apply(context, _ : FacadeResponse)))
   }
 
-  def filterEvent(context: FacadeRequestContext, event: FacadeRequest)
+  def filterEvent(context: FacadeRequestContext, stage: RequestStage, event: FacadeRequest)
                  (implicit ec: ExecutionContext): Future[FacadeRequest] = {
-    FutureUtils.chain(event, findEventFilters(context.prepared.head, event).map(f ⇒ f.apply(context, _ : FacadeRequest)))
+    FutureUtils.chain(event, findEventFilters(stage, event).map(f ⇒ f.apply(context, _ : FacadeRequest)))
   }
 
   def findRequestFilters(request: FacadeRequest): Seq[RequestFilter]
-  def findResponseFilters(preparedRequestContext: PreparedRequestContext, response: FacadeResponse): Seq[ResponseFilter]
-  def findEventFilters(preparedRequestContext: PreparedRequestContext, event: FacadeRequest): Seq[EventFilter]
+  def findResponseFilters(stage: RequestStage, response: FacadeResponse): Seq[ResponseFilter]
+  def findEventFilters(stage: RequestStage, event: FacadeRequest): Seq[EventFilter]
 }
 
 object FilterChain {
