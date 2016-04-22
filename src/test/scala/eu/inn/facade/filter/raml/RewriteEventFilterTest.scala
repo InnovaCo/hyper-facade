@@ -28,7 +28,7 @@ class RewriteEventFilterTest extends FreeSpec with Matchers with ScalaFutures wi
         Uri("/rewritten/{service}", Map("service" → "some-service")), Method.POST, Map.empty, Null
       )
 
-      val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepare(request)
+      val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).prepareNext(request)
 
       val restartException = intercept[FilterRestartException]{
         Await.result(filter.apply(context, event), 10.seconds)

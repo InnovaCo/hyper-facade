@@ -85,7 +85,7 @@ trait RequestProcessor extends Injectable {
   def prepareContextAndRequestBeforeRaml(requestContext: FacadeRequestContext, request: FacadeRequest) = {
     val ramlParsedUri = ramlConfig.resourceUri(request.uri.pattern.specific)
     val facadeRequestWithRamlUri = request.copy(uri = ramlParsedUri)
-    val preparedContext = requestContext.prepare(facadeRequestWithRamlUri)
+    val preparedContext = requestContext.prepareNext(facadeRequestWithRamlUri)
     (preparedContext, facadeRequestWithRamlUri)
   }
 

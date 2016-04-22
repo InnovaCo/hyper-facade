@@ -5,38 +5,34 @@ import eu.inn.facade.raml.{ContentType, Method, RamlConfig, RamlResourceMethodCo
 
 class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
 
-  def findRequestFilters(context: FacadeRequestContext, request: FacadeRequest): Seq[RequestFilter] = {
+  def findRequestFilters(request: FacadeRequest): Seq[RequestFilter] = {
     requestOrEventFilters(request.uri.pattern.specific, request.method, request.contentType).requestFilters
   }
 
-  def findResponseFilters(context: FacadeRequestContext, response: FacadeResponse): Seq[ResponseFilter] = {
-    context.prepared match {
-      case Some(r) ⇒
-        val method = r.requestMethod
-        val result = filtersOrMethod(r.requestUri.pattern.specific, method) match {
-          case Left(filters) ⇒
-            filters
+  def findResponseFilters(preparedRequestContext: PreparedRequestContext, response: FacadeResponse): Seq[ResponseFilter] = {
+    val method = preparedRequestContext.requestMethod
+    val result = filtersOrMethod(preparedRequestContext.requestUri.pattern.specific, method) match {
+      case Left(filters) ⇒
+        filters
 
-          case Right(resourceMethod) ⇒
-            resourceMethod.responses.get(response.status) match {
-              case Some(responses) ⇒
-                responses.ramlContentTypes.get(response.clientContentType.map(ContentType)) match { // todo: test this!
-                  case Some(ramlContentType) ⇒
-                    ramlContentType.filters
-                  case None ⇒
-                    resourceMethod.methodFilters
-                }
+      case Right(resourceMethod) ⇒
+        resourceMethod.responses.get(response.status) match {
+          case Some(responses) ⇒
+            responses.ramlContentTypes.get(response.clientContentType.map(ContentType)) match {
+              // todo: test this!
+              case Some(ramlContentType) ⇒
+                ramlContentType.filters
               case None ⇒
                 resourceMethod.methodFilters
             }
+          case None ⇒
+            resourceMethod.methodFilters
         }
-        result.responseFilters
-      case None ⇒
-        Seq.empty
     }
+    result.responseFilters
   }
 
-  def findEventFilters(context: FacadeRequestContext, event: FacadeRequest): Seq[EventFilter] = {
+  def findEventFilters(preparedRequestContext: PreparedRequestContext, event: FacadeRequest): Seq[EventFilter] = {
     val uri = event.uri.pattern.specific
     val methodName = if (event.method.startsWith("feed:")) event.method.substring(5) else event.method
     requestOrEventFilters(uri, methodName, event.contentType).eventFilters

@@ -18,16 +18,6 @@ class RewriteRequestFilter(val args: rewrite) extends RequestFilter {
 
 class RewriteEventFilter extends EventFilter {
   override def apply(context: FacadeRequestContext, event: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
-    context.prepared match {
-      case Some(preparedContext) ⇒
-        if (preparedContext.requestUri.formatted == event.uri.formatted)
-          Future(event)
-        else
-          rewrite(context, event)
-    }
-  }
-
-  def rewrite(context: FacadeRequestContext, event: FacadeRequest): Future[Nothing] = {
     val rewrittenUri = UriTransformer.rewriteOneStepBack(context.method)(event.uri)
     val rewrittenEvent = event.copy(
       uri = rewrittenUri

@@ -1,10 +1,7 @@
 package eu.inn.facade.raml
 
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
-import eu.inn.facade.filter.raml.RewriteEventFilterFactory
-import eu.inn.facade.model.{RamlFilterFactory, RamlTarget, TargetMethod, TargetResource}
-import eu.inn.facade.raml.annotationtypes.rewrite
-import eu.inn.hyperbus.transport.api.uri.Uri
+import eu.inn.facade.model.{RamlFilterFactory, TargetMethod, TargetResource}
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector, StringIdentifier}
 
@@ -93,8 +90,8 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
         val ident = StringIdentifier(annotation.name)
         inj.getBinding(List(ident)) match {
           case Some(_) ⇒
-            if (annotation.name == Annotation.REWRITE)
-              injectInvertedRewriteFilters(target)
+            //if (annotation.name == Annotation.REWRITE)
+            //  injectInvertedRewriteFilters(target)
             val filterFactory = inject[RamlFilterFactory](annotation.name)
             filterFactory.createFilterChain(target)
 
@@ -111,7 +108,7 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
     }
   }
 
-  def injectInvertedRewriteFilters(target: RamlTarget): Unit = {
+/*  def injectInvertedRewriteFilters(target: RamlTarget): Unit = {
     val rewriteEventFilters = inject[RewriteEventFilterFactory].createFilterChain(target)
     val rewriteAnnotation = target match {
       case TargetMethod(_, _, annotation) ⇒ annotation
@@ -144,7 +141,7 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
       case None ⇒
         None
     }
-  }
+  }*/
 }
 
 class InvalidRamlConfigException(message: String) extends Exception(message)

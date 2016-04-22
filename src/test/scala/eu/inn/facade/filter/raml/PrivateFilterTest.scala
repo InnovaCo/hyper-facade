@@ -30,7 +30,7 @@ class PrivateFilterTest extends FreeSpec with Matchers with ScalaFutures  with I
         )
       )
 
-      val context = mockContext(request).prepare(request)
+      val context = mockContext(request).prepareNext(request)
       val filteredResponse = ramlFilters.filterResponse(context, response).futureValue
       val fields = filteredResponse.body.asMap
       val valueSubFields = fields("value").asMap

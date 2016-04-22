@@ -1,6 +1,5 @@
 package eu.inn.facade.model
 
-import eu.inn.facade.raml.RewriteIndex
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.MessagingContextFactory
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -12,7 +11,7 @@ case class FacadeRequestContext(
                                  pathAndQuery: String,
                                  method: String,
                                  requestHeaders: Map[String, Seq[String]],
-                                 prepared: Option[PreparedRequestContext]
+                                 prepared: Seq[PreparedRequestContext]
                                )
 {
   def clientCorrelationId: Option[String] = {
@@ -24,8 +23,8 @@ case class FacadeRequestContext(
     MessagingContextFactory.withCorrelationId(clientCorrelationId.getOrElse(IdGenerator.create()))
   }
 
-  def prepare(request: FacadeRequest) = copy(
-    prepared = Some(PreparedRequestContext(request.uri, request.method, request.headers))
+  def prepareNext(request: FacadeRequest) = copy(
+    prepared = Seq(PreparedRequestContext(request.uri, request.method, request.headers))
   )
 }
 
@@ -41,7 +40,7 @@ object FacadeRequestContext {
       facadeRequest.headers ++ httpRequest.headers.groupBy(_.name).map { kv ⇒
         kv._1 → kv._2.map(_.value)
       },
-      None
+      Seq.empty
     )
   }
 }
