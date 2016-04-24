@@ -2,16 +2,14 @@ package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{ObjV, Text}
 import eu.inn.facade.MockContext
-import eu.inn.facade.model.{FacadeRequest, FilterRestartException}
+import eu.inn.facade.model.FacadeRequest
 import eu.inn.facade.raml._
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
-import scala.concurrent.Await
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
 
 class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with BeforeAndAfterAll with MockContext {
 
@@ -35,10 +33,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       )
 
       val requestContext = mockContext(request)
-
-      val restartException = intercept[FilterRestartException]{
-        Await.result(filter.apply(requestContext, request), 10.seconds)
-      }
+      val filteredRequest = filter.apply(requestContext, request).futureValue
 
       val expectedRequest = FacadeRequest(
         Uri("/rewritten/some-service"),
@@ -46,7 +41,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         Map.empty,
         Map("field" → Text("value")))
 
-      restartException.facadeRequest shouldBe expectedRequest
+      filteredRequest shouldBe expectedRequest
     }
 
     "rewrite with arguments" in {
@@ -62,9 +57,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       )
 
       val requestContext = mockContext(request)
-      val restartException = intercept[FilterRestartException]{
-        Await.result(filter.apply(requestContext, request), 10.seconds)
-      }
+      val filteredRequest = filter.apply(requestContext, request).futureValue
 
       val expectedRequest = FacadeRequest(
         Uri("/test-rewrite/some-service/100500"),
@@ -73,7 +66,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
         ObjV("field" → "value")
       )
 
-      restartException.facadeRequest shouldBe expectedRequest
+      filteredRequest shouldBe expectedRequest
     }
 
     "rewrite links" in {
@@ -86,13 +79,11 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       )
       val requestContext = mockContext(request)
 
-      val restartException = intercept[FilterRestartException]{
-        Await.result(filter.apply(requestContext, request), 10.seconds)
-      }
+      val filteredRequest = filter.apply(requestContext, request).futureValue
       val expectedRequest = FacadeRequest(
         Uri("/rewritten/some-service"), Method.POST, Map.empty, ObjV("field" → "content"))
 
-      restartException.facadeRequest shouldBe expectedRequest
+      filteredRequest shouldBe expectedRequest
     }
   }
 }

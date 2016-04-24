@@ -5,6 +5,7 @@ import eu.inn.hyperbus.transport.api.matchers.Specific
 import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
 import spray.http.Uri.Path
 
+
 object UriTransformer {
 
   def rewriteToOriginal(from: Uri): Uri = {
@@ -25,7 +26,7 @@ object UriTransformer {
     }
   }
 
-  def rewriteOneStepBack(method: String)(from: Uri): Uri = {
+  /*def rewriteOneStepBack(method: String)(from: Uri): Uri = {
     RewriteIndexHolder.rewriteIndex.findNextBack(from, Some(method)) match {
       case Some(foundUri) ⇒
         Uri(rewrite(from, foundUri).formatted)
@@ -36,7 +37,7 @@ object UriTransformer {
 
   def rewriteOneStepForward(from: Uri, toUri: String): Uri = {
     Uri(rewrite(from, Uri(toUri)).formatted)
-  }
+  }*/
 
   def rewriteForward(from: Uri): Uri = {
     if (spray.http.Uri(from.pattern.specific).scheme.nonEmpty)
@@ -76,7 +77,7 @@ object UriTransformer {
       uri
   }
 
-  private def rewrite(from: Uri, to: Uri): Uri = {
+  def rewrite(from: Uri, to: Uri): Uri = {
     val toUriPath = to.pattern.specific
     val toUriParams = UriParser.extractParameters(to.pattern.specific)
     val newArgs = toUriParams flatMap { uriParameter ⇒
@@ -84,7 +85,13 @@ object UriTransformer {
         case Some(matcher) ⇒
           Some(uriParameter → matcher)
         case None ⇒
-          throw new IllegalArgumentException(s"No parameter argument specified for $uriParameter on $from")
+          to.args.get(uriParameter) match {
+            case Some(matcher) ⇒
+              Some(uriParameter → matcher)
+
+            case None ⇒
+              throw new IllegalArgumentException(s"No parameter argument specified for $uriParameter on $from")
+          }
       }
     }
     Uri(Specific(toUriPath), newArgs.toMap)

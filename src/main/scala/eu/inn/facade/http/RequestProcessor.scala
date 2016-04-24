@@ -14,11 +14,6 @@ import scaldi.{Injectable, Injector}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
-case class FacadeRequestWithContext(
-                                   context: FacadeRequestContext,
-                                   request: FacadeRequest
-                                   )
-
 trait RequestProcessor extends Injectable {
   def log: Logger
   implicit def injector: Injector
@@ -30,42 +25,43 @@ trait RequestProcessor extends Injectable {
   val afterFilterChain = inject[FilterChain]("afterFilterChain")
   val maxRestarts = 5 // todo: move to config
 
-  def processRequestToFacade(requestContext: FacadeRequestContext, request: FacadeRequest): Future[FacadeResponse] = {
-    beforeFilterChain.filterRequest(requestContext, request) flatMap { unpreparedRequest ⇒
-      val fctX = prepareContextAndRequestBeforeRaml(requestContext, unpreparedRequest)
-      processRequestWithRaml(fctX) flatMap { fct ⇒
-        hyperbus <~ fct.request.toDynamicRequest recover {
-          handleHyperbusExceptions(fct.context)
+  def processRequestToFacade(fct: FCT): Future[FacadeResponse] = {
+    beforeFilterChain.filterRequest(fct.context, fct.request) flatMap { unpreparedRequest ⇒
+      val fctX = prepareContextAndRequestBeforeRaml(fct.context, unpreparedRequest)
+      processRequestWithRaml(fctX) flatMap { fctY ⇒
+        hyperbus <~ fctY.request.toDynamicRequest recover {
+          handleHyperbusExceptions(fctY.context)
         } flatMap { response ⇒
-          FutureUtils.chain(FacadeResponse(response), fct.context.stages.map { stage ⇒
-            ramlFilterChain.filterResponse(fct.context, stage, _ : FacadeResponse)
+          FutureUtils.chain(FacadeResponse(response), fctY.stages.map { stage ⇒
+            ramlFilterChain.filterResponse(fctY.context, _ : FacadeResponse)
           }) flatMap { r ⇒
-            afterFilterChain.filterResponse(fct.context, fct.context.stages.head, r)
+            afterFilterChain.filterResponse(fctY.context, r)
           }
         }
       }
-    } recover handleFilterExceptions(requestContext) { response ⇒
+    } recover handleFilterExceptions(fct.context) { response ⇒
       response
     }
   }
 
   def processRequestWithRaml(fct: FCT): Future[FCT] = {
-    if (fct.context.stages.size > maxRestarts) {
+    if (fct.stages.size > maxRestarts) {
       Future.failed(
-        new RestartLimitReachedException(fct.context.stages.size, maxRestarts)
+        new RestartLimitReachedException(fct.stages.size, maxRestarts)
       )
     }
     else {
-      ramlFilterChain.filterRequest(fct.context, fct.request) map { filteredRequest ⇒
-        FCT(fct.context, filteredRequest)
-      } recoverWith {
-        case e: FilterRestartException ⇒
+      ramlFilterChain.filterRequest(fct.context, fct.request) flatMap { filteredRequest ⇒
+        if (filteredRequest.uri.pattern == fct.request.uri.pattern) {
+          Future.successful(fct.copy(request = filteredRequest))
+        } else {
           if (log.isDebugEnabled) {
-            log.debug(s"Request ${fct.context} is restarted from ${fct.request} to ${e.facadeRequest}")
+            log.debug(s"Request ${fct.context} is restarted from ${fct.request} to $filteredRequest")
           }
-          val templatedRequest = withTemplatedUri(e.facadeRequest)
-          val fctNew = FCT(fct.context.withNextStage(templatedRequest), templatedRequest)
+          val templatedRequest = withTemplatedUri(filteredRequest)
+          val fctNew = fct.withNextStage(templatedRequest)
           processRequestWithRaml(fctNew)
+        }
       }
     }
   }
@@ -92,7 +88,7 @@ trait RequestProcessor extends Injectable {
   def prepareContextAndRequestBeforeRaml(requestContext: FacadeRequestContext, request: FacadeRequest) = {
     val ramlParsedUri = ramlConfig.resourceUri(request.uri.pattern.specific)
     val facadeRequestWithRamlUri = request.copy(uri = ramlParsedUri)
-    val preparedContext = requestContext.withNextStage(facadeRequestWithRamlUri)
+    val preparedContext = requestContext.prepareNext(facadeRequestWithRamlUri)
     FCT(preparedContext, facadeRequestWithRamlUri)
   }
 

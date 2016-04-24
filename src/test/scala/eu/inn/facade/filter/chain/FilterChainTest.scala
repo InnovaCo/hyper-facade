@@ -34,7 +34,8 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures with Mock
   }
 
   class TestResponseFilter extends ResponseFilter {
-    override def apply(context: FacadeRequestContext, output: FacadeResponse)(implicit ec: ExecutionContext): Future[FacadeResponse] = {
+    override def apply(context: FacadeRequestContext, stage: RequestStage, output: FacadeResponse)
+                      (implicit ec: ExecutionContext): Future[FacadeResponse] = {
       if (output.headers.nonEmpty) {
         Future(output)
       }

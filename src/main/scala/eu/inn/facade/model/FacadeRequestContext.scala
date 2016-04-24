@@ -11,7 +11,7 @@ case class FacadeRequestContext(
                                  pathAndQuery: String,
                                  method: String,
                                  requestHeaders: Map[String, Seq[String]],
-                                 stages: Seq[RequestStage]
+                                 prepared: Seq[PreparedRequestContext]
                                )
 {
   def clientCorrelationId: Option[String] = {
@@ -23,8 +23,8 @@ case class FacadeRequestContext(
     MessagingContextFactory.withCorrelationId(clientCorrelationId.getOrElse(IdGenerator.create()))
   }
 
-  def withNextStage(request: FacadeRequest) = copy(
-    stages = Seq(RequestStage(request.uri, request.method, request.headers)) ++ stages
+  def prepareNext(request: FacadeRequest) = copy(
+    prepared = Seq(PreparedRequestContext(request.uri, request.method, request.headers))
   )
 }
 
@@ -45,11 +45,21 @@ object FacadeRequestContext {
   }
 }
 
+case class PreparedRequestContext(
+                                   requestUri: Uri,
+                                   requestMethod: String,
+                                   requestHeaders: Map[String, Seq[String]]
+                                 )
+
 case class RequestStage(
-                       requestUri: Uri,
-                       requestMethod: String,
-                       requestHeaders: Map[String, Seq[String]]
+                         requestUri: Uri,
+                         requestMethod: String
                        )
 
 // todo: name
-case class FCT(context: FacadeRequestContext, request: FacadeRequest)
+case class FCT(context: FacadeRequestContext, stages: Seq[RequestStage], request: FacadeRequest) {
+  def withNextStage(nextRequest: FacadeRequest): FCT = copy(
+    stages = Seq(RequestStage(nextRequest.uri, nextRequest.method)) ++ stages,
+    request = nextRequest
+  )
+}
