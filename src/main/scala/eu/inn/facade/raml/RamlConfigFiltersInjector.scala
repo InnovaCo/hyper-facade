@@ -1,10 +1,7 @@
 package eu.inn.facade.raml
 
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
-import eu.inn.facade.filter.raml.RewriteEventFilterFactory
-import eu.inn.facade.model.{RamlFilterFactory, RamlTarget, TargetMethod, TargetResource}
-import eu.inn.facade.raml.annotationtypes.rewrite
-import eu.inn.hyperbus.transport.api.uri.Uri
+import eu.inn.facade.model.{RamlFilterFactory, TargetMethod, TargetResource}
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector, StringIdentifier}
 
@@ -93,8 +90,6 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
         val ident = StringIdentifier(annotation.name)
         inj.getBinding(List(ident)) match {
           case Some(_) ⇒
-            if (annotation.name == Annotation.REWRITE)
-              injectInvertedRewriteFilters(target)
             val filterFactory = inject[RamlFilterFactory](annotation.name)
             filterFactory.createFilterChain(target)
 
@@ -108,41 +103,6 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
           log.error(s"Can't inject filter for $annotation", e)
           filterChain
       }
-    }
-  }
-
-  def injectInvertedRewriteFilters(target: RamlTarget): Unit = {
-    val rewriteEventFilters = inject[RewriteEventFilterFactory].createFilterChain(target)
-    val rewriteAnnotation = target match {
-      case TargetMethod(_, _, annotation) ⇒ annotation
-      case TargetResource(_, annotation) ⇒ annotation
-    }
-    val uri = rewriteAnnotation.value.get.asInstanceOf[rewrite].getUri
-    resourcesByUri.get(uri) match {
-      case Some(resourceConfig) ⇒
-        val updatedResourceConfig = resourceConfig.copy(
-          filters = rewriteEventFilters
-        )
-        resourcesWithFilters += uri → updatedResourceConfig
-      case None ⇒
-        matchByUri(uri, resourcesByUri) match {
-          case Some((rewrittenUri, resourceConfig)) ⇒
-            val updatedResourceConfig = resourceConfig.copy(
-              filters = rewriteEventFilters
-            )
-            resourcesWithFilters += rewrittenUri → updatedResourceConfig
-        }
-    }
-  }
-
-  def matchByUri(uri: String, resourcesByUri: Map[String, ResourceConfig]): Option[(String, ResourceConfig)] = {
-    val uris = resourcesByUri.keySet - uri
-    UriMatcher.matchUri(Uri(uri), uris.toList) match {
-      case Some(matchedUri) ⇒
-        val matchedUriStr = matchedUri.pattern.specific
-        Some(matchedUriStr, resourcesByUri(matchedUriStr))
-      case None ⇒
-        None
     }
   }
 }

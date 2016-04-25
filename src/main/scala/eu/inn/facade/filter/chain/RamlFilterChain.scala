@@ -20,7 +20,8 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
           case Right(resourceMethod) ⇒
             resourceMethod.responses.get(response.status) match {
               case Some(responses) ⇒
-                responses.ramlContentTypes.get(response.clientContentType.map(ContentType)) match { // todo: test this!
+                responses.ramlContentTypes.get(response.clientContentType.map(ContentType)) match {
+                  // todo: test this!
                   case Some(ramlContentType) ⇒
                     ramlContentType.filters
                   case None ⇒
@@ -31,15 +32,22 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
             }
         }
         result.responseFilters
+
       case None ⇒
         Seq.empty
     }
   }
 
   def findEventFilters(context: FacadeRequestContext, event: FacadeRequest): Seq[EventFilter] = {
-    val uri = event.uri.pattern.specific
-    val methodName = if (event.method.startsWith("feed:")) event.method.substring(5) else event.method
-    requestOrEventFilters(uri, methodName, event.contentType).eventFilters
+    context.prepared match {
+      case Some(r) ⇒
+        val uri = r.requestUri.pattern.specific // event.uri.pattern.specific
+      val methodName = if (event.method.startsWith("feed:")) event.method.substring(5) else event.method
+        requestOrEventFilters(uri, methodName, event.contentType).eventFilters
+
+      case None ⇒
+        Seq.empty
+    }
   }
 
   private def requestOrEventFilters(uri: String, method: String, contentType: Option[String]): SimpleFilterChain = {

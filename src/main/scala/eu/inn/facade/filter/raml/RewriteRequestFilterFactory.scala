@@ -17,17 +17,6 @@ class RewriteRequestFilterFactory extends RamlFilterFactory {
     SimpleFilterChain(
       requestFilters = Seq(new RewriteRequestFilter(rewriteArgs)),
       responseFilters = Seq.empty,
-      eventFilters = Seq.empty
-    )
-  }
-}
-
-class RewriteEventFilterFactory extends RamlFilterFactory {
-
-  override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
-    SimpleFilterChain(
-      requestFilters = Seq.empty,
-      responseFilters = Seq.empty,
       eventFilters = Seq(new RewriteEventFilter)
     )
   }

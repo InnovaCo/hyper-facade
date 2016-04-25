@@ -15,12 +15,13 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpWsRequestFilter(config: Config) extends RequestFilter {
+  val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
 
   override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer = chain(removeRootPathPrefix(rootPathPrefix), rewriteForward)
+      val uriTransformer = chain(removeRootPathPrefix(rootPathPrefix), rewriteLinkForward(_: Uri, rewriteCountLimit))
       val httpUri = spray.http.Uri(request.uri.pattern.specific)
       val requestUri = removeRootPathPrefix(rootPathPrefix)(Uri(Specific(httpUri.path.toString)))
 

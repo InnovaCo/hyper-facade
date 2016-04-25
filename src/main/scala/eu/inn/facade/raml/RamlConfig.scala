@@ -11,9 +11,10 @@ class RamlConfig(
     traits(uriPattern, method).map(foundTrait ⇒ foundTrait.name).distinct
   }
 
-  def resourceUri(requestUriString: String): Uri = {
-    val requestUri = Uri(requestUriString)
-    UriMatcher.matchUri(requestUri, uris).getOrElse(requestUri)
+  def resourceUri(requestUri: Uri): Uri = {
+    //todo: lookup in map instead of sequence!
+    val formattedUri = Uri(requestUri.formatted)
+    UriMatcher.matchUri(formattedUri, uris).getOrElse(requestUri)
   }
 
   private def traits(uriPattern: String, method: String): Seq[Trait] = {

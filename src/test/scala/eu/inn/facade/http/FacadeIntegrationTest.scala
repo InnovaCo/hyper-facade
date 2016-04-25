@@ -8,7 +8,7 @@ import eu.inn.binders.json._
 import eu.inn.binders.value.{Null, Obj, ObjV, Text}
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest, UriSpecificDeserializer, UriSpecificSerializer}
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.{FeedTestBody, ReliableFeedTestRequest, TestService, UnreliableFeedTestRequest}
+import eu.inn.facade._
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
@@ -295,6 +295,41 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null
       )
+    }
+
+    "websocket: unreliable events feed with rewrite" in {
+      val q = new TestQueue
+      val client = createWsClient("unreliable-rewrite-feed-client", "/status/test-service/{arg}", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/status/test-service/{arg}")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Obj(Map("content" → Text("fullResource-154")))))
+        ).futureValue
+      }
+
+      client ! FacadeRequest(Uri("/test-rewrite-with-args/some-service/100500"), "subscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+        Null
+      )
+
+      val resourceState = q.next().futureValue
+      resourceState should startWith("""{"status":200,"headers":{"Hyperbus-Message-Id":""")
+      resourceState should endWith("""body":{"content":"fullResource-154"}}""")
+
+      testService.publish(UnreliableRewriteFeedTestRequest(
+        "100500",
+        FeedTestBody("haha"),
+        Headers.plain(Map(
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
+      )
+
+      q.next().futureValue shouldBe """{"uri":"/v3/test-rewrite-with-args/some-service/100500","method":"feed:put","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
+
+      client ! FacadeRequest(Uri("/test-rewrite-with-args/some-service/100500"), "unsubscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
     }
 
     "websocket: get request" in {

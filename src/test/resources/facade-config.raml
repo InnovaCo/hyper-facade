@@ -203,6 +203,10 @@ traits:
   (rewrite):
     uri: /status/test-service
 
+/test-rewrite-with-args/some-service/{arg}:
+  (rewrite):
+    uri: /status/test-service/{arg}
+
 /test-rewrite-method/some-service:
   get:
   put:
@@ -223,3 +227,5 @@ traits:
     uri: /revault/content/some-service
 
   /child:
+
+/parent/external-child:

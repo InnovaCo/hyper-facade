@@ -54,5 +54,6 @@ object FacadeConfigPaths {
   val INJECT_MODULES = ROOT + "inject-modules"
   val HTTP = ROOT + "http-transport"
   val SHUTDOWN_TIMEOUT = ROOT + "shutdown-timeout"
-  val MAX_RESUBSCRIPTIONS = ROOT + "max-resubscriptions"
+  val MAX_SUBSCRIPTION_TRIES = ROOT + "max-subscription-tries"
+  val REWRITE_COUNT_LIMIT = ROOT + "rewrite-count-limit"
 }
