@@ -9,9 +9,11 @@ import com.typesafe.config.Config
 import eu.inn.config.ConfigExtenders._
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.hyperbus.Hyperbus
+import eu.inn.metrics.{Metrics, ProcessMetrics}
+import eu.inn.metrics.loaders.MetricsReporterLoader
 import eu.inn.servicecontrol.api.Service
 import org.slf4j.LoggerFactory
-import scaldi.{Injectable, Injector}
+import scaldi.{Injectable, Injector, TypeTagIdentifier}
 import spray.can.server.ServerSettings
 import spray.http._
 import spray.routing._
@@ -20,7 +22,8 @@ import spray.routing.directives.LogEntry
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
-import scala.util.{Failure, Success}
+import scala.util.control.NonFatal
+import scala.util.{Failure, Success, Try}
 
 class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   with Service
@@ -36,6 +39,9 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
 
   val config = inject [Config]
   val restConfig = config.getConfig(FacadeConfigPaths.HTTP)
+  val metrics = inject[Metrics]
+
+  val restConfig = config.getConfig(FacadeConfig.HTTP)
   //val handleErrorsDirectives = inject [HandleErrorsDirectives]
   val shutdownTimeout = config.getFiniteDuration(FacadeConfigPaths.SHUTDOWN_TIMEOUT)
 
@@ -46,6 +52,16 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   val port = restConfig.getInt("port")
 
   def start(initRoutes: ⇒ Route) {
+    import scala.reflect.runtime.universe._
+    inj.getBinding(List(TypeTagIdentifier(typeOf[MetricsReporterLoader]))) match {
+      case Some(_) ⇒
+        inject[MetricsReporterLoader].run()
+        ProcessMetrics.startReporting(metrics)
+
+      case None ⇒
+        log.warn("Metric reporter is not configured.")
+    }
+
     startServer(interface, port, settings = Some(ServerSettings(rootConf))) {
       startWithDirectives(initRoutes)
     } onComplete {
@@ -71,8 +87,8 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   }
 
   override def stopService(controlBreak: Boolean): Unit = {
-    log.info("Stopping HyperBus Facade...")
-    println("Stopping HyperBus Facade...")
+    log.info("Stopping Hyperbus Facade...")
+    println("Stopping Hyperbus Facade...")
     try {
       Await.result(actorSystem.terminate(), shutdownTimeout)
     } catch {
@@ -83,9 +99,9 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
       Await.result(hyperBus.shutdown(shutdownTimeout*4/5), shutdownTimeout)
     } catch {
       case t: Throwable ⇒
-        log.error("HyperBus didn't shutdown gracefully", t)
+        log.error("Hyperbus didn't shutdown gracefully", t)
     }
-    log.info("HyperBus Facade stopped")
+    log.info("Hyperbus Facade stopped")
   }
 
   private def respondWithCORSHeaders(allowedOrigins: Seq[String], allowedPaths: Seq[Pattern] = Nil): Directive0 =

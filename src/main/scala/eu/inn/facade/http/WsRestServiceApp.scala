@@ -4,8 +4,9 @@ import akka.actor._
 import akka.io.{IO, Inet, Tcp}
 import akka.pattern.ask
 import akka.util.Timeout
-import eu.inn.facade.{FacadeConfigPaths, StatsReporterFactory}
+import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.events.SubscriptionsManager
+import eu.inn.facade.metrics.MetricKeys
 import eu.inn.hyperbus.Hyperbus
 import scaldi.{Injectable, Injector}
 import spray.can.Http
@@ -20,9 +21,9 @@ class WsRestServiceApp(implicit inj: Injector)
   extends RestServiceApp
   with Injectable {
 
-  private val stats = inject [StatsReporterFactory].createStats("http")
-  private val connectionCountStat = stats.counter("connection-count")
-  private val rejectedConnectionsMetter = stats.meter("rejected-connects")
+  private val trackActiveConnections = metrics.counter(MetricKeys.ACTIVE_CONNECTIONS)
+  private val rejectedConnectionsMeter = metrics.meter(MetricKeys.REJECTED_CONNECTS)
+
   val hyperbus = inject [Hyperbus]
   val subscriptionsManager = inject [SubscriptionsManager]
 
@@ -50,7 +51,7 @@ class WsRestServiceApp(implicit inj: Injector)
             case Http.Connected(remoteAddress, localAddress) =>
               if (connectionCount >= maxConnectionCount) {
                 sender() ! Http.Register(noMoreConnectionsWorker)
-                rejectedConnectionsMetter.mark()
+                rejectedConnectionsMeter.mark()
               }
               else {
                 val serverConnection = sender()
@@ -65,11 +66,11 @@ class WsRestServiceApp(implicit inj: Injector)
                   ), "wrkr-" + connectionId.toHexString
                 )
                 context.watch(worker)
-                connectionCountStat.inc()
+                trackActiveConnections.inc()
               }
             case Terminated(worker) ⇒
               connectionCount -= 1
-              connectionCountStat.dec()
+              trackActiveConnections.dec()
           }
         }
       },
