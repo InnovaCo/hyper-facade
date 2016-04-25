@@ -10,6 +10,7 @@ import eu.inn.facade.utils.FutureUtils
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.NoTransportRouteException
 import eu.inn.hyperbus.{Hyperbus, IdGenerator, model}
+import eu.inn.metrics.Metrics
 import org.slf4j.Logger
 import scaldi.{Injectable, Injector}
 
@@ -26,6 +27,7 @@ trait RequestProcessor extends Injectable {
   val ramlFilterChain = inject[FilterChain]("ramlFilterChain")
   val afterFilterChain = inject[FilterChain]("afterFilterChain")
   val config = inject[Config]
+  val metrics = inject[Metrics]
   val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
 
   def processRequestToFacade(cwr: ContextWithRequest): Future[FacadeResponse] = {

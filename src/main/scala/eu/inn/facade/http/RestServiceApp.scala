@@ -9,8 +9,8 @@ import com.typesafe.config.Config
 import eu.inn.config.ConfigExtenders._
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.hyperbus.Hyperbus
-import eu.inn.metrics.{Metrics, ProcessMetrics}
 import eu.inn.metrics.loaders.MetricsReporterLoader
+import eu.inn.metrics.{Metrics, ProcessMetrics}
 import eu.inn.servicecontrol.api.Service
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector, TypeTagIdentifier}
@@ -22,8 +22,7 @@ import spray.routing.directives.LogEntry
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext}
-import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   with Service
@@ -34,15 +33,12 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   implicit val executionContext = inject [ExecutionContext]
 
   private val rootConf = inject [Config]
-  private val ErrorHandlerHeader = "X-Errors-Handled"
   val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
 
   val config = inject [Config]
   val restConfig = config.getConfig(FacadeConfigPaths.HTTP)
   val metrics = inject[Metrics]
 
-  val restConfig = config.getConfig(FacadeConfig.HTTP)
-  //val handleErrorsDirectives = inject [HandleErrorsDirectives]
   val shutdownTimeout = config.getFiniteDuration(FacadeConfigPaths.SHUTDOWN_TIMEOUT)
 
   val hyperBus = inject [Hyperbus]  // it's time to initialize hyperbus
@@ -76,7 +72,7 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
 
   def startWithDirectives(initRoutes: ⇒ Route): Route = {
     enableAccessLogIf(restConfig.getBoolean("access-log.enabled")) {
-      addJsonMediaTypeIfNotExists {
+      addJsonMediaTypeIfNotExists() {
         respondWithCORSHeaders(restConfig.getStringList("cors.allowed-origins"), restConfig.getStringList("cors.allowed-paths").map(Pattern.compile)) {
           pathSuffix(Slash.?) {
             initRoutes
@@ -138,7 +134,7 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
       case _ ⇒ noop
     }
 
-  private def addJsonMediaTypeIfNotExists: Directive0 =
+  private def addJsonMediaTypeIfNotExists(): Directive0 =
     mapHttpResponseEntity(_.flatMap {
       case ent if ent.contentType == ContentTypes.`text/plain(UTF-8)` ⇒
         ent.copy(contentType = ContentTypes.`application/json`)
