@@ -117,7 +117,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   def processRequest(requestContext: FacadeRequestContext, facadeRequest: FacadeRequest) = {
     val key = facadeRequest.clientCorrelationId.get
     val actorName = "Subscr-" + key
-    val requestWithContext = FacadeRequestWithContext(requestContext, facadeRequest)
+    val requestWithContext = ContextWithRequest(requestContext, facadeRequest)
     context.child(actorName) match {
       case Some(actor) ⇒ actor.forward(requestWithContext)
       case None ⇒ context.actorOf(FeedSubscriptionActor.props(self, hyperbus, subscriptionManager), actorName) ! requestWithContext

@@ -8,7 +8,7 @@ import scala.concurrent.{ExecutionContext, Future}
 trait FilterChain {
   def filterRequest(context: FacadeRequestContext, request: FacadeRequest)
                    (implicit ec: ExecutionContext): Future[FacadeRequest] = {
-    FutureUtils.chain(request, findRequestFilters(context, request).map(f ⇒ f.apply(context, _ : FacadeRequest)))
+    FutureUtils.chain(request, findRequestFilters(request).map(f ⇒ f.apply(context, _ : FacadeRequest)))
   }
 
   def filterResponse(context: FacadeRequestContext, response: FacadeResponse)
@@ -22,7 +22,7 @@ trait FilterChain {
     FutureUtils.chain(event, findEventFilters(context, event).map(f ⇒ f.apply(context, _ : FacadeRequest)))
   }
 
-  def findRequestFilters(context: FacadeRequestContext, request: FacadeRequest): Seq[RequestFilter]
+  def findRequestFilters(request: FacadeRequest): Seq[RequestFilter]
   def findResponseFilters(context: FacadeRequestContext, response: FacadeResponse): Seq[ResponseFilter]
   def findEventFilters(context: FacadeRequestContext, event: FacadeRequest): Seq[EventFilter]
 }

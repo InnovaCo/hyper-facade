@@ -71,8 +71,7 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
             )
         )
       )
-      val context = mockContext(request).prepare(request)
-
+      val context = mockContext(request)
       val enrichedRequest = ramlFilters.filterRequest(context, request).futureValue
       val fields = enrichedRequest.body.asMap
       val valueSubFields = fields("value").asMap

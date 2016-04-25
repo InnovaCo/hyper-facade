@@ -1,6 +1,5 @@
 package eu.inn.facade.model
 
-import eu.inn.facade.raml.RewriteIndex
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.MessagingContextFactory
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -24,7 +23,7 @@ case class FacadeRequestContext(
     MessagingContextFactory.withCorrelationId(clientCorrelationId.getOrElse(IdGenerator.create()))
   }
 
-  def prepare(request: FacadeRequest) = copy(
+  def prepareNext(request: FacadeRequest) = copy(
     prepared = Some(PreparedRequestContext(request.uri, request.method, request.headers))
   )
 }
@@ -46,8 +45,28 @@ object FacadeRequestContext {
   }
 }
 
+// todo: better name?
 case class PreparedRequestContext(
                                    requestUri: Uri,
                                    requestMethod: String,
                                    requestHeaders: Map[String, Seq[String]]
                                  )
+
+// todo: better name?
+case class RequestStage(
+                         requestUri: Uri,
+                         requestMethod: String
+                       )
+
+// todo: better name?
+case class ContextWithRequest(context: FacadeRequestContext, stages: Seq[RequestStage], request: FacadeRequest) {
+  def withNextStage(nextRequest: FacadeRequest): ContextWithRequest = copy(
+    context = context.prepareNext(nextRequest),
+    stages = Seq(RequestStage(nextRequest.uri, nextRequest.method)) ++ stages,
+    request = nextRequest
+  )
+}
+
+object ContextWithRequest {
+  def apply(context: FacadeRequestContext, request: FacadeRequest): ContextWithRequest = new ContextWithRequest(context, Seq.empty, request)
+}

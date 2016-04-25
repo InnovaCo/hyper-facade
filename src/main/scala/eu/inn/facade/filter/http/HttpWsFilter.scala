@@ -15,11 +15,13 @@ import spray.http.HttpHeaders
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpWsResponseFilter(config: Config) extends ResponseFilter {
+  val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
+
   override def apply(context: FacadeRequestContext, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer = chain(rewriteToOriginal, addRootPathPrefix(rootPathPrefix))
+      val uriTransformer = chain(rewriteLinkToOriginal(_: Uri,rewriteCountLimit), addRootPathPrefix(rootPathPrefix))
       val (newHeaders, newBody) = HttpWsFilter.filterMessage(response, uriTransformer)
       response.copy(
         headers = newHeaders,
@@ -30,11 +32,12 @@ class HttpWsResponseFilter(config: Config) extends ResponseFilter {
 }
 
 class WsEventFilter(config: Config) extends EventFilter {
+  val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
   override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer = chain(rewriteToOriginal, addRootPathPrefix(rootPathPrefix))
+      val uriTransformer = chain(rewriteLinkToOriginal(_: Uri,rewriteCountLimit), addRootPathPrefix(rootPathPrefix))
       val (newHeaders, newBody) = HttpWsFilter.filterMessage(request, uriTransformer)
       request.copy(
         uri = uriTransformer(Uri(request.uri.formatted)),

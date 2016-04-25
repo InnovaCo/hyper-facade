@@ -7,15 +7,15 @@ import scala.collection.immutable.SortedMap
 case class IndexKey(uri: String, method: Option[Method])
 
 case class RewriteIndex(inverted: Map[IndexKey, String], forward: Map[IndexKey, String]) {
-  def findNextForward(uri: Uri, requestMethod: Option[String]): Option[Uri] = {
-    findNext(uri, requestMethod, forward)
+  def findRewriteForward(uri: Uri, requestMethod: Option[String]): Option[Uri] = {
+    findRewrite(uri, requestMethod, forward)
   }
 
-  def findNextBack(uri: Uri, requestMethod: Option[String]): Option[Uri] = {
-    findNext(uri, requestMethod, inverted)
+  def findRewriteBackward(uri: Uri, requestMethod: Option[String]): Option[Uri] = {
+    findRewrite(uri, requestMethod, inverted)
   }
 
-  private def findNext(uri: Uri, requestMethod: Option[String], index: Map[IndexKey, String]): Option[Uri] = {
+  private def findRewrite(uri: Uri, requestMethod: Option[String], index: Map[IndexKey, String]): Option[Uri] = {
     val method = requestMethod match {
       case Some(m) ⇒ Some(Method(m))
       case None ⇒ None
