@@ -28,70 +28,51 @@ trait RequestProcessor extends Injectable {
   val config = inject[Config]
   val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
 
-  def processRequestToFacade(fct: FCT): Future[FacadeResponse] = {
-    beforeFilterChain.filterRequest(fct.context, fct.request) flatMap { unpreparedRequest ⇒
-      val fctX = prepareContextAndRequestBeforeRaml(fct, unpreparedRequest)
-      processRequestWithRaml(fctX) flatMap { fctY ⇒
-        hyperbus <~ fctY.request.toDynamicRequest recover {
-          handleHyperbusExceptions(fctY.context)
+  def processRequestToFacade(cwr: ContextWithRequest): Future[FacadeResponse] = {
+    beforeFilterChain.filterRequest(cwr.context, cwr.request) flatMap { unpreparedRequest ⇒
+      val cwrBeforeRaml = prepareContextAndRequestBeforeRaml(cwr, unpreparedRequest)
+      processRequestWithRaml(cwrBeforeRaml) flatMap { cwrRaml ⇒
+        hyperbus <~ cwrRaml.request.toDynamicRequest recover {
+          handleHyperbusExceptions(cwrRaml)
         } flatMap { response ⇒
-          FutureUtils.chain(FacadeResponse(response), fctY.stages.map { stage ⇒
-            ramlFilterChain.filterResponse(fctY.context, _ : FacadeResponse)
+          FutureUtils.chain(FacadeResponse(response), cwrRaml.stages.map { stage ⇒
+            ramlFilterChain.filterResponse(cwrRaml.context, _ : FacadeResponse)
           }) flatMap { r ⇒
-            afterFilterChain.filterResponse(fctY.context, r)
+            afterFilterChain.filterResponse(cwrRaml.context, r)
           }
         }
       }
-    } recover handleFilterExceptions(fct.context) { response ⇒
+    } recover handleFilterExceptions(cwr) { response ⇒
       response
     }
   }
 
-  def processRequestWithRaml(fct: FCT): Future[FCT] = {
-    if (fct.stages.size > rewriteCountLimit) {
+  def processRequestWithRaml(cwr: ContextWithRequest): Future[ContextWithRequest] = {
+    if (cwr.stages.size > rewriteCountLimit) {
       Future.failed(
-        new RestartLimitReachedException(fct.stages.size, rewriteCountLimit)
+        new RestartLimitReachedException(cwr.stages.size, rewriteCountLimit)
       )
     }
     else {
-      ramlFilterChain.filterRequest(fct.context, fct.request) flatMap { filteredRequest ⇒
-        if (filteredRequest.uri.pattern == fct.request.uri.pattern) {
-          Future.successful(fct.copy(request = filteredRequest))
+      ramlFilterChain.filterRequest(cwr.context, cwr.request) flatMap { filteredRequest ⇒
+        if (filteredRequest.uri.pattern == cwr.request.uri.pattern) {
+          Future.successful(cwr.copy(request = filteredRequest))
         } else {
           if (log.isDebugEnabled) {
-            log.debug(s"Request ${fct.context} is restarted from ${fct.request} to $filteredRequest")
+            log.debug(s"Request ${cwr.context} is restarted from ${cwr.request} to $filteredRequest")
           }
           val templatedRequest = withTemplatedUri(filteredRequest)
-          val fctNew = fct.withNextStage(templatedRequest)
-          processRequestWithRaml(fctNew)
+          val cwrNext = cwr.withNextStage(templatedRequest)
+          processRequestWithRaml(cwrNext)
         }
       }
     }
   }
 
-
-  /*def processEventWithRaml(requestContext: FacadeRequestContext, facadeRequest: FacadeRequest, tryNum: Int): Future[FacadeRequest] = {
-    if (tryNum > maxRestarts) {
-      Future.failed(
-        new RestartLimitReachedException(tryNum, maxRestarts)
-      )
-    }
-    else {
-      ramlFilterChain.filterEvent(requestContext, facadeRequest) recoverWith {
-        case e : FilterRestartException ⇒
-          if (log.isDebugEnabled) {
-            log.debug(s"Event $requestContext is restarted from $facadeRequest to ${e.facadeRequest}")
-          }
-          val templatedEvent = withTemplatedUri(e.facadeRequest)
-          processEventWithRaml(requestContext, templatedEvent, tryNum + 1)
-      }
-    }
-  }*/
-
-  def prepareContextAndRequestBeforeRaml(fct: FCT, request: FacadeRequest) = {
+  def prepareContextAndRequestBeforeRaml(cwr: ContextWithRequest, request: FacadeRequest) = {
     val ramlParsedUri = ramlConfig.resourceUri(request.uri)
     val facadeRequestWithRamlUri = request.copy(uri = ramlParsedUri)
-    fct.withNextStage(facadeRequestWithRamlUri)
+    cwr.withNextStage(facadeRequestWithRamlUri)
   }
 
   def withTemplatedUri(request: FacadeRequest): FacadeRequest = {
@@ -99,40 +80,40 @@ trait RequestProcessor extends Injectable {
     request.copy(uri = ramlParsedUri)
   }
 
-  def handleHyperbusExceptions(requestContext: FacadeRequestContext) : PartialFunction[Throwable, Response[DynamicBody]] = {
+  def handleHyperbusExceptions(cwr: ContextWithRequest) : PartialFunction[Throwable, Response[DynamicBody]] = {
     case hyperbusException: HyperbusException[ErrorBody] ⇒
       hyperbusException
 
     case noRoute: NoTransportRouteException ⇒
-      implicit val mcf = requestContext.clientMessagingContext()
-      model.NotFound(ErrorBody("not-found", Some(s"'${requestContext.pathAndQuery}' is not found.")))
+      implicit val mcf = cwr.context.clientMessagingContext()
+      model.NotFound(ErrorBody("not-found", Some(s"'${cwr.context.pathAndQuery}' is not found.")))
 
     case askTimeout: AskTimeoutException ⇒
-      implicit val mcf = requestContext.clientMessagingContext()
+      implicit val mcf = cwr.context.clientMessagingContext()
       val errorId = IdGenerator.create()
-      log.error(s"Timeout #$errorId while handling $requestContext")
-      model.GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${requestContext.pathAndQuery}'"), errorId = errorId))
+      log.error(s"Timeout #$errorId while handling ${cwr.context}")
+      model.GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${cwr.context.pathAndQuery}'"), errorId = errorId))
 
     case NonFatal(nonFatal) ⇒
-      handleInternalError(nonFatal, requestContext)
+      handleInternalError(nonFatal, cwr)
   }
 
-  def handleFilterExceptions[T](requestContext: FacadeRequestContext)(func: FacadeResponse ⇒ T) : PartialFunction[Throwable, T] = {
+  def handleFilterExceptions[T](cwr: ContextWithRequest)(func: FacadeResponse ⇒ T) : PartialFunction[Throwable, T] = {
     case e: FilterInterruptException ⇒
       if (e.getCause != null) {
-        log.error(s"Request execution interrupted: $requestContext", e)
+        log.error(s"Request execution interrupted: ${cwr.context}", e)
       }
       func(e.response)
 
     case NonFatal(nonFatal) ⇒
-      val response = handleInternalError(nonFatal, requestContext)
+      val response = handleInternalError(nonFatal, cwr)
       func(FacadeResponse(response))
   }
 
-  def handleInternalError(exception: Throwable, requestContext: FacadeRequestContext): Response[ErrorBody] = {
-    implicit val mcf = requestContext.clientMessagingContext()
+  def handleInternalError(exception: Throwable, cwr: ContextWithRequest): Response[ErrorBody] = {
+    implicit val mcf = cwr.context.clientMessagingContext()
     val errorId = IdGenerator.create()
-    log.error(s"Exception #$errorId while handling $requestContext", exception)
+    log.error(s"Exception #$errorId while handling ${cwr.context}", exception)
     model.InternalServerError(ErrorBody("internal-server-error", Some(exception.getMessage), errorId = errorId))
   }
 }

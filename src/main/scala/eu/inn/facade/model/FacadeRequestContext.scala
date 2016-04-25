@@ -45,26 +45,28 @@ object FacadeRequestContext {
   }
 }
 
+// todo: better name?
 case class PreparedRequestContext(
                                    requestUri: Uri,
                                    requestMethod: String,
                                    requestHeaders: Map[String, Seq[String]]
                                  )
 
+// todo: better name?
 case class RequestStage(
                          requestUri: Uri,
                          requestMethod: String
                        )
 
-// todo: name
-case class FCT(context: FacadeRequestContext, stages: Seq[RequestStage], request: FacadeRequest) {
-  def withNextStage(nextRequest: FacadeRequest): FCT = copy(
+// todo: better name?
+case class ContextWithRequest(context: FacadeRequestContext, stages: Seq[RequestStage], request: FacadeRequest) {
+  def withNextStage(nextRequest: FacadeRequest): ContextWithRequest = copy(
     context = context.prepareNext(nextRequest),
     stages = Seq(RequestStage(nextRequest.uri, nextRequest.method)) ++ stages,
     request = nextRequest
   )
 }
 
-object FCT {
-  def apply(context: FacadeRequestContext, request: FacadeRequest): FCT = new FCT(context, Seq.empty, request)
+object ContextWithRequest {
+  def apply(context: FacadeRequestContext, request: FacadeRequest): ContextWithRequest = new ContextWithRequest(context, Seq.empty, request)
 }

@@ -32,7 +32,7 @@ class HttpWorker(implicit val injector: Injector) extends RequestProcessor {
         request,
         facadeRequest
       )
-    processRequestToFacade(FCT(requestContext, facadeRequest)) map { response ⇒
+    processRequestToFacade(ContextWithRequest(requestContext, facadeRequest)) map { response ⇒
       response.toHttpResponse
     }
   }
