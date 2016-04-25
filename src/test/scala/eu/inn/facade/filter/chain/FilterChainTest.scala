@@ -34,7 +34,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures with Mock
   }
 
   class TestResponseFilter extends ResponseFilter {
-    override def apply(context: FacadeRequestContext, stage: RequestStage, output: FacadeResponse)
+    override def apply(context: FacadeRequestContext, output: FacadeResponse)
                       (implicit ec: ExecutionContext): Future[FacadeResponse] = {
       if (output.headers.nonEmpty) {
         Future(output)
@@ -78,7 +78,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures with Mock
     val response = FacadeResponse(201, Map.empty, Text("test body"))
 
     val interrupt = intercept[FilterInterruptException] {
-      filterChain.filterResponse(mockContext(request), mockStage(request), response).awaitFuture
+      filterChain.filterResponse(mockContext(request), response).awaitFuture
     }
 
     interrupt.response.body shouldBe Null
@@ -93,7 +93,7 @@ class FilterChainTest extends FreeSpec with Matchers with ScalaFutures with Mock
       Text("test body")
     )
 
-    val filteredResponse = filterChain.filterResponse(mockContext(request), mockStage(request), response).futureValue
+    val filteredResponse = filterChain.filterResponse(mockContext(request), response).futureValue
 
     filteredResponse.body shouldBe Text("test body")
     filteredResponse.headers shouldBe Map("contentType" → Seq("application/json"), "messageId" → Seq("#12345"), "correlationId" → Seq("#54321"))

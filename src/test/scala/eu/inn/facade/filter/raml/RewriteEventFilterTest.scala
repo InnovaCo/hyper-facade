@@ -21,17 +21,17 @@ class RewriteEventFilterTest extends FreeSpec with Matchers with ScalaFutures wi
     "rewrite links" in {
       val filter = new RewriteEventFilter
 
-      val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
+      val request = FacadeRequest(Uri("/test-rewrite/{service}", Map("service" → "some-service")), Method.GET, Map.empty, Null)
       val event = FacadeRequest(
         Uri("/rewritten/{service}", Map("service" → "some-service")), Method.POST, Map.empty, Null
       )
 
-      val context = mockContext(request.copy(uri=Uri(request.uri.formatted))).withNextStage(request)
+      val context = mockContext(request)
 
-      val filteredEvent = filter.apply(context, context.stages.head, event).futureValue
+      val filteredEvent = filter.apply(context, event).futureValue
 
       val expectedEvent = FacadeRequest(
-        Uri("/test-rewrite/some-service"), Method.POST, Map.empty,Null
+        Uri("/test-rewrite/{service}", Map("service" → "some-service")), Method.POST, Map.empty,Null
       )
 
       filteredEvent shouldBe expectedEvent

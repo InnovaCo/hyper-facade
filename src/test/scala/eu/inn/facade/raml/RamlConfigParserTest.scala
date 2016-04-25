@@ -68,14 +68,17 @@ class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
     }
 
     "request URI substitution" in {
-      val parameterRegularMatch = ramlConfig.resourceUri("/unreliable-feed/someContent")
+      val parameterRegularMatch = ramlConfig.resourceUri(Uri("/unreliable-feed/someContent"))
       parameterRegularMatch shouldBe Uri("/unreliable-feed/{content}", Map("content" → "someContent"))
 
-      val strictUriMatch = ramlConfig.resourceUri("/unreliable-feed/someContent/someDetails")
+      val strictUriMatch = ramlConfig.resourceUri(Uri("/unreliable-feed/someContent/someDetails"))
       strictUriMatch shouldBe Uri("/unreliable-feed/someContent/someDetails")
 
-      val parameterPathMatch = ramlConfig.resourceUri("/reliable-feed/someContent/someDetails")
+      val parameterPathMatch = ramlConfig.resourceUri(Uri("/reliable-feed/someContent/someDetails"))
       parameterPathMatch shouldBe Uri("/reliable-feed/{content:*}", Map("content" → "someContent/someDetails"))
+
+      val parameterArgPathMatch = ramlConfig.resourceUri(Uri("/reliable-feed/someContent/{arg}", Map("arg" → "someDetails")))
+      parameterArgPathMatch shouldBe Uri("/reliable-feed/{content:*}", Map("content" → "someContent/someDetails"))
     }
 
     "filter (annotation) with arguments" in {

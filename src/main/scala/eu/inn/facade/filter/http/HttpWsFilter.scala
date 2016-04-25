@@ -15,7 +15,7 @@ import spray.http.HttpHeaders
 import scala.concurrent.{ExecutionContext, Future}
 
 class HttpWsResponseFilter(config: Config) extends ResponseFilter {
-  override def apply(context: FacadeRequestContext, stage: RequestStage, response: FacadeResponse)
+  override def apply(context: FacadeRequestContext, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
@@ -30,7 +30,7 @@ class HttpWsResponseFilter(config: Config) extends ResponseFilter {
 }
 
 class WsEventFilter(config: Config) extends EventFilter {
-  override def apply(context: FacadeRequestContext, stage: RequestStage, request: FacadeRequest)
+  override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)

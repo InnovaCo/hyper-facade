@@ -11,7 +11,7 @@ case class FacadeRequestContext(
                                  pathAndQuery: String,
                                  method: String,
                                  requestHeaders: Map[String, Seq[String]],
-                                 prepared: Seq[PreparedRequestContext]
+                                 prepared: Option[PreparedRequestContext]
                                )
 {
   def clientCorrelationId: Option[String] = {
@@ -24,7 +24,7 @@ case class FacadeRequestContext(
   }
 
   def prepareNext(request: FacadeRequest) = copy(
-    prepared = Seq(PreparedRequestContext(request.uri, request.method, request.headers))
+    prepared = Some(PreparedRequestContext(request.uri, request.method, request.headers))
   )
 }
 
@@ -40,7 +40,7 @@ object FacadeRequestContext {
       facadeRequest.headers ++ httpRequest.headers.groupBy(_.name).map { kv ⇒
         kv._1 → kv._2.map(_.value)
       },
-      Seq.empty
+      None
     )
   }
 }
@@ -59,7 +59,12 @@ case class RequestStage(
 // todo: name
 case class FCT(context: FacadeRequestContext, stages: Seq[RequestStage], request: FacadeRequest) {
   def withNextStage(nextRequest: FacadeRequest): FCT = copy(
+    context = context.prepareNext(nextRequest),
     stages = Seq(RequestStage(nextRequest.uri, nextRequest.method)) ++ stages,
     request = nextRequest
   )
+}
+
+object FCT {
+  def apply(context: FacadeRequestContext, request: FacadeRequest): FCT = new FCT(context, Seq.empty, request)
 }

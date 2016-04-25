@@ -51,7 +51,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Be
       )
 
       val context = mockContext(request)
-      val filteredResponse = afterFilters.filterResponse(context, context.stages.head, response).futureValue(Timeout(Span(300, Seconds)))
+      val filteredResponse = afterFilters.filterResponse(context, response).futureValue(Timeout(Span(300, Seconds)))
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
       linksMap("some-other1") shouldBe Left(Link(href="/v3/test-rewritten/abc"))
@@ -81,7 +81,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Be
       )
 
       val context = mockContext(request)
-      val filteredEvent = afterFilters.filterEvent(context, context.stages.head, event).futureValue
+      val filteredEvent = afterFilters.filterEvent(context, event).futureValue
       filteredEvent.uri shouldBe Uri("/v3/test")
 
       val linksMap = filteredEvent.body.__links.fromValue[LinksMap] // binders deserialization magic
@@ -107,7 +107,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Be
       )
 
       val context = mockContext(request)
-      val filteredResponse = afterFilters.filterResponse(context, context.stages.head, response).futureValue
+      val filteredResponse = afterFilters.filterResponse(context, response).futureValue
 
       filteredResponse.headers("Location") shouldBe Seq("/v3/test-factory/100500")
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
@@ -150,7 +150,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Be
       )
 
       val context = mockContext(request)
-      val filteredResponse = afterFilters.filterResponse(context, context.stages.head, response).futureValue
+      val filteredResponse = afterFilters.filterResponse(context, response).futureValue
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
 
@@ -211,7 +211,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Be
       )
 
       val context = mockContext(request)
-      val filteredEvent = afterFilters.filterEvent(context, context.stages.head, event).futureValue
+      val filteredEvent = afterFilters.filterEvent(context, event).futureValue
       filteredEvent.uri shouldBe Uri("/v3/test")
 
       val linksMap = filteredEvent.body.__links.fromValue[LinksMap] // binders deserialization magic

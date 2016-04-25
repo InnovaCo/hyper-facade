@@ -60,7 +60,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       val filteredRequest = filter.apply(requestContext, request).futureValue
 
       val expectedRequest = FacadeRequest(
-        Uri("/test-rewrite/some-service/100500"),
+        Uri("/test-rewrite/some-service/{serviceId}", Map("serviceId" → "100500")),
         Method.GET,
         Map.empty,
         ObjV("field" → "value")

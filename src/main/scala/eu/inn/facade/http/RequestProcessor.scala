@@ -27,7 +27,7 @@ trait RequestProcessor extends Injectable {
 
   def processRequestToFacade(fct: FCT): Future[FacadeResponse] = {
     beforeFilterChain.filterRequest(fct.context, fct.request) flatMap { unpreparedRequest ⇒
-      val fctX = prepareContextAndRequestBeforeRaml(fct.context, unpreparedRequest)
+      val fctX = prepareContextAndRequestBeforeRaml(fct, unpreparedRequest)
       processRequestWithRaml(fctX) flatMap { fctY ⇒
         hyperbus <~ fctY.request.toDynamicRequest recover {
           handleHyperbusExceptions(fctY.context)
@@ -85,15 +85,14 @@ trait RequestProcessor extends Injectable {
     }
   }*/
 
-  def prepareContextAndRequestBeforeRaml(requestContext: FacadeRequestContext, request: FacadeRequest) = {
-    val ramlParsedUri = ramlConfig.resourceUri(request.uri.pattern.specific)
+  def prepareContextAndRequestBeforeRaml(fct: FCT, request: FacadeRequest) = {
+    val ramlParsedUri = ramlConfig.resourceUri(request.uri)
     val facadeRequestWithRamlUri = request.copy(uri = ramlParsedUri)
-    val preparedContext = requestContext.prepareNext(facadeRequestWithRamlUri)
-    FCT(preparedContext, facadeRequestWithRamlUri)
+    fct.withNextStage(facadeRequestWithRamlUri)
   }
 
   def withTemplatedUri(request: FacadeRequest): FacadeRequest = {
-    val ramlParsedUri = ramlConfig.resourceUri(request.uri.pattern.specific)
+    val ramlParsedUri = ramlConfig.resourceUri(request.uri)
     request.copy(uri = ramlParsedUri)
   }
 

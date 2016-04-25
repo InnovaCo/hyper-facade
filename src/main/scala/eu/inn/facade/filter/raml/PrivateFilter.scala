@@ -24,7 +24,7 @@ class RequestPrivateFilter(val privateAddresses: PrivateAddresses) extends Reque
 }
 
 class ResponsePrivateFilter(val fields: Seq[Field], val privateAddresses: PrivateAddresses) extends ResponseFilter {
-  override def apply(context: FacadeRequestContext, stage: RequestStage, response: FacadeResponse)
+  override def apply(context: FacadeRequestContext, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       if (isAllowedAddress(context.requestHeaders, privateAddresses)) response
@@ -36,7 +36,7 @@ class ResponsePrivateFilter(val fields: Seq[Field], val privateAddresses: Privat
 }
 
 class EventPrivateFilter(val fields: Seq[Field], val privateAddresses: PrivateAddresses) extends EventFilter {
-  override def apply(context: FacadeRequestContext, stage: RequestStage, response: FacadeRequest)
+  override def apply(context: FacadeRequestContext, response: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       if (isAllowedAddress(context.requestHeaders, privateAddresses)) {
