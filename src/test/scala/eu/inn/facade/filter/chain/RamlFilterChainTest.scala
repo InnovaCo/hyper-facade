@@ -22,7 +22,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
     "resource filter chain" in {
       val request = FacadeRequest(Uri("/private"), "get", Map.empty, Null)
       val context = mockContext(request)
-      val filters = filterChain.findRequestFilters(request)
+      val filters = filterChain.findRequestFilters(context, request)
       filters.length should equal(1)
       filters.head shouldBe a[RequestPrivateFilter]
     }
@@ -30,7 +30,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
     "annotation based filter chain" in {
       val request = FacadeRequest(Uri("/status/test-service"), "get", Map.empty, Null)
       val context = mockContext(request)
-      val filters = filterChain.findRequestFilters(request)
+      val filters = filterChain.findRequestFilters(context, request)
       filters.length should equal(1)
       filters.head shouldBe a[EnrichRequestFilter]
     }
@@ -69,7 +69,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
       val event = FacadeRequest(Uri("/status/test-service"), "feed:put", Map.empty,
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )
-      val requestFilters = filterChain.findRequestFilters(request)
+      val requestFilters = filterChain.findRequestFilters(context, request)
       val eventFilters = filterChain.findEventFilters(context, event)
 
       requestFilters.head shouldBe a[RewriteRequestFilter]
@@ -81,7 +81,8 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
       val event = FacadeRequest(Uri("/status/test-service/100501"), "feed:put", Map.empty,
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )
-      val requestFilters = filterChain.findRequestFilters(request)
+      val context = mockContext(request)
+      val requestFilters = filterChain.findRequestFilters(context, request)
       val eventFilters = filterChain.findEventFilters(mockContext(request), event)
 
       requestFilters.head shouldBe a[RewriteRequestFilter]
@@ -93,7 +94,8 @@ class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with Mo
       val event = FacadeRequest(Uri("/revault/content/{path:*}", Map("path" → "some-service")), "feed:put", Map.empty, Null)
       val notMatchedEvent = FacadeRequest(Uri("/revault/content/{path:*}", Map("path" → "other-service")), "feed:put", Map.empty, Null)
 
-      val requestFilters = filterChain.findRequestFilters(request)
+      val context = mockContext(request)
+      val requestFilters = filterChain.findRequestFilters(context, request)
       val eventFilters = filterChain.findEventFilters(mockContext(request), event)
       val notMatchedEventFilters = filterChain.findEventFilters(mockContext(request), notMatchedEvent)
 
