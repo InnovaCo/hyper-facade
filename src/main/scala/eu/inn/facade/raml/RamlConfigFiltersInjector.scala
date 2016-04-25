@@ -90,8 +90,6 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
         val ident = StringIdentifier(annotation.name)
         inj.getBinding(List(ident)) match {
           case Some(_) ⇒
-            //if (annotation.name == Annotation.REWRITE)
-            //  injectInvertedRewriteFilters(target)
             val filterFactory = inject[RamlFilterFactory](annotation.name)
             filterFactory.createFilterChain(target)
 
@@ -107,41 +105,6 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
       }
     }
   }
-
-/*  def injectInvertedRewriteFilters(target: RamlTarget): Unit = {
-    val rewriteEventFilters = inject[RewriteEventFilterFactory].createFilterChain(target)
-    val rewriteAnnotation = target match {
-      case TargetMethod(_, _, annotation) ⇒ annotation
-      case TargetResource(_, annotation) ⇒ annotation
-    }
-    val uri = rewriteAnnotation.value.get.asInstanceOf[rewrite].getUri
-    resourcesByUri.get(uri) match {
-      case Some(resourceConfig) ⇒
-        val updatedResourceConfig = resourceConfig.copy(
-          filters = rewriteEventFilters
-        )
-        resourcesWithFilters += uri → updatedResourceConfig
-      case None ⇒
-        matchByUri(uri, resourcesByUri) match {
-          case Some((rewrittenUri, resourceConfig)) ⇒
-            val updatedResourceConfig = resourceConfig.copy(
-              filters = rewriteEventFilters
-            )
-            resourcesWithFilters += rewrittenUri → updatedResourceConfig
-        }
-    }
-  }
-
-  def matchByUri(uri: String, resourcesByUri: Map[String, ResourceConfig]): Option[(String, ResourceConfig)] = {
-    val uris = resourcesByUri.keySet - uri
-    UriMatcher.matchUri(Uri(uri), uris.toList) match {
-      case Some(matchedUri) ⇒
-        val matchedUriStr = matchedUri.pattern.specific
-        Some(matchedUriStr, resourcesByUri(matchedUriStr))
-      case None ⇒
-        None
-    }
-  }*/
 }
 
 class InvalidRamlConfigException(message: String) extends Exception(message)

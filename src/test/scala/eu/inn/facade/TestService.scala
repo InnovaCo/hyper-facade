@@ -56,11 +56,7 @@ class TestService(hyperbus: Hyperbus) {
   def publish(request: Request[FeedTestBody]): Future[PublishResult] = {
     hyperbus <| request
   }
-/*
-  def publish(request: UnreliableFeedTestRequest): Future[PublishResult] = {
-    hyperbus <| request
-  }
-*/
+
   def onCommand(matcher: RequestMatcher, response: Response[Body], optionalTestCallback: (DynamicRequest ⇒ Unit) = _ ⇒ ()) = {
     hyperbus.onCommand(matcher) { request: DynamicRequest ⇒
       Future {

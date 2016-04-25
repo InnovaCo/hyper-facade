@@ -27,15 +27,5 @@ class RewriteEventFilter extends EventFilter {
       case None ⇒
         Future.successful(event)
     }
-
-    /*
-
-    val rewrittenUri = UriTransformer.rewrite(event.uri, Uri(args.getUri))
-    //val rewrittenUri = UriTransformer.rewriteOneStepForward(event.uri, args.getUri)
-    val rewrittenEvent = event.copy(
-      uri = rewrittenUri
-    )
-    Future.failed(new FilterRestartException(rewrittenEvent, "rewrite"))
-    */
   }
 }
