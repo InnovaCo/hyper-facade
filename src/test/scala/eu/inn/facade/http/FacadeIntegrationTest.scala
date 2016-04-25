@@ -332,6 +332,50 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
     }
 
+    "websocket: unreliable events feed with rewrite (not matching of request context)" in {
+      val q = new TestQueue
+      val client = createWsClient("unreliable-rewrite-nm-feed-client", "/rewritten-events/{path}", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/rewritten-events/{path:*}")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Obj(Map("content" → Text("rewritten-events-not-matching-context")))))
+        ).futureValue
+      }
+
+      // hacky revault specific event handling
+      client ! FacadeRequest(Uri("/v3/events?page.from="), "subscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")),
+        Null
+      )
+
+      val resourceState = q.next().futureValue
+      resourceState should startWith("""{"status":200,"headers":{"Hyperbus-Message-Id":""")
+      resourceState should endWith("""body":{"content":"rewritten-events-not-matching-context"}}""")
+
+      testService.publish(RewriteOutsideFeedTestRequest(
+        "root/1",
+        DynamicBody(ObjV("content" → "event1")),
+        Headers.plain(Map(
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
+      )
+
+      q.next().futureValue shouldBe """{"uri":"/v3/events/1","method":"feed:put","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["messageId"]},"body":{"content":"event1"}}"""
+
+      testService.publish(RewriteOutsideFeedTestRequest(
+        "root/2",
+        DynamicBody(ObjV("content" → "event2")),
+        Headers.plain(Map(
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
+      )
+
+      q.next().futureValue shouldBe """{"uri":"/v3/events/2","method":"feed:put","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["messageId"]},"body":{"content":"event2"}}"""
+
+      client ! FacadeRequest(Uri("/v3/events"), "unsubscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
+    }
+
     "websocket: get request" in {
       val q = new TestQueue
       val client = createWsClient("get-client", "/status/test-service", q.put)

@@ -235,3 +235,15 @@ traits:
   /child:
 
 /parent/external-child:
+
+
+# Event Rewrite Test Resources
+/events:
+  (rewrite):
+    uri: /rewritten-events/root
+
+/events/{path}:
+  (rewrite):
+    uri: /rewritten-events/root/{path}
+
+/rewritten-events/{path:*}:

@@ -3,6 +3,7 @@ package eu.inn.facade.filter.raml
 import eu.inn.binders.value.Null
 import eu.inn.facade.MockContext
 import eu.inn.facade.model.FacadeRequest
+import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.facade.raml.{Method, RewriteIndexHolder}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
@@ -19,7 +20,7 @@ class RewriteEventFilterTest extends FreeSpec with Matchers with ScalaFutures wi
 
   "RewriteEventFilter" - {
     "rewrite links" in {
-      val filter = new RewriteEventFilter
+      val filter = new RewriteEventFilter(r("/rewritten/{service}"), 10)
 
       val request = FacadeRequest(Uri("/test-rewrite/{service}", Map("service" → "some-service")), Method.GET, Map.empty, Null)
       val event = FacadeRequest(
@@ -36,5 +37,11 @@ class RewriteEventFilterTest extends FreeSpec with Matchers with ScalaFutures wi
 
       filteredEvent shouldBe expectedEvent
     }
+  }
+
+  def r(uri: String): rewrite = {
+    val res = new rewrite
+    res.setUri(uri)
+    res
   }
 }

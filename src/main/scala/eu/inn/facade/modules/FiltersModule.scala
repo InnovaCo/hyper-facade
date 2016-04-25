@@ -12,7 +12,6 @@ class FiltersModule extends Module {
   bind [RamlFilterFactory]          identifiedBy "private"                              to injected[PrivateFilterFactory]
   bind [RamlFilterFactory]          identifiedBy "x-client-ip" and "x-client-language"  to injected[EnrichmentFilterFactory]
   bind [RamlFilterFactory]          identifiedBy "rewrite"                              to injected[RewriteRequestFilterFactory]
-  //bind [RewriteEventFilterFactory]  identifiedBy "rewrite-back"                         to injected[RewriteEventFilterFactory]
   bind [RamlFilterFactory]          identifiedBy "feed"                                 to injected[EmptyFilterFactory]
 
   bind [FilterChain]                identifiedBy "beforeFilterChain"                    to new SimpleFilterChain(
