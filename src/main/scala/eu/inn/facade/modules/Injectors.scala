@@ -2,13 +2,14 @@ package eu.inn.facade.modules
 
 import eu.inn.config.ConfigLoader
 import eu.inn.facade.FacadeConfigPaths
+import eu.inn.metrics.modules.MetricsModule
 import scaldi.Injector
 
 import scala.collection.JavaConversions._
 
 object Injectors {
   def apply(): Injector = {
-    val injector = new ConfigModule :: new FiltersModule :: loadConfigInjectedModules(new ServiceModule)
+    val injector = new ConfigModule :: new FiltersModule :: loadConfigInjectedModules(new ServiceModule) :: new MetricsModule
     injector.initNonLazy()
   }
 
