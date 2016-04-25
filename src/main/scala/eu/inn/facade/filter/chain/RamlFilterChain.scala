@@ -5,7 +5,7 @@ import eu.inn.facade.raml.{ContentType, Method, RamlConfig, RamlResourceMethodCo
 
 class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
 
-  def findRequestFilters(request: FacadeRequest): Seq[RequestFilter] = {
+  def findRequestFilters(context: FacadeRequestContext, request: FacadeRequest): Seq[RequestFilter] = {
     requestOrEventFilters(request.uri.pattern.specific, request.method, request.contentType).requestFilters
   }
 
