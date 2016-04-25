@@ -2,7 +2,6 @@ package eu.inn.facade.events
 
 import akka.actor._
 import akka.pattern.pipe
-import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.http.RequestProcessor
 import eu.inn.facade.model.{FacadeResponse, _}
@@ -25,7 +24,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   with Stash
   with RequestProcessor {
 
-  val maxResubscriptionsCount = inject[Config].getInt(FacadeConfigPaths.MAX_RESUBSCRIPTIONS)
+  val maxSubscriptionTries = config.getInt(FacadeConfigPaths.MAX_SUBSCRIPTION_TRIES)
   val log = LoggerFactory.getLogger(getClass)
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
@@ -83,8 +82,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     if (log.isTraceEnabled) {
       log.trace(s"Starting subscription #$subscriptionSyncTries for ${fct.request.uri}")
     }
-    if (subscriptionSyncTries > maxResubscriptionsCount) {
-      log.error(s"Subscription sync attempts ($subscriptionSyncTries) has exceeded allowed limit ($maxResubscriptionsCount) for ${fct.request}")
+    if (subscriptionSyncTries > maxSubscriptionTries) {
+      log.error(s"Subscription sync attempts ($subscriptionSyncTries) has exceeded allowed limit ($maxSubscriptionTries) for ${fct.request}")
       context.stop(self)
     }
     subscriptionManager.off(self)

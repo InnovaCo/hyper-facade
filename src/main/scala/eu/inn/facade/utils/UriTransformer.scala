@@ -7,50 +7,38 @@ import spray.http.Uri.Path
 
 
 object UriTransformer {
-
-  def rewriteToOriginal(from: Uri): Uri = {
+  def rewriteLinkToOriginal(from: Uri, maxRewrites: Int): Uri = {
     if (spray.http.Uri(from.pattern.specific).scheme.nonEmpty)
       from
     else {
-      var found = false
+      var rewritesLeft = maxRewrites
       var rewrittenUri = from
-      while (!found) {
-        RewriteIndexHolder.rewriteIndex.findNextBack(rewrittenUri, None) match {
+      while (rewritesLeft > 0) {
+        rewritesLeft -= 0
+        RewriteIndexHolder.rewriteIndex.findRewriteBackward(rewrittenUri, None) match {
           case Some(uri) ⇒
             rewrittenUri = rewrite(rewrittenUri, uri)
           case None ⇒
-            found = true
+            rewritesLeft = 0
         }
       }
       Uri(rewrittenUri.formatted)
     }
   }
 
-  /*def rewriteOneStepBack(method: String)(from: Uri): Uri = {
-    RewriteIndexHolder.rewriteIndex.findNextBack(from, Some(method)) match {
-      case Some(foundUri) ⇒
-        Uri(rewrite(from, foundUri).formatted)
-      case None ⇒
-        Uri(from.formatted)
-    }
-  }
-
-  def rewriteOneStepForward(from: Uri, toUri: String): Uri = {
-    Uri(rewrite(from, Uri(toUri)).formatted)
-  }*/
-
-  def rewriteForward(from: Uri): Uri = {
+  def rewriteLinkForward(from: Uri, maxRewrites: Int): Uri = {
     if (spray.http.Uri(from.pattern.specific).scheme.nonEmpty)
       from
     else {
-      var found = false
+      var rewritesLeft = maxRewrites
       var rewrittenUri = from
-      while (!found) {
-        RewriteIndexHolder.rewriteIndex.findNextForward(rewrittenUri, None) match {
+      while (rewritesLeft > 0) {
+        rewritesLeft -= 0
+        RewriteIndexHolder.rewriteIndex.findRewriteForward(rewrittenUri, None) match {
           case Some(uri) ⇒
             rewrittenUri = rewrite(rewrittenUri, uri)
           case None ⇒
-            found = true
+            rewritesLeft = 0
         }
       }
       rewrittenUri

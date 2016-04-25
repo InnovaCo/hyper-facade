@@ -1,6 +1,8 @@
 package eu.inn.facade.http
 
 import akka.pattern.AskTimeoutException
+import com.typesafe.config.Config
+import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
@@ -23,7 +25,8 @@ trait RequestProcessor extends Injectable {
   val beforeFilterChain = inject[FilterChain]("beforeFilterChain")
   val ramlFilterChain = inject[FilterChain]("ramlFilterChain")
   val afterFilterChain = inject[FilterChain]("afterFilterChain")
-  val maxRestarts = 5 // todo: move to config
+  val config = inject[Config]
+  val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
 
   def processRequestToFacade(fct: FCT): Future[FacadeResponse] = {
     beforeFilterChain.filterRequest(fct.context, fct.request) flatMap { unpreparedRequest ⇒
@@ -45,9 +48,9 @@ trait RequestProcessor extends Injectable {
   }
 
   def processRequestWithRaml(fct: FCT): Future[FCT] = {
-    if (fct.stages.size > maxRestarts) {
+    if (fct.stages.size > rewriteCountLimit) {
       Future.failed(
-        new RestartLimitReachedException(fct.stages.size, maxRestarts)
+        new RestartLimitReachedException(fct.stages.size, rewriteCountLimit)
       )
     }
     else {
