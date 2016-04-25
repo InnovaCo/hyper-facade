@@ -23,7 +23,7 @@ case class FacadeRequestContext(
     MessagingContextFactory.withCorrelationId(clientCorrelationId.getOrElse(IdGenerator.create()))
   }
 
-  def prepareNext(request: FacadeRequest) = copy(
+  def prepare(request: FacadeRequest) = copy(
     prepared = Some(PreparedRequestContext(request.uri, request.method, request.headers))
   )
 }
@@ -61,7 +61,7 @@ case class RequestStage(
 // todo: better name?
 case class ContextWithRequest(context: FacadeRequestContext, stages: Seq[RequestStage], request: FacadeRequest) {
   def withNextStage(nextRequest: FacadeRequest): ContextWithRequest = copy(
-    context = context.prepareNext(nextRequest),
+    context = context.prepare(nextRequest),
     stages = Seq(RequestStage(nextRequest.uri, nextRequest.method)) ++ stages,
     request = nextRequest
   )

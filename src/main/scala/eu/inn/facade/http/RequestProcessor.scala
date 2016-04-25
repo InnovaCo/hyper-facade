@@ -50,7 +50,7 @@ trait RequestProcessor extends Injectable {
   def processRequestWithRaml(cwr: ContextWithRequest): Future[ContextWithRequest] = {
     if (cwr.stages.size > rewriteCountLimit) {
       Future.failed(
-        new RestartLimitReachedException(cwr.stages.size, rewriteCountLimit)
+        new RewriteLimitReachedException(cwr.stages.size, rewriteCountLimit)
       )
     }
     else {
