@@ -36,7 +36,3 @@ class RewriteEventFilter(val args: rewrite, rewriteCountLimit: Int) extends Even
     }
   }
 }
-
-/*
-"uri":{"pattern":"/revault/content/{path:*}","args":{"path":"services/status-monitor/app-statuses/9"}}
-*/

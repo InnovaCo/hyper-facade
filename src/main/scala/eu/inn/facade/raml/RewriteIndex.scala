@@ -16,10 +16,7 @@ case class RewriteIndex(inverted: Map[IndexKey, String], forward: Map[IndexKey, 
   }
 
   private def findRewrite(uri: Uri, requestMethod: Option[String], index: Map[IndexKey, String]): Option[Uri] = {
-    val method = requestMethod match {
-      case Some(m) ⇒ Some(Method(m))
-      case None ⇒ None
-    }
+    val method = requestMethod.map(m ⇒ Method(m))
     findMostSpecificRewriteRule(index, method, uri)
   }
 

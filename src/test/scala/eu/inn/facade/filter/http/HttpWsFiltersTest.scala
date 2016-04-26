@@ -6,6 +6,7 @@ import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml.{Method, RewriteIndexHolder}
+import eu.inn.facade.utils.UriTransformer
 import eu.inn.hyperbus.model.Link
 import eu.inn.hyperbus.model.Links.LinksMap
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -28,9 +29,17 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Be
     RewriteIndexHolder.updateRewriteIndex("/test/{a}", "/test-rewritten/{a}", None)
     RewriteIndexHolder.updateRewriteIndex("/test/xyz", "/test-rewritten/xyz", None)
     RewriteIndexHolder.updateRewriteIndex("/inner-test/{a}", "/inner-test-rewritten/{a}", None)
+
+    RewriteIndexHolder.updateRewriteIndex("/inner-test/{a}", "/inner-test-rewritten/{a}", None)
+    RewriteIndexHolder.updateRewriteIndex("/events/{path}", "/rewritten-events/root/{path}", None)
   }
 
   "HttpWsFiltersTest " - {
+    "rewrite 1" in {
+      val r = UriTransformer.rewriteLinkToOriginal(Uri("/rewritten-events/{path:*}", Map("path" → "root/1")), 1)
+      r shouldBe Uri("/events/1")
+    }
+
     "_links rewriting and formatting (response)" in {
       val request = FacadeRequest(Uri("/test"), Method.GET, Map.empty, Null)
       val response = FacadeResponse(200, Map("messageId" → Seq("#12345"), "correlationId" → Seq("#54321")),
