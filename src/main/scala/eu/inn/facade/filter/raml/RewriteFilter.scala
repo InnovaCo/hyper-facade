@@ -22,17 +22,11 @@ class RewriteEventFilter(val args: rewrite, rewriteCountLimit: Int) extends Even
   override def apply(context: FacadeRequestContext, event: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
 
-    if (UriMatcher.matchUri(args.getUri, event.uri).isDefined) {
-      context.prepared match {
-        case Some(r) ⇒
-          Future.successful(event.copy(uri = r.requestUri))
-        case None ⇒
-          Future.successful(event)
-      }
-    }
-    else {
-      val newUri = UriTransformer.rewriteLinkToOriginal(event.uri, rewriteCountLimit)
-      Future.successful(event.copy(uri = newUri))
+    context.prepared match {
+      case Some(r) ⇒
+        Future.successful(event.copy(uri = r.requestUri))
+      case None ⇒
+        Future.successful(event)
     }
   }
 }

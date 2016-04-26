@@ -31,13 +31,28 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Be
     RewriteIndexHolder.updateRewriteIndex("/inner-test/{a}", "/inner-test-rewritten/{a}", None)
 
     RewriteIndexHolder.updateRewriteIndex("/inner-test/{a}", "/inner-test-rewritten/{a}", None)
-    RewriteIndexHolder.updateRewriteIndex("/events/{path}", "/rewritten-events/root/{path}", None)
+    RewriteIndexHolder.updateRewriteIndex("/events/{path}", "/rewritten-events/root/{path:*}", None)
   }
 
   "HttpWsFiltersTest " - {
-    "rewrite 1" in {
+    "Rewrite backward" in {
+      val r = UriTransformer.rewriteLinkToOriginal(Uri("/rewritten-events/root/1"), 1)
+      r shouldBe Uri("/events/1")
+    }
+
+    "Rewrite backward (templated)" in {
       val r = UriTransformer.rewriteLinkToOriginal(Uri("/rewritten-events/{path:*}", Map("path" → "root/1")), 1)
       r shouldBe Uri("/events/1")
+    }
+
+    "Rewrite forward" in {
+      val r = UriTransformer.rewriteLinkForward(Uri("/events/25"), 1)
+      r shouldBe Uri("/rewritten-events/root/{path:*}", Map("path" → "25"))
+    }
+
+    "Rewrite forward (templated)" in {
+      val r = UriTransformer.rewriteLinkForward(Uri("/events/{path}",Map("path" → "25")), 1)
+      r shouldBe Uri("/rewritten-events/root/{path:*}", Map("path" → "25"))
     }
 
     "_links rewriting and formatting (response)" in {
