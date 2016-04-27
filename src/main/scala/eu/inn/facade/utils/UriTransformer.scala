@@ -33,7 +33,7 @@ object UriTransformer {
       var rewritesLeft = maxRewrites
       var rewrittenUri = from
       while (rewritesLeft > 0) {
-        rewritesLeft -= 0
+        rewritesLeft -= 1
         RewriteIndexHolder.rewriteIndex.findRewriteForward(rewrittenUri, None) match {
           case Some(uri) ⇒
             rewrittenUri = rewrite(rewrittenUri, uri)
