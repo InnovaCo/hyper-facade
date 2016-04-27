@@ -5,6 +5,7 @@ import akka.pattern.pipe
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.http.RequestProcessor
 import eu.inn.facade.model.{FacadeResponse, _}
+import eu.inn.facade.metrics.MetricKeys
 import eu.inn.facade.raml.Method
 import eu.inn.facade.utils.FutureUtils
 import eu.inn.hyperbus.Hyperbus
@@ -19,10 +20,10 @@ import scala.concurrent.ExecutionContext
 class FeedSubscriptionActor(websocketWorker: ActorRef,
                             hyperbus: Hyperbus,
                             subscriptionManager: SubscriptionsManager)
-                       (implicit val injector: Injector)
+                           (implicit val injector: Injector)
   extends Actor
-  with Stash
-  with RequestProcessor {
+    with Stash
+    with RequestProcessor {
 
   val maxSubscriptionTries = config.getInt(FacadeConfigPaths.MAX_SUBSCRIPTION_TRIES)
   val log = LoggerFactory.getLogger(getClass)
@@ -43,7 +44,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     case event: DynamicRequest ⇒
       processEventWhileSubscribing(cwr, event)
 
-    case resourceState: Response[DynamicBody] @unchecked ⇒
+    case resourceState: Response[DynamicBody]@unchecked ⇒
       processResourceState(cwr, resourceState, subscriptionSyncTries)
 
     case BecomeReliable(lastRevision: Long) ⇒
@@ -71,7 +72,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def stopStartSubscription: Receive = {
-    case cwr @ ContextWithRequest(_, _, request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _)) ⇒
+    case cwr@ContextWithRequest(_, _, request@FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _)) ⇒
       startSubscription(cwr, 0)
 
     case ContextWithRequest(_, _, FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _)) ⇒
@@ -107,6 +108,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     implicit val ec = executionContext
 
+    val trackRequestTime = metrics.timer(MetricKeys.REQUEST_PROCESS_TIME).time()
     processRequestWithRaml(cwr) flatMap { cwrRaml ⇒
       val correlationId = cwrRaml.request.headers.getOrElse(Header.CORRELATION_ID,
         cwrRaml.request.headers(Header.MESSAGE_ID)).head
@@ -116,6 +118,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       hyperbus <~ cwrRaml.request.copy(method = Method.GET).toDynamicRequest
     } recover {
       handleHyperbusExceptions(cwr)
+    } andThen { case _ ⇒
+      trackRequestTime.stop
     } pipeTo self
   }
 
@@ -144,11 +148,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     implicit val ec = executionContext
     FutureUtils.chain(facadeResponse, cwr.stages.map { stage ⇒
-      ramlFilterChain.filterResponse(cwr.context, _ : FacadeResponse)
+      ramlFilterChain.filterResponse(cwr.context, _: FacadeResponse)
     }) flatMap { filteredResponse ⇒
       afterFilterChain.filterResponse(cwr.context, filteredResponse) map { finalResponse ⇒
         websocketWorker ! finalResponse
-        if (finalResponse.status > 399) { // failed
+        if (finalResponse.status > 399) {
+          // failed
           PoisonPill
         }
         else {
@@ -176,7 +181,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     implicit val ec = executionContext
 
     FutureUtils.chain(FacadeRequest(event), cwr.stages.map { stage ⇒
-      ramlFilterChain.filterEvent(cwr.context, _ : FacadeRequest)
+      ramlFilterChain.filterEvent(cwr.context, _: FacadeRequest)
     }) flatMap { e ⇒
       afterFilterChain.filterEvent(cwr.context, e) map { filteredRequest ⇒
         websocketWorker ! filteredRequest
@@ -205,7 +210,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           implicit val ec = executionContext
 
           FutureUtils.chain(FacadeRequest(event), cwr.stages.map { stage ⇒
-            ramlFilterChain.filterEvent(cwr.context,  _ : FacadeRequest)
+            ramlFilterChain.filterEvent(cwr.context, _: FacadeRequest)
           }) flatMap { e ⇒
             afterFilterChain.filterEvent(cwr.context, e) map { filteredRequest ⇒
               websocketWorker ! filteredRequest
@@ -216,13 +221,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
             }
           }
         }
-        else
-        if (revisionId > lastRevisionId + 1) {
+        else if (revisionId > lastRevisionId + 1) {
           // we lost some events, start from the beginning
           self ! RestartSubscription
           log.info(s"Subscription on ${cwr.context.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting...")
         }
-        // if revisionId <= lastRevisionId -- just ignore this event
+      // if revisionId <= lastRevisionId -- just ignore this event
 
       case _ ⇒
         log.error(s"Received event: $event without revisionId for reliable feed: ${cwr.context}")
@@ -252,8 +256,11 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 }
 
 case class BecomeReliable(lastRevision: Long)
+
 case object BecomeUnreliable
+
 case object RestartSubscription
+
 case class BeforeFilterComplete(cwr: ContextWithRequest)
 
 object FeedSubscriptionActor {
