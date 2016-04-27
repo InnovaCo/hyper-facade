@@ -4,6 +4,7 @@ import akka.pattern.AskTimeoutException
 import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.filter.chain.FilterChain
+import eu.inn.facade.metrics.MetricKeys
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlConfig
 import eu.inn.facade.utils.FutureUtils
@@ -31,21 +32,23 @@ trait RequestProcessor extends Injectable {
   val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
 
   def processRequestToFacade(cwr: ContextWithRequest): Future[FacadeResponse] = {
-    beforeFilterChain.filterRequest(cwr.context, cwr.request) flatMap { unpreparedRequest ⇒
-      val cwrBeforeRaml = prepareContextAndRequestBeforeRaml(cwr, unpreparedRequest)
-      processRequestWithRaml(cwrBeforeRaml) flatMap { cwrRaml ⇒
-        hyperbus <~ cwrRaml.request.toDynamicRequest recover {
-          handleHyperbusExceptions(cwrRaml)
-        } flatMap { response ⇒
-          FutureUtils.chain(FacadeResponse(response), cwrRaml.stages.map { stage ⇒
-            ramlFilterChain.filterResponse(cwrRaml.context, _ : FacadeResponse)
-          }) flatMap { r ⇒
-            afterFilterChain.filterResponse(cwrRaml.context, r)
+    metrics.timerOfFuture(MetricKeys.REQUEST_PROCESS_TIME) {
+      beforeFilterChain.filterRequest(cwr.context, cwr.request) flatMap { unpreparedRequest ⇒
+        val cwrBeforeRaml = prepareContextAndRequestBeforeRaml(cwr, unpreparedRequest)
+        processRequestWithRaml(cwrBeforeRaml) flatMap { cwrRaml ⇒
+          hyperbus <~ cwrRaml.request.toDynamicRequest recover {
+            handleHyperbusExceptions(cwrRaml)
+          } flatMap { response ⇒
+            FutureUtils.chain(FacadeResponse(response), cwrRaml.stages.map { stage ⇒
+              ramlFilterChain.filterResponse(cwrRaml.context, _: FacadeResponse)
+            }) flatMap { r ⇒
+              afterFilterChain.filterResponse(cwrRaml.context, r)
+            }
           }
         }
+      } recover handleFilterExceptions(cwr) { response ⇒
+        response
       }
-    } recover handleFilterExceptions(cwr) { response ⇒
-      response
     }
   }
 
