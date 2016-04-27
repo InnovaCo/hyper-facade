@@ -44,7 +44,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     case event: DynamicRequest ⇒
       processEventWhileSubscribing(cwr, event)
 
-    case resourceState: Response[DynamicBody]@unchecked ⇒
+    case resourceState: Response[DynamicBody] @unchecked ⇒
       processResourceState(cwr, resourceState, subscriptionSyncTries)
 
     case BecomeReliable(lastRevision: Long) ⇒
@@ -72,7 +72,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def stopStartSubscription: Receive = {
-    case cwr@ContextWithRequest(_, _, request@FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _)) ⇒
+    case cwr @ ContextWithRequest(_, _, request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _)) ⇒
       startSubscription(cwr, 0)
 
     case ContextWithRequest(_, _, FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _)) ⇒
@@ -148,12 +148,11 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     implicit val ec = executionContext
     FutureUtils.chain(facadeResponse, cwr.stages.map { stage ⇒
-      ramlFilterChain.filterResponse(cwr.context, _: FacadeResponse)
+      ramlFilterChain.filterResponse(cwr.context, _ : FacadeResponse)
     }) flatMap { filteredResponse ⇒
       afterFilterChain.filterResponse(cwr.context, filteredResponse) map { finalResponse ⇒
         websocketWorker ! finalResponse
-        if (finalResponse.status > 399) {
-          // failed
+        if (finalResponse.status > 399) { // failed
           PoisonPill
         }
         else {
@@ -181,7 +180,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     implicit val ec = executionContext
 
     FutureUtils.chain(FacadeRequest(event), cwr.stages.map { stage ⇒
-      ramlFilterChain.filterEvent(cwr.context, _: FacadeRequest)
+      ramlFilterChain.filterEvent(cwr.context, _ : FacadeRequest)
     }) flatMap { e ⇒
       afterFilterChain.filterEvent(cwr.context, e) map { filteredRequest ⇒
         websocketWorker ! filteredRequest
@@ -210,7 +209,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           implicit val ec = executionContext
 
           FutureUtils.chain(FacadeRequest(event), cwr.stages.map { stage ⇒
-            ramlFilterChain.filterEvent(cwr.context, _: FacadeRequest)
+            ramlFilterChain.filterEvent(cwr.context, _ : FacadeRequest)
           }) flatMap { e ⇒
             afterFilterChain.filterEvent(cwr.context, e) map { filteredRequest ⇒
               websocketWorker ! filteredRequest
@@ -221,12 +220,13 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
             }
           }
         }
-        else if (revisionId > lastRevisionId + 1) {
+        else
+        if (revisionId > lastRevisionId + 1) {
           // we lost some events, start from the beginning
           self ! RestartSubscription
           log.info(s"Subscription on ${cwr.context.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting...")
         }
-      // if revisionId <= lastRevisionId -- just ignore this event
+        // if revisionId <= lastRevisionId -- just ignore this event
 
       case _ ⇒
         log.error(s"Received event: $event without revisionId for reliable feed: ${cwr.context}")
@@ -256,11 +256,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 }
 
 case class BecomeReliable(lastRevision: Long)
-
 case object BecomeUnreliable
-
 case object RestartSubscription
-
 case class BeforeFilterComplete(cwr: ContextWithRequest)
 
 object FeedSubscriptionActor {
