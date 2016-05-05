@@ -20,13 +20,6 @@ class RewriteRequestFilter(val args: rewrite) extends RequestFilter {
 class RewriteEventFilter(val args: rewrite, rewriteCountLimit: Int) extends EventFilter {
   override def apply(context: FacadeRequestContext, event: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
-//    val newUri = UriTransformer.rewriteLinkToOriginal(event.uri, 1)
-//    context.prepared match {
-//      case Some(r) ⇒
-//        Future.successful(event.copy(uri = newUri))
-//      case None ⇒
-//        Future.successful(event)
-//    }
     val newUri = UriTransformer.rewriteBackward(event.uri, event.method)
     Future.successful(event.copy(uri = newUri))
   }
