@@ -20,7 +20,7 @@ class RewriteRequestFilterFactory(config: Config) extends RamlFilterFactory {
     SimpleFilterChain(
       requestFilters = Seq(new RewriteRequestFilter(rewriteArgs)),
       responseFilters = Seq.empty,
-      eventFilters = Seq(new RewriteEventFilter(rewriteArgs, rewriteCountLimit))
+      eventFilters = Seq(new RewriteEventFilter)
     )
   }
 }
