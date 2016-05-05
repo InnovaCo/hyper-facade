@@ -3,7 +3,7 @@ package eu.inn.facade.modules
 import eu.inn.config.ConfigLoader
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.metrics.modules.MetricsModule
-import scaldi._
+import scaldi.Injector
 
 import scala.collection.JavaConversions._
 
