@@ -42,8 +42,14 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
     context.prepared match {
       case Some(r) ⇒
         val uri = r.requestUri.pattern.specific // event.uri.pattern.specific
-      val methodName = if (event.method.startsWith("feed:")) event.method.substring(5) else event.method
-        requestOrEventFilters(uri, methodName, event.contentType).eventFilters
+        val eventMethodFilters = requestOrEventFilters(uri, event.method, event.contentType).eventFilters
+        if (eventMethodFilters.nonEmpty)
+          eventMethodFilters
+        else {
+          val methodName = if (event.method.startsWith("feed:")) event.method.substring(5) else event.method
+          requestOrEventFilters(uri, methodName, event.contentType).eventFilters
+        }
+
 
       case None ⇒
         Seq.empty

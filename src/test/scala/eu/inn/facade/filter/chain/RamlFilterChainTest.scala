@@ -1,11 +1,11 @@
 package eu.inn.facade.filter.chain
 
 import eu.inn.binders.value.{Null, ObjV}
-import eu.inn.facade.MockContext
 import eu.inn.facade.filter.NoOpFilter
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
 import eu.inn.facade.modules.Injectors
+import eu.inn.facade.{CleanRewriteIndex, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
@@ -13,9 +13,9 @@ import scaldi.Injectable
 // todo: important to test when specific != formatted!
 // + integrated test with filter lookup when specific != formatted!
 
-class RamlFilterChainTest extends FreeSpec with Matchers with Injectable with MockContext {
-  implicit val injector = Injectors()
+class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable with MockContext {
 
+  implicit val injector = Injectors()
   val filterChain = inject [FilterChain].asInstanceOf[RamlFilterChain]
 
   "FilterChainRamlFactory " - {

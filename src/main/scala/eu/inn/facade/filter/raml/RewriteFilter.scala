@@ -1,7 +1,6 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.facade.model._
-import eu.inn.facade.raml.UriMatcher
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.facade.utils.UriTransformer
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -21,12 +20,14 @@ class RewriteRequestFilter(val args: rewrite) extends RequestFilter {
 class RewriteEventFilter(val args: rewrite, rewriteCountLimit: Int) extends EventFilter {
   override def apply(context: FacadeRequestContext, event: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
-
-    context.prepared match {
-      case Some(r) ⇒
-        Future.successful(event.copy(uri = r.requestUri))
-      case None ⇒
-        Future.successful(event)
-    }
+//    val newUri = UriTransformer.rewriteLinkToOriginal(event.uri, 1)
+//    context.prepared match {
+//      case Some(r) ⇒
+//        Future.successful(event.copy(uri = newUri))
+//      case None ⇒
+//        Future.successful(event)
+//    }
+    val newUri = UriTransformer.rewriteBackward(event.uri, event.method)
+    Future.successful(event.copy(uri = newUri))
   }
 }

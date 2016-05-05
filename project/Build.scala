@@ -35,7 +35,8 @@ object Build extends sbt.Build {
         resolvers ++= Seq(
           "Innova libs repo" at "http://repproxy.srv.inn.ru/artifactory/libs-release-local",
           "Innova ext repo" at "http://repproxy.srv.inn.ru/artifactory/ext-release-local",
-          Resolver.sonatypeRepo("public")
+          Resolver.sonatypeRepo("public"),
+          Resolver.mavenLocal
         ),
 
         libraryDependencies ++= Seq(
@@ -50,8 +51,8 @@ object Build extends sbt.Build {
           "eu.inn"                         %% "hyperbus-transport"          % "0.1.76",
           "eu.inn"                         %% "hyperbus-t-kafka"            % "0.1.76",
           "eu.inn"                         %% "hyperbus-t-distributed-akka" % "0.1.76",
-          "eu.inn"                         % "java-raml1-parser"            % "0.0.30",
-          "eu.inn"                         % "javascript-module-holders"    % "0.0.30",
+          "java-raml1-tools"               % "java-raml1-parser"            % "0.0.1-SNAPSHOT",
+          "java-raml1-tools"               % "javascript-module-holders"    % "0.0.1-SNAPSHOT",
           "eu.inn"                         %% "service-control"             % "0.2.17",
           "eu.inn"                         %% "service-config"              % "0.1.6",
           "eu.inn"                         %% "service-metrics"             % "0.1.6",

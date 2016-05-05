@@ -1,35 +1,26 @@
 package eu.inn.facade.filter.http
 
 import eu.inn.binders.value._
-import eu.inn.facade.MockContext
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.FacadeRequest
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.raml.RewriteIndexHolder
+import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
 import eu.inn.hyperbus.model.Link
 import eu.inn.hyperbus.model.Links._
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with BeforeAndAfterAll with Injectable with MockContext {
+class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with Injectable with MockContext {
 
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "specific-raml-configs/http-ws-request-filter-test.raml")
   implicit val injector = Injectors()
   val beforeFilters = inject[FilterChain]("beforeFilterChain")
-  override def beforeAll() = {
-    RewriteIndexHolder.clearIndex()
-    RewriteIndexHolder.updateRewriteIndex("/test/{a}", "/rewritten/{a}", None)
-    RewriteIndexHolder.updateRewriteIndex("/test/abc", "/rewritten/abc", None)
-    RewriteIndexHolder.updateRewriteIndex("/rewritten/{a}", "/rewritten-twice/{a}", None)
-    RewriteIndexHolder.updateRewriteIndex("/rewritten/abc", "/rewritten-twice/abc", None)
-    RewriteIndexHolder.updateRewriteIndex("/inner-test/{a}", "/inner-rewritten/{a}", None)
-    RewriteIndexHolder.updateRewriteIndex("/inner-test/{b}", "/inner-rewritten/{b}", None)
-  }
 
   "HttpWsRequestFilterTest " - {
     "_links rewriting and formatting" in {
@@ -40,8 +31,8 @@ class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures w
             "some-other1" → ObjV("href" → "/v3/test/abc", "templated" → false),
             "some-other2" → ObjV("href" → "/v3/test/xyz"),
             "some-other3" → List(
+              ObjV("href" → "/v3/test/abc"),
               ObjV("href" → "/v3/test/abc123"),
-              ObjV("href" → "/v333/test/abc123"),
               ObjV("href" → "/v3/test/{b}", "templated" → true)
             )
           ),
@@ -56,12 +47,12 @@ class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures w
 
       val linksMap = filteredRequest.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/rewritten-twice/1", templated = false))
-      linksMap("some-other1") shouldBe Left(Link(href="/rewritten-twice/abc", templated = false))
-      linksMap("some-other2") shouldBe Left(Link(href="/test/xyz", templated = false))  // URI left as is because there is no record in RewriteIndex with formatted URI '/test/xyz'
+      linksMap("some-other1") shouldBe Left(Link(href="/test/abc", templated = false))
+      linksMap("some-other2") shouldBe Left(Link(href="/rewritten-twice/xyz", templated = false))  // URI left as is because there is no record in RewriteIndex with formatted URI '/test/xyz'
       linksMap("some-other3") shouldBe Right(
         Seq(
-          Link(href="/test/abc123", templated = false),  // URI left as is because there is no record in RewriteIndex with formatted URI '/test/abc123'
-          Link(href="/v333/test/abc123", templated = false),  // URI left as is because prefix '/v333' doesn't match configured root prefix '/v3'
+          Link(href="/test/abc", templated = false),  // URI left as is because there is no record in RewriteIndex with formatted URI '/test/abc123'
+          Link(href="/rewritten-twice/abc123", templated = false),  // URI left as is because prefix '/v333' doesn't match configured root prefix '/v3'
           Link(href="/test/2", templated = false))  // URI left as is because there is no record in RewriteIndex with templated URI '/test/{b}'
       )
     }
@@ -91,7 +82,7 @@ class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures w
             )
           ),
           "_links" → ObjV(
-            "self" → ObjV("href" → "/v333/test/{a}", "templated" → true)
+            "self" → ObjV("href" → "/v3/test/{a}", "templated" → true)
           ),
           "a" → 1,
           "b" → 2
@@ -103,7 +94,7 @@ class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures w
       filteredRequest.uri shouldBe Uri("/test")
 
       val linksMap = filteredRequest.body.__links.fromValue[LinksMap] // binders deserialization magic
-      linksMap("self") shouldBe Left(Link(href="/v333/test/1", templated = false))
+      linksMap("self") shouldBe Left(Link(href="/rewritten-twice/1", templated = false))
 
       val e = filteredRequest.body.asMap("_embedded")
       val x = e.asMap("x")
@@ -120,7 +111,7 @@ class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures w
         ),
         ObjV(
           "_links" → ObjV(
-            "self" → ObjV("href" → "/inner-test/567", "templated" → false)
+            "self" → ObjV("href" → "/inner-rewritten/567", "templated" → false)
           )
         )
       )

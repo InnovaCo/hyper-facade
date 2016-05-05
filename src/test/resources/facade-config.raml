@@ -118,7 +118,7 @@ traits:
           type: User
         headers:
           content-type:
-  put:
+  feed:put:
     is: [ secured ]
     body:
       application/json:
@@ -243,7 +243,8 @@ traits:
     uri: /rewritten-events/root
 
 /events/{path}:
-  (rewrite):
-    uri: /rewritten-events/root/{path}
+  feed:put:
+    (rewrite):
+      uri: /rewritten-events/root/{path}
 
 /rewritten-events/{path:*}:

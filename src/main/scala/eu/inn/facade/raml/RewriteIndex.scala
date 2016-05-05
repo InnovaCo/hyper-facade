@@ -1,5 +1,7 @@
 package eu.inn.facade.raml
 
+import eu.inn.facade.raml.UriMatcher.ExtendUri
+import eu.inn.hyperbus.transport.api.matchers.Specific
 import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
 
 import scala.collection.immutable.SortedMap
@@ -21,15 +23,42 @@ case class RewriteIndex(inverted: Map[IndexKey, String], forward: Map[IndexKey, 
   }
 
   private def findMostSpecificRewriteRule(index: Map[IndexKey, String], method: Option[Method], originalUri: Uri): Option[Uri] = {
-    findInIndex(index, method, originalUri.formatted) orElse
-      findInIndex(index, method, originalUri.pattern.specific) match {
+    exactMatch(index, method, originalUri.formatted) orElse
+      exactMatch(index, method, originalUri.pattern.specific) orElse
+      patternMatch(index, method, originalUri) match {
       case Some(matchedUri) ⇒
+        val newArgs = originalUri.args ++ matchedUri.args
         Some(matchedUri.copy(
-          args = originalUri.args
+          args = newArgs
         ))
       case None ⇒
         None
     }
+  }
+
+  private def exactMatch(index: Map[IndexKey, String], method: Option[Method], originalUri: String): Option[Uri] = {
+    index.get(IndexKey(originalUri, method)) orElse
+      index.get(IndexKey(originalUri, None)) match {
+      case Some(uri) ⇒
+        Some(Uri(uri))
+      case None ⇒ None
+    }
+  }
+
+  private def patternMatch(index: Map[IndexKey, String], method: Option[Method], originalUri: Uri): Option[Uri] = {
+    var found: Option[Uri] = None
+    index.foreach {
+      case (key, indexUri) ⇒
+        if (found.isEmpty || Uri(indexUri).isLonger(found.get)) { // it means that we could have more specific match
+          UriMatcher.matchUri(key.uri, originalUri) orElse
+            UriMatcher.matchUri(key.uri, Uri(originalUri.formatted)) match {
+            case Some(matchedUri) ⇒
+              found = Some(Uri(Specific(indexUri), matchedUri.args))
+            case None ⇒
+          }
+        }
+    }
+    found
   }
 
   private def findInIndex(index: Map[IndexKey, String], method: Option[Method], originalUri: String): Option[Uri] = {
@@ -43,6 +72,7 @@ case class RewriteIndex(inverted: Map[IndexKey, String], forward: Map[IndexKey, 
 }
 
 object RewriteIndex {
+
   implicit object UriTemplateOrdering extends Ordering[IndexKey] {
     override def compare(left: IndexKey, right: IndexKey): Int = {
       if (left.method.isDefined) {

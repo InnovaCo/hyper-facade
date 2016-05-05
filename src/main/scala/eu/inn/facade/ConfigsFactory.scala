@@ -26,7 +26,7 @@ object ConfigsFactory {
   }
 
   private def ramlFilePath(config: Config): String = {
-    val filePath = config.getString(FacadeConfigPaths.RAML_FILE)
+    val filePath = System.getProperty(FacadeConfigPaths.RAML_FILE, config.getString(FacadeConfigPaths.RAML_FILE))
 
     // it means that config contains absolute file path
     if (filePath.startsWith("/"))
