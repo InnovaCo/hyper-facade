@@ -46,8 +46,6 @@ object UriMatcher {
             case requestUriToken@TextToken(value) ⇒
               args += patternParamName → value
               matchesCorrectly = patternTokenIter.hasNext == reqUriTokenIter.hasNext
-            case requestUriToken @ ParameterToken(reqParamName, RegularMatchType) ⇒
-              matchesCorrectly = reqParamName == patternParamName
             case _ ⇒
               matchesCorrectly = false
           }
@@ -99,13 +97,5 @@ object UriMatcher {
       }
       foldUriTail(uriTail + tokenStr, iter)
     } else uriTail
-  }
-
-  implicit class ExtendUri(uri: Uri) {
-    def isLonger(otherUri: Uri): Boolean = {
-      val thisTokens = UriParser.tokens(uri.pattern.specific).length
-      val otherTokens = UriParser.tokens(otherUri.pattern.specific).length
-      (thisTokens - otherTokens) > 0
-    }
   }
 }

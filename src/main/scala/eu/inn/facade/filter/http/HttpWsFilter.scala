@@ -15,7 +15,7 @@ import spray.http.HttpHeaders
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class HttpWsResponseFilter(config: Config, ramlConfig: RamlConfig) extends ResponseFilter {
+class HttpWsResponseFilter(config: Config) extends ResponseFilter {
   val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
 
   override def apply(context: FacadeRequestContext, response: FacadeResponse)
@@ -32,7 +32,7 @@ class HttpWsResponseFilter(config: Config, ramlConfig: RamlConfig) extends Respo
   }
 }
 
-class WsEventFilter(config: Config, ramlConfig: RamlConfig) extends EventFilter {
+class WsEventFilter(config: Config) extends EventFilter {
   val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
   override def apply(context: FacadeRequestContext, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {

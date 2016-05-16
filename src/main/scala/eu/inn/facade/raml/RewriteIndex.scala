@@ -1,6 +1,5 @@
 package eu.inn.facade.raml
 
-import eu.inn.facade.raml.UriMatcher.ExtendUri
 import eu.inn.hyperbus.transport.api.matchers.Specific
 import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
 
@@ -49,9 +48,8 @@ case class RewriteIndex(inverted: Map[IndexKey, String], forward: Map[IndexKey, 
     var found: Option[Uri] = None
     index.foreach {
       case (key, indexUri) ⇒
-        if (found.isEmpty || Uri(indexUri).isLonger(found.get)) { // it means that we could have more specific match
-          UriMatcher.matchUri(key.uri, originalUri) orElse
-            UriMatcher.matchUri(key.uri, Uri(originalUri.formatted)) match {
+        if (found.isEmpty) {
+          UriMatcher.matchUri(key.uri, Uri(originalUri.formatted)) match {
             case Some(matchedUri) ⇒
               found = Some(Uri(Specific(indexUri), matchedUri.args))
             case None ⇒
@@ -59,15 +57,6 @@ case class RewriteIndex(inverted: Map[IndexKey, String], forward: Map[IndexKey, 
         }
     }
     found
-  }
-
-  private def findInIndex(index: Map[IndexKey, String], method: Option[Method], originalUri: String): Option[Uri] = {
-    index.get(IndexKey(originalUri, method)) orElse
-      index.get(IndexKey(originalUri, None)) match {
-      case Some(uri) ⇒
-        Some(Uri(uri))
-      case None ⇒ None
-    }
   }
 }
 
@@ -99,6 +88,6 @@ object RewriteIndex {
   }
 
   def apply(): RewriteIndex = {
-    new RewriteIndex(SortedMap.empty[IndexKey, String], SortedMap.empty[IndexKey, String])
+    RewriteIndex(SortedMap.empty[IndexKey, String], SortedMap.empty[IndexKey, String])
   }
 }

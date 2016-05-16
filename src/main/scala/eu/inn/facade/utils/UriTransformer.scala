@@ -43,7 +43,7 @@ object UriTransformer {
   }
 
   def rewriteLinkForward(from: Uri, maxRewrites: Int, ramlConfig: RamlConfig): Uri = {
-    if (!shouldRewriteForward(from, ramlConfig))
+    if (!linkIsRewriteable(from, ramlConfig))
       from
     else {
       var rewritesLeft = maxRewrites
@@ -106,7 +106,7 @@ object UriTransformer {
     Uri(Specific(toUriPath), newArgs.toMap)
   }
 
-  private def shouldRewriteForward(from: Uri, ramlConfig: RamlConfig): Boolean = {
+  private def linkIsRewriteable(from: Uri, ramlConfig: RamlConfig): Boolean = {
     val emptyScheme = spray.http.Uri(from.pattern.specific).scheme.isEmpty
     val rewriteAllowed = ramlConfig.resourcesByUri.get(from.pattern.specific) orElse
       ramlConfig.resourcesByUri.get(from.formatted) match {
