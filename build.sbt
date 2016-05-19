@@ -1,5 +1,5 @@
 organization := "eu.inn"
 
-name := "hyperbus-facade"
+name := "hyper-facade"
 
 scalaVersion := "2.11.8"

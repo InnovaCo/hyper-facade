@@ -43,7 +43,7 @@ object ConfigsFactory {
 }
 
 object FacadeConfigPaths {
-  val ROOT = "hyperbus-facade."
+  val ROOT = "hyper-facade."
   val PRIVATE_ADDRESSES = ROOT + "private.addresses"
   val PRIVATE_NETWORKS = ROOT + "private.networks"
   val LOGGERS = ROOT + "loggers"
