@@ -233,25 +233,20 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
   }
 
-  //  todo: this method is hacky and revault specific, elaborate more (move to revault filter?)
+  //  todo: this method seems hacky
   //  in this case we allow regular expression in URL
   def getSubscriptionUri(filteredRequest: FacadeRequest): Uri = {
     val uri = filteredRequest.uri
-    if (filteredRequest.body.asMap.contains("page.from")) {
-      val newArgs: Map[String, TextMatcher] = UriParser.tokens(uri.pattern.specific).flatMap {
-        case ParameterToken(name, PathMatchType) ⇒
-          Some(name → RegexMatcher(uri.args(name).specific + "/.*"))
+    val newArgs: Map[String, TextMatcher] = UriParser.tokens(uri.pattern.specific).flatMap {
+      case ParameterToken(name, PathMatchType) ⇒
+        Some(name → RegexMatcher(uri.args(name).specific + "/.*"))
 
-        case ParameterToken(name, RegularMatchType) ⇒
-          Some(name → uri.args(name))
+      case ParameterToken(name, RegularMatchType) ⇒
+        Some(name → uri.args(name))
 
-        case _ ⇒ None
-      }.toMap
-      Uri(uri.pattern, newArgs)
-    }
-    else {
-      uri
-    }
+      case _ ⇒ None
+    }.toMap
+    Uri(uri.pattern, newArgs)
   }
 }
 

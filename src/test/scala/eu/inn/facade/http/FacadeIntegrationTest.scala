@@ -342,8 +342,8 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      // hacky revault specific event handling
-      client ! FacadeRequest(Uri("/v3/events?page.from="), "subscribe",
+      // hacky {path:*} specific event handling
+      client ! FacadeRequest(Uri("/v3/events"), "subscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")),
         Null
       )
