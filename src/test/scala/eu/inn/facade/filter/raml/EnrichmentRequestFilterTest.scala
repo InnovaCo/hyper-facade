@@ -1,11 +1,11 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{Obj, Text}
-import eu.inn.facade.MockContext
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.FacadeRequest
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.raml.{Annotation, DataType, Field, Method}
+import eu.inn.facade.raml._
+import eu.inn.facade.{CleanRewriteIndex, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
@@ -15,7 +15,7 @@ import scaldi.Injectable
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with MockContext with Injectable {
+class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with MockContext with Injectable {
   implicit val injector = Injectors()
   val ramlFilters = inject[FilterChain]("ramlFilterChain")
 

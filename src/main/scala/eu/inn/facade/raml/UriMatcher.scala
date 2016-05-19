@@ -27,7 +27,7 @@ object UriMatcher {
     * @return if request URI matches pattern then Some of constructed URI with parameters will be returned, None otherwise
     */
   def matchUri(pattern: String, uri: Uri): Option[Uri] = {
-    val requestUriTokens = UriParser.tokens(uri.pattern.specific)
+    val requestUriTokens = UriParser.tokens(uri.formatted)
     var args = Map[String, String]()
     val patternTokens = UriParser.tokens(pattern)
     val patternTokenIter = patternTokens.iterator
@@ -41,13 +41,11 @@ object UriMatcher {
           matchesCorrectly = (patternToken == reqUriToken) &&
                  (patternTokenIter.hasNext == reqUriTokenIter.hasNext)
 
-        case ParameterToken(paramName, RegularMatchType) ⇒
+        case ParameterToken(patternParamName, RegularMatchType) ⇒
           reqUriToken match {
             case requestUriToken@TextToken(value) ⇒
-              args += paramName → value
+              args += patternParamName → value
               matchesCorrectly = patternTokenIter.hasNext == reqUriTokenIter.hasNext
-            case requestUriToken@ParameterToken(_, RegularMatchType) ⇒
-              matchesCorrectly = true
             case _ ⇒
               matchesCorrectly = false
           }

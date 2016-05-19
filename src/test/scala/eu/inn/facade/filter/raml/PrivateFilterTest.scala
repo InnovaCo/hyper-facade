@@ -1,10 +1,10 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{Null, Obj, Text}
-import eu.inn.facade.MockContext
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.{FacadeRequest, FacadeResponse}
 import eu.inn.facade.modules.Injectors
+import eu.inn.facade.{CleanRewriteIndex, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
@@ -12,7 +12,7 @@ import scaldi.Injectable
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class PrivateFilterTest extends FreeSpec with Matchers with ScalaFutures  with Injectable with MockContext {
+class PrivateFilterTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with Injectable with MockContext {
   implicit val injector = Injectors()
   val ramlFilters = inject[FilterChain]("ramlFilterChain")
 

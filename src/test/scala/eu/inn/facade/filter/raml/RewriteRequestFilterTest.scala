@@ -1,20 +1,19 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{ObjV, Text}
-import eu.inn.facade.MockContext
 import eu.inn.facade.model.FacadeRequest
 import eu.inn.facade.raml._
 import eu.inn.facade.raml.annotationtypes.rewrite
+import eu.inn.facade.{CleanRewriteIndex, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with BeforeAndAfterAll with MockContext {
+class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with MockContext {
 
   override def beforeAll() = {
-    RewriteIndexHolder.clearIndex()
     RewriteIndexHolder.updateRewriteIndex("/test-rewrite", "/rewritten", None)
     RewriteIndexHolder.updateRewriteIndex("/rewritten", "/rewritten-twice", None)
   }

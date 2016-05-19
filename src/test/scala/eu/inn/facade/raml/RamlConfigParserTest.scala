@@ -1,5 +1,6 @@
 package eu.inn.facade.raml
 
+import eu.inn.facade.CleanRewriteIndex
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml.Method._
@@ -7,7 +8,7 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
-class RamlConfigParserTest extends FreeSpec with Matchers with Injectable {
+class RamlConfigParserTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable {
   implicit val injector = Injectors()
   val ramlConfig = inject[RamlConfig]
 

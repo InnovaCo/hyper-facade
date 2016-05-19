@@ -118,7 +118,7 @@ traits:
           type: User
         headers:
           content-type:
-  put:
+  feed:put:
     is: [ secured ]
     body:
       application/json:
@@ -212,6 +212,9 @@ traits:
   put:
     (rewrite):
       uri: /revault/content/some-service
+  feed:put:
+    (rewrite):
+      uri: /revault/content/some-service
 
 /test-rewrite/some-service/{serviceId}:
   (rewrite):
@@ -235,3 +238,16 @@ traits:
   /child:
 
 /parent/external-child:
+
+
+# Event Rewrite Test Resources
+/events:
+  (rewrite):
+    uri: /rewritten-events/root
+
+/events/{path}:
+  feed:put:
+    (rewrite):
+      uri: /rewritten-events/root/{path}
+
+/rewritten-events/{path:*}:

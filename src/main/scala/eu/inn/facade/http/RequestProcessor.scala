@@ -1,5 +1,7 @@
 package eu.inn.facade.http
 
+import java.net.MalformedURLException
+
 import akka.pattern.AskTimeoutException
 import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfigPaths

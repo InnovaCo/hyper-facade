@@ -22,15 +22,16 @@ case class FeedTestBody(content: String) extends Body
 
 @request(Method.FEED_POST, "/test-service/reliable")
 case class ReliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
-  with DefinedResponse[Ok[DynamicBody]]
 
 @request(Method.FEED_POST, "/test-service/unreliable")
 case class UnreliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
-  with DefinedResponse[Ok[DynamicBody]]
 
 @request(Method.FEED_PUT, "/status/test-service/{arg}")
 case class UnreliableRewriteFeedTestRequest(arg: String, body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
-  with DefinedResponse[Ok[DynamicBody]]
+
+@request(Method.FEED_PUT, "/rewritten-events/{path:*}")
+case class RewriteOutsideFeedTestRequest(path: String, body: DynamicBody, headers: Map[String, Seq[String]]) extends Request[DynamicBody]
+
 
 object TestService extends App {
   val config = ConfigLoader()
@@ -53,7 +54,7 @@ object TestService extends App {
   * This class is just a test stuff for publishing events to Hyperbus.
   */
 class TestService(hyperbus: Hyperbus) {
-  def publish(request: Request[FeedTestBody]): Future[PublishResult] = {
+  def publish(request: Request[Body]): Future[PublishResult] = {
     hyperbus <| request
   }
 

@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import eu.inn.binders.value._
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.model._
+import eu.inn.facade.raml.RamlConfig
 import eu.inn.facade.utils.FunctionUtils.chain
 import eu.inn.facade.utils.HalTransformer
 import eu.inn.facade.utils.UriTransformer._
@@ -21,7 +22,7 @@ class HttpWsResponseFilter(config: Config) extends ResponseFilter {
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer = chain(rewriteLinkToOriginal(_: Uri,rewriteCountLimit), addRootPathPrefix(rootPathPrefix))
+      val uriTransformer = chain(rewriteLinkToOriginal(_: Uri, rewriteCountLimit), addRootPathPrefix(rootPathPrefix))
       val (newHeaders, newBody) = HttpWsFilter.filterMessage(response, uriTransformer)
       response.copy(
         headers = newHeaders,
@@ -37,10 +38,10 @@ class WsEventFilter(config: Config) extends EventFilter {
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
-      val uriTransformer = chain(rewriteLinkToOriginal(_: Uri,rewriteCountLimit), addRootPathPrefix(rootPathPrefix))
+      val uriTransformer = chain(rewriteLinkToOriginal(_: Uri, rewriteCountLimit), addRootPathPrefix(rootPathPrefix))
       val (newHeaders, newBody) = HttpWsFilter.filterMessage(request, uriTransformer)
       request.copy(
-        uri = uriTransformer(Uri(request.uri.formatted)),
+        uri = addRootPathPrefix(rootPathPrefix)(Uri(request.uri.formatted)),
         headers = newHeaders,
         body = newBody
       )

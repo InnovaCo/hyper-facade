@@ -65,7 +65,7 @@ object HalTransformer {
       ObjV("href" → uri.formatted)
     } else {
       val uri = transformUri(Uri(href))
-      ObjV("href" → uri.pattern.specific, "templated" → false)
+      ObjV("href" → uri.formatted, "templated" → false)
     }
   }
 }

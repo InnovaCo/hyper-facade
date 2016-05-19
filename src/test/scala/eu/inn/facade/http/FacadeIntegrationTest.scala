@@ -6,9 +6,9 @@ import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import eu.inn.binders.json._
 import eu.inn.binders.value.{Null, Obj, ObjV, Text}
+import eu.inn.facade._
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade._
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
@@ -33,7 +33,7 @@ import scala.io.Source
 /**
   * Important: Kafka should be up and running to pass this test
   */
-class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with Injectable
+class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with Injectable
   with BeforeAndAfterEach with WsTestClientHelper with Eventually {
   implicit val injector = Injectors()
   implicit val actorSystem = inject[ActorSystem]
@@ -66,7 +66,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      Source.fromURL("http://localhost:54321/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """{"a":"response"}"""
+      Source.fromURL("http://localhost:54321/v3/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """{"a":"response"}"""
     }
 
     "http get. Resource is not configured in RAML" in {
@@ -78,7 +78,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           }
         ).futureValue
       }
-      Source.fromURL("http://localhost:54321/someSecretResource?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
+      Source.fromURL("http://localhost:54321/v3/someSecretResource?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
     }
 
     "http get. Error response" in {
@@ -90,12 +90,12 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       val clientActorSystem = ActorSystem()
       val pipeline: HttpRequest => Future[HttpResponse] = sendReceive(clientActorSystem, ExecutionContext.fromExecutor(newPoolExecutor()))
-      val uri404 = "http://localhost:54321/test-service/reliable"
+      val uri404 = "http://localhost:54321/v3/test-service/reliable"
       val response404 = pipeline(Get(http.Uri(uri404))).futureValue
       response404.entity.asString should include (""""code":"not-found"""")
       response404.status.intValue shouldBe 404
 
-      val uri503 = "http://localhost:54321/failed-resource"
+      val uri503 = "http://localhost:54321/v3/failed-resource"
       val response503 = pipeline(Get(http.Uri(uri503))).futureValue
       response503.entity.asString should include (""""code":"service-is-not-available"""")
       response503.status.intValue shouldBe 503
@@ -112,7 +112,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       val clientActorSystem = ActorSystem()
       val pipeline: HttpRequest => Future[HttpResponse] = sendReceive(clientActorSystem, ExecutionContext.fromExecutor(newPoolExecutor()))
-      val uri = "http://localhost:54321/test-service/reliable"
+      val uri = "http://localhost:54321/v3/test-service/reliable"
       val response = pipeline(Get(http.Uri(uri))).futureValue
 
       response.entity.asString shouldBe """"response""""
@@ -127,7 +127,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "websocket: unreliable feed" in {
       val q = new TestQueue
-      val client = createWsClient("unreliable-feed-client", "/status/test-service", q.put)
+      val client = createWsClient("unreliable-feed-client", "/v3/status/test-service", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
@@ -135,7 +135,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
+      client ! FacadeRequest(Uri("/v3/test-service/unreliable"), "subscribe",
         Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
@@ -155,14 +155,14 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       q.next().futureValue shouldBe """{"uri":"/v3/test-service/unreliable","method":"feed:post","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
 
-      client ! FacadeRequest(Uri("/test-service/unreliable"), "unsubscribe",
+      client ! FacadeRequest(Uri("/v3/test-service/unreliable"), "unsubscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
     }
 
     "websocket: handle error response" in {
       val q = new TestQueue
-      val client = createWsClient("error-feed-client", "/status/test-service", q.put)
+      val client = createWsClient("error-feed-client", "/v3/status/test-service", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
@@ -170,7 +170,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/test-service/unreliable"), "subscribe",
+      client ! FacadeRequest(Uri("/v3/test-service/unreliable"), "subscribe",
           Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
             FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
             FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
@@ -183,7 +183,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "websocket: reliable feed" in {
       val q = new TestQueue
-      val client = createWsClient("reliable-feed-client", "/status/test-service", q.put)
+      val client = createWsClient("reliable-feed-client", "/v3/status/test-service", q.put)
 
       val initialResourceState = Ok(
         DynamicBody(Obj(Map("content" → Text("fullResource")))),
@@ -197,7 +197,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
           Header.MESSAGE_ID → Seq("messageId"),
           Header.CORRELATION_ID → Seq("correlationId"))))
 
-      val subscriptionRequest = FacadeRequest(Uri("/test-service/reliable"), "subscribe",
+      val subscriptionRequest = FacadeRequest(Uri("/v3/test-service/reliable"), "subscribe",
         Map(FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
@@ -291,7 +291,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       )
       receivedEvent3 shouldBe directEvent3.toJson
 
-      client ! FacadeRequest(Uri("/test-service/reliable"), "unsubscribe",
+      client ! FacadeRequest(Uri("/v3/test-service/reliable"), "unsubscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null
       )
@@ -299,7 +299,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "websocket: unreliable events feed with rewrite" in {
       val q = new TestQueue
-      val client = createWsClient("unreliable-rewrite-feed-client", "/status/test-service/{arg}", q.put)
+      val client = createWsClient("unreliable-rewrite-feed-client", "/v3/status/test-service/{arg}", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/status/test-service/{arg}")), Map(Header.METHOD → Specific(Method.GET))),
@@ -307,7 +307,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/test-rewrite-with-args/some-service/100500"), "subscribe",
+      client ! FacadeRequest(Uri("/v3/test-rewrite-with-args/some-service/100500"), "subscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
         Null
@@ -327,14 +327,58 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
       q.next().futureValue shouldBe """{"uri":"/v3/test-rewrite-with-args/some-service/100500","method":"feed:put","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
 
-      client ! FacadeRequest(Uri("/test-rewrite-with-args/some-service/100500"), "unsubscribe",
+      client ! FacadeRequest(Uri("/v3/test-rewrite-with-args/some-service/100500"), "unsubscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
     }
 
+    "websocket: unreliable events feed with rewrite (not matching of request context)" in {
+      val q = new TestQueue
+      val client = createWsClient("unreliable-rewrite-nm-feed-client", "/v3/rewritten-events/{path}", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/rewritten-events/{path:*}")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Obj(Map("content" → Text("rewritten-events-not-matching-context")))))
+        ).futureValue
+      }
+
+      // hacky revault specific event handling
+      client ! FacadeRequest(Uri("/v3/events?page.from="), "subscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")),
+        Null
+      )
+
+      val resourceState = q.next().futureValue
+      resourceState should startWith("""{"status":200,"headers":{"Hyperbus-Message-Id":""")
+      resourceState should endWith("""body":{"content":"rewritten-events-not-matching-context"}}""")
+
+      testService.publish(RewriteOutsideFeedTestRequest(
+        "root/1",
+        DynamicBody(ObjV("content" → "event1")),
+        Headers.plain(Map(
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
+      )
+
+      q.next().futureValue shouldBe """{"uri":"/v3/events/1","method":"feed:put","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["messageId"]},"body":{"content":"event1"}}"""
+
+      testService.publish(RewriteOutsideFeedTestRequest(
+        "root/2",
+        DynamicBody(ObjV("content" → "event2")),
+        Headers.plain(Map(
+          Header.MESSAGE_ID → Seq("messageId"),
+          Header.CORRELATION_ID → Seq("correlationId"))))
+      )
+
+      q.next().futureValue shouldBe """{"uri":"/v3/events/2","method":"feed:put","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["messageId"]},"body":{"content":"event2"}}"""
+
+      client ! FacadeRequest(Uri("/v3/events"), "unsubscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
+    }
+
     "websocket: get request" in {
       val q = new TestQueue
-      val client = createWsClient("get-client", "/status/test-service", q.put)
+      val client = createWsClient("get-client", "/v3/status/test-service", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
@@ -347,7 +391,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/test-service/reliable"), Method.GET,
+      client ! FacadeRequest(Uri("/v3/test-service/reliable"), Method.GET,
         Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
@@ -358,7 +402,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "websocket: post request" in {
       val q = new TestQueue
-      val client = createWsClient("post-client", "/status/test-service", q.put)
+      val client = createWsClient("post-client", "/v3/status/test-service", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.POST))),
@@ -368,7 +412,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/test-service/reliable"), Method.POST,
+      client ! FacadeRequest(Uri("/v3/test-service/reliable"), Method.POST,
         Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
@@ -380,7 +424,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "websocket: get with rewrite with arguments" in {
       val q = new TestQueue
-      val client = createWsClient("ws-get-rewrite-args-client", "/test-rewrite/some-service/{serviceId}", q.put)
+      val client = createWsClient("ws-get-rewrite-args-client", "/v3/test-rewrite/some-service/{serviceId}", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/rewritten/some-service/{serviceId}")), Map(Header.METHOD → Specific(Method.GET))),
@@ -390,7 +434,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/test-rewrite/some-service/100500"), Method.GET,
+      client ! FacadeRequest(Uri("/v3/test-rewrite/some-service/100500"), Method.GET,
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
 
       val resourceState = q.next().futureValue
@@ -399,7 +443,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "websocket: get applies private response filter" in {
       val q = new TestQueue
-      val client = createWsClient("ws-get-private-client", "/test-rewrite/some-service", q.put)
+      val client = createWsClient("ws-get-private-client", "/v3/test-rewrite/some-service", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
@@ -415,7 +459,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/users/100500"), Method.GET,
+      client ! FacadeRequest(Uri("/v3/users/100500"), Method.GET,
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
 
       val resourceState = q.next().futureValue
@@ -425,7 +469,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
 
     "websocket: get applies private event filter" in {
       val q = new TestQueue
-      val client = createWsClient("ws-get-private-event-client", "/test-rewrite/some-service", q.put)
+      val client = createWsClient("ws-get-private-event-client", "/v3/test-rewrite/some-service", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
@@ -441,7 +485,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/users/100500"), "subscribe",
+      client ! FacadeRequest(Uri("/v3/users/100500"), "subscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
 
       val resourceState = q.next().futureValue
@@ -466,7 +510,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      Source.fromURL("http://localhost:54321/test-rewrite/some-service", "UTF-8").mkString shouldBe """"response""""
+      Source.fromURL("http://localhost:54321/v3/test-rewrite/some-service", "UTF-8").mkString shouldBe """"response""""
     }
 
     "http get with rewrite with arguments" in {
@@ -478,7 +522,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      Source.fromURL("http://localhost:54321/test-rewrite/some-service/100501", "UTF-8").mkString shouldBe """"response-with-args""""
+      Source.fromURL("http://localhost:54321/v3/test-rewrite/some-service/100501", "UTF-8").mkString shouldBe """"response-with-args""""
     }
 
     "http get applies private response filter" in {
@@ -496,7 +540,7 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
         ).futureValue
       }
 
-      val str = Source.fromURL("http://localhost:54321/users/100500", "UTF-8").mkString
+      val str = Source.fromURL("http://localhost:54321/v3/users/100500", "UTF-8").mkString
       str should include (""""userName":"jsmith"""")
       str shouldNot include ("""password""")
     }
