@@ -49,7 +49,8 @@ object FacadeRequestContext {
 case class PreparedRequestContext(
                                    requestUri: Uri,
                                    requestMethod: String,
-                                   requestHeaders: Map[String, Seq[String]]
+                                   requestHeaders: Map[String, Seq[String]],
+                                   contextStorage: Map[String, Any]
                                  )
 
 // todo: better name?
