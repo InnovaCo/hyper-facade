@@ -3,19 +3,19 @@ package eu.inn.facade.filter.authentication
 import eu.inn.binders.value.Value
 import eu.inn.facade.model.FacadeRequestContext
 
-trait UserIdentity {
+trait AuthUser {
   def id: String
   def roles: Set[String]
   def properties: Value
 }
 
-object UserIdentity {
-  val KEY_NAME = "user-identity"
+object AuthUser {
+  val KEY_NAME = "auth-user"
 
   implicit class ExtendFacadeRequestContext(facadeRequestContext: FacadeRequestContext) {
-    def userIdentity: Option[UserIdentity] = {
+    def authUser: Option[AuthUser] = {
       facadeRequestContext.prepared.get.contextStorage.get(KEY_NAME) match {
-        case Some(identity : UserIdentity) ⇒ Some(identity)
+        case Some(user : AuthUser) ⇒ Some(user)
         case _ ⇒ None
       }
     }
