@@ -1,0 +1,6 @@
+authorize
+deny
+rewrite
+private_
+x_client_ip
+x_client_language
