@@ -23,7 +23,7 @@ class DenyFilterTest extends FreeSpec with Matchers with ScalaFutures with Injec
     "request. private resource. forbidden" in {
       val unauthorizedRequest = FacadeRequest(
         Uri("/authorized-only-resource"),
-        Method.POST,
+        Method.GET,
         Map.empty,
         Map("field" → Text("value"))
       )
@@ -35,7 +35,7 @@ class DenyFilterTest extends FreeSpec with Matchers with ScalaFutures with Injec
     "request. private resource. allowed" in {
       val request = FacadeRequest(
         Uri("/authorized-only-resource"),
-        Method.POST,
+        Method.GET,
         Map.empty,
         Map("field" → Text("value"))
       )

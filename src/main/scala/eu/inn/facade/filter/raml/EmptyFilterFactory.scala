@@ -5,7 +5,7 @@ import eu.inn.facade.filter.model.{RamlFilterFactory, RamlTarget}
 import eu.inn.facade.model._
 
 class EmptyFilterFactory extends RamlFilterFactory {
-  def createFilterChain(target: RamlTarget): SimpleFilterChain = {
+  override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
     FilterChain.empty
   }
 }

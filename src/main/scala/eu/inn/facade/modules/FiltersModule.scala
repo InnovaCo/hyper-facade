@@ -11,8 +11,9 @@ class FiltersModule extends Module {
 
   bind [RamlFilterFactory]          identifiedBy "private"                              to injected[PrivateFilterFactory]
   bind [RamlFilterFactory]          identifiedBy "deny"                                 to injected[DenyFilterFactory]
+  bind [RamlFilterFactory]          identifiedBy "authorize"                            to injected[AuthorizeFilterFactory]
   bind [RamlFilterFactory]          identifiedBy "x-client-ip" and "x-client-language"  to injected[EnrichmentFilterFactory]
-  bind [RamlFilterFactory]          identifiedBy "rewrite"                              to injected[RewriteRequestFilterFactory]
+  bind [RamlFilterFactory]          identifiedBy "rewrite"                              to injected[RewriteFilterFactory]
 
   bind [FilterChain]                identifiedBy "beforeFilterChain"                    to SimpleFilterChain(
     requestFilters            = Seq(injected[HttpWsRequestFilter])

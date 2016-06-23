@@ -7,6 +7,11 @@ baseUri: https://meta.inn.eu/revault
 annotationTypes:
   authorize:
 
-/resource-with-auth:
+/auth-resource:
   (authorize):
-    if: uri.userId != context.authUser.id
+    if: context.authUser.id = 123456
+
+/auth-method:
+  post:
+    (authorize):
+      if: context.authUser.id = 123456

@@ -6,7 +6,7 @@ import eu.inn.facade.filter.model.{RamlFilterFactory, RamlTarget, TargetMethod, 
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.facade.raml.{Annotation, Method, RamlConfigException, RewriteIndexHolder}
 
-class RewriteRequestFilterFactory(config: Config) extends RamlFilterFactory {
+class RewriteFilterFactory(config: Config) extends RamlFilterFactory {
 
   override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
     val (rewriteArgs, originalUri, ramlMethod) = target match {

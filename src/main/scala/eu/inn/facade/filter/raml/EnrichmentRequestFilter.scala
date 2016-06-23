@@ -5,22 +5,9 @@ import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.model.{RamlFilterFactory, RamlTarget, RequestFilter, TargetFields}
 import eu.inn.facade.model._
 import eu.inn.facade.raml.{Annotation, Field}
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
-
-class EnrichmentFilterFactory extends RamlFilterFactory {
-  def createFilterChain(target: RamlTarget): SimpleFilterChain = {
-    target match {
-      case TargetFields(typeName, fields) ⇒
-        SimpleFilterChain(
-          requestFilters = Seq(new EnrichRequestFilter(fields)),
-          responseFilters = Seq.empty,
-          eventFilters = Seq.empty
-        )
-      case _ ⇒ FilterChain.empty // log warning
-    }
-  }
-}
 
 class EnrichRequestFilter(val fields: Seq[Field]) extends RequestFilter {
   override def apply(contextWithRequest: ContextWithRequest)
@@ -66,5 +53,23 @@ class EnrichRequestFilter(val fields: Seq[Field]) extends RequestFilter {
     ramlField.fields.nonEmpty &&
       fields.nonEmpty &&
       fields.contains(ramlField.name)
+  }
+}
+
+class EnrichmentFilterFactory extends RamlFilterFactory {
+  val log = LoggerFactory.getLogger(getClass)
+
+  override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
+    target match {
+      case TargetFields(_, fields) ⇒
+        SimpleFilterChain(
+          requestFilters = Seq(new EnrichRequestFilter(fields)),
+          responseFilters = Seq.empty,
+          eventFilters = Seq.empty
+        )
+      case unknownTarget ⇒
+        log.warn(s"Annotations 'x-client-ip' and 'x-client-language' are not supported for target $unknownTarget. Empty filter chain will be created")
+        FilterChain.empty
+    }
   }
 }

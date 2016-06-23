@@ -19,17 +19,19 @@ class DenyFilterFactory extends RamlFilterFactory {
           eventFilters = Seq(new DenyEventFilter(fields))
         )
 
-      case TargetResource(_, Annotation(_, Some(deny: deny))) ⇒ SimpleFilterChain(
-        requestFilters = Seq(new DenyRequestFilter(deny.getIfExpression)),
-        responseFilters = Seq.empty,
-        eventFilters = Seq.empty
-      )
+      case TargetResource(_, Annotation(_, Some(deny: deny))) ⇒
+        SimpleFilterChain(
+          requestFilters = Seq(new DenyRequestFilter(deny.getIfExpression)),
+          responseFilters = Seq.empty,
+          eventFilters = Seq.empty
+        )
 
-      case TargetMethod(_, _, Annotation(_, Some(deny: deny))) ⇒ SimpleFilterChain(
-        requestFilters = Seq(new DenyRequestFilter(deny.getIfExpression)),
-        responseFilters = Seq.empty,
-        eventFilters = Seq.empty
-      )
+      case TargetMethod(_, _, Annotation(_, Some(deny: deny))) ⇒
+        SimpleFilterChain(
+          requestFilters = Seq(new DenyRequestFilter(deny.getIfExpression)),
+          responseFilters = Seq.empty,
+          eventFilters = Seq.empty
+        )
 
       case unknownTarget ⇒
         log.warn(s"Annotation (deny) is not supported for target $unknownTarget. Empty filter chain will be created")
