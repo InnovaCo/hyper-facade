@@ -15,15 +15,15 @@ class DenyRequestFilter(ifExpression: String) extends RequestFilter with MapBase
   override def apply(contextWithRequest: ContextWithRequest)
                     (implicit ec: ExecutionContext): Future[ContextWithRequest] = {
     Future {
-      if (expressionEngine(contextWithRequest.request, contextWithRequest.context).parse(ifExpression))
-        contextWithRequest
-      else {
+      if (expressionEngine(contextWithRequest.request, contextWithRequest.context).parse(ifExpression)) {
         val error = Forbidden(ErrorBody("forbidden"))
         throw new FilterInterruptException(
           FacadeResponse(error),
           s"Access to resource ${contextWithRequest.request.uri} is forbidden"
         )
       }
+      else
+        contextWithRequest
     }
   }
 }
@@ -42,7 +42,8 @@ class DenyResponseFilter(val fields: Seq[Field]) extends ResponseFilter with Map
 }
 
 class DenyEventFilter(val fields: Seq[Field]) extends EventFilter with MapBasedConditionalFilter {
-  override def apply(contextWithRequest: ContextWithRequest, event: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
+  override def apply(contextWithRequest: ContextWithRequest, event: FacadeRequest)
+                    (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val exprEngine = expressionEngine(contextWithRequest.request, contextWithRequest.context)
       event.copy(

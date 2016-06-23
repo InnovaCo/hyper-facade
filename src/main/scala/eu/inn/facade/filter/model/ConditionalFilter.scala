@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.model
 
-import eu.inn.facade.model.{FacadeHeaders, FacadeRequest, FacadeRequestContext}
+import eu.inn.facade.model.{ContextStorage, FacadeHeaders, FacadeRequest, FacadeRequestContext}
 import eu.inn.facade.model.ContextStorage._
 import eu.inn.parser.{EvaluationEngine, ExpressionEngine, MapBasedEvaluationEngine}
 
@@ -29,8 +29,8 @@ trait MapBasedConditionalFilter extends ConditionalFilter {
       case None ⇒ Map.empty[String, Any]
     }
     val contextMap = Map[String, Any](
-      "authUser" → authUserMap,
-      "isAuthorized" → context.isAuthorized,
+      ContextStorage.AUTH_USER → authUserMap,
+      ContextStorage.IS_AUTHORIZED → context.isAuthorized,
       "ip" → (context.requestHeaders.get(FacadeHeaders.CLIENT_IP) match {
         case Some(ip :: tail) ⇒ ip
         case _ ⇒ None

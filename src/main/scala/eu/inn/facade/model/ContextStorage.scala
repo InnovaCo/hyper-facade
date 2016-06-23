@@ -3,8 +3,8 @@ package eu.inn.facade.model
 import eu.inn.authentication.AuthUser
 
 object ContextStorage {
-  val AUTH_USER = "auth-user"
-  val IS_AUTHORIZED = "is-authorized"
+  val AUTH_USER = "authUser"
+  val IS_AUTHORIZED = "isAuthorized"
 
   implicit class ExtendFacadeRequestContext(facadeRequestContext: FacadeRequestContext) {
 

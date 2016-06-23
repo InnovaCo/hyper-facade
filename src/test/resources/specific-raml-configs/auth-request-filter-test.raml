@@ -5,15 +5,8 @@ mediaType: application/json
 baseUri: https://meta.inn.eu/revault
 
 annotationTypes:
-  deny:
-    properties:
-      if: string
   authorize:
-    properties:
-      if: string
 
-/test:
+/resource-with-auth:
   (authorize):
-    if: uri.userId = context.authUser.id
-  (deny):
-    if: !context.isAuthorized
+    if: uri.userId != context.authUser.id

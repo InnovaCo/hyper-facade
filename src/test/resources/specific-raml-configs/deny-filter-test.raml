@@ -1,0 +1,36 @@
+#%RAML 1.0
+title: Facade API
+version: v1
+mediaType: application/json
+baseUri: https://meta.inn.eu/revault
+
+types:
+  Status:
+    type: object
+    properties:
+      publicField: number
+      privateField:
+        (deny):
+          if: "!context.isAuthorized"
+
+annotationTypes:
+  deny:
+
+/authorized-only-resource:
+  (deny):
+    if: "!context.isAuthorized"
+
+/authorized-only-method:
+  get:
+    (deny):
+      if: "!context.isAuthorized"
+
+/authorized-only-fields:
+  get:
+    responses:
+      200:
+        body:
+          type: Status
+  feed:put:
+    body:
+      type: Status
