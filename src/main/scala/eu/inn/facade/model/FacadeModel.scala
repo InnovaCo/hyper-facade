@@ -56,6 +56,7 @@ case class FacadeRequest(uri: Uri, method: String, headers: Map[String, Seq[Stri
 }
 
 object FacadeRequest {
+
   def apply(request: HttpRequest): FacadeRequest = {
     val pathAndQuery = request.uri.path.toString + {
       if (request.uri.query.nonEmpty)

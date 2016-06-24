@@ -64,7 +64,7 @@ object Build extends sbt.Build {
         "io.spray"                       %% "spray-routing-shapeless2"    % "1.3.3",
         "org.scaldi"                     %% "scaldi"                      % "0.5.7",
         "io.spray"                       %% "spray-client"                % "1.3.3"     % "test",
-        "eu.inn"                         %% "simple-auth-service"         % "0.1.4"     % "test",
+        "eu.inn"                         %% "simple-auth-service"         % "0.1.6"     % "test",
         "org.scalatest"                  %% "scalatest"                   % "2.2.6"     % "test"
       ),
 

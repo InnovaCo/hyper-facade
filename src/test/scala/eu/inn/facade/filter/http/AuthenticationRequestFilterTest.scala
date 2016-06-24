@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.http
 
-import eu.inn.authentication.{AuthUser, AuthenticationService}
+import eu.inn.authentication.{AuthUser, BasicAuthenticationService}
 import eu.inn.binders.value.{Null, Text}
 import eu.inn.facade.MockContext
 import eu.inn.facade.model._
@@ -16,7 +16,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class AuthenticationRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with Injectable with MockContext {
 
   implicit val injector = Injectors()
-  inject[AuthenticationService]
+  inject[BasicAuthenticationService]
   val filter = new AuthenticationRequestFilter
 
   "AuthenticationFilter" - {
@@ -40,7 +40,7 @@ class AuthenticationRequestFilterTest extends FreeSpec with Matchers with ScalaF
       val unauthorizedRequest = FacadeRequest(
         Uri("/resource"),
         Method.POST,
-        Map(FacadeHeaders.AUTHORIZATION → Seq("Authorization: Basic admin:wrong-password")),
+        Map(FacadeHeaders.AUTHORIZATION → Seq("admin:wrong-password")),
         Map("field" → Text("value"))
       )
       val requestContext = mockContext(unauthorizedRequest)
@@ -56,7 +56,7 @@ class AuthenticationRequestFilterTest extends FreeSpec with Matchers with ScalaF
       val request = FacadeRequest(
         Uri("/resource"),
         Method.POST,
-        Map(FacadeHeaders.AUTHORIZATION → Seq("Authorization: Basic admin:admin")),
+        Map(FacadeHeaders.AUTHORIZATION → Seq("admin:admin")),
         Map("field" → Text("value"))
       )
       val requestContext = mockContext(request)

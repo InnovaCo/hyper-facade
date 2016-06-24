@@ -3,7 +3,8 @@ package eu.inn.facade.model
 import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.MessagingContextFactory
 import eu.inn.hyperbus.transport.api.uri.Uri
-import spray.http.HttpRequest
+import spray.http.HttpHeaders.Authorization
+import spray.http.{BasicHttpCredentials, HttpHeader, HttpRequest}
 
 case class FacadeRequestContext(
                                  remoteAddress: String,
@@ -30,6 +31,7 @@ case class FacadeRequestContext(
 }
 
 object FacadeRequestContext {
+
   def create(remoteAddress: String, httpRequest: HttpRequest, facadeRequest: FacadeRequest) = {
     FacadeRequestContext(
       remoteAddress,
@@ -38,13 +40,25 @@ object FacadeRequestContext {
       facadeRequest.method,
       // http headers always override request headers
       // this could be important for WS request
-      facadeRequest.headers ++ httpRequest.headers.groupBy(_.name).map { kv ⇒
-        kv._1 → kv._2.map(_.value)
-      },
+      facadeRequest.headers ++ normalizeHeaders(httpRequest.headers),
       None,
       Map.empty
     )
   }
+
+  def normalizeHeaders(headers: List[HttpHeader]): Map[String, Seq[String]] = {
+    headers.foldLeft(Map.newBuilder[String, Seq[String]]) { (facadeRequestHeaders, httpHeader) ⇒
+      httpHeader match {
+        case basicAuth @ Authorization(credentials: BasicHttpCredentials) ⇒
+          val userPass = s"${credentials.username}: ${credentials.password}"
+          facadeRequestHeaders += (FacadeHeaders.AUTHORIZATION -> Seq(userPass))
+
+        case other ⇒
+          facadeRequestHeaders += (httpHeader.name → Seq(httpHeader.value))
+      }
+    }.result()
+  }
+
 }
 
 // todo: better name?

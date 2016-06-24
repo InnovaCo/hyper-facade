@@ -20,15 +20,15 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
 
   override def apply(contextWithRequest: ContextWithRequest)
                     (implicit ec: ExecutionContext): Future[ContextWithRequest] = {
-    contextWithRequest.request.headers.get(FacadeHeaders.AUTHORIZATION) match {
-      case Some(credentials) ⇒
-        val authRequest = AuthenticationRequest(AuthenticationRequestBody(credentials.head))
+    val context = contextWithRequest.context
+    context.requestHeaders.get(FacadeHeaders.AUTHORIZATION) match {
+      case Some(credentials :: tail) ⇒
+        val authRequest = AuthenticationRequest(AuthenticationRequestBody(credentials))
         hyperbus <~ authRequest recover {
           handleHyperbusExceptions(authRequest)
         } map { response: Response[Body] ⇒
           val authUserValue = response.body.asInstanceOf[DynamicBody].content.authUser
           val authUser = authUserValue.fromValue[AuthUser]
-          val context = contextWithRequest.context
           val updatedContextStorage = context.contextStorage + (ContextStorage.AUTH_USER → authUser)
           contextWithRequest.copy(
             context = context.copy(
@@ -62,5 +62,10 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
       val errorId = IdGenerator.create()
       log.error(s"Timeout #$errorId while handling $authRequest")
       GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${authRequest.uri}'"), errorId = errorId))
+
+    case other: Throwable ⇒
+      val errorId = IdGenerator.create()
+      log.error(s"error $errorId", other)
+      InternalServerError(ErrorBody("internal-error", errorId = errorId))
   }
 }

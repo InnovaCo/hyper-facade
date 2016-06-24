@@ -1,59 +1,28 @@
 package eu.inn.facade.http
 
-import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, TimeUnit}
-
 import akka.actor.ActorSystem
-import com.typesafe.config.Config
 import eu.inn.binders.json._
 import eu.inn.binders.value.{Null, Obj, ObjV, Text}
 import eu.inn.facade._
+import eu.inn.facade.integration.IntegrationTestBase
 import eu.inn.facade.model._
-import eu.inn.facade.modules.Injectors
-import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
 import eu.inn.hyperbus.transport.api.uri.Uri
-import eu.inn.hyperbus.transport.api.{Subscription, TransportConfigurationLoader, TransportManager}
-import eu.inn.servicecontrol.api.Service
-import org.scalatest.concurrent.{Eventually, ScalaFutures}
-import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{BeforeAndAfterEach, FreeSpec, Matchers}
-import scaldi.Injectable
 import spray.client.pipelining._
 import spray.http
 import spray.http.HttpCharsets._
 import spray.http.HttpHeaders.{RawHeader, `Content-Type`}
 import spray.http._
 
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration.{Duration, _}
+import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.io.Source
 
 /**
   * Important: Kafka should be up and running to pass this test
   */
-class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with Injectable
-  with BeforeAndAfterEach with WsTestClientHelper with Eventually {
-  implicit val injector = Injectors()
-  implicit val actorSystem = inject[ActorSystem]
-  implicit val patience = PatienceConfig(scaled(Span(15, Seconds)))
-  implicit val timeout = akka.util.Timeout(15.seconds)
-  implicit val uid = new UriSpecificDeserializer
-  implicit val uis = new UriSpecificSerializer
-
-  val httpWorker = inject[HttpWorker]
-
-  inject[Service].asInstanceOf[WsRestServiceApp].start {
-    httpWorker.restRoutes.routes
-  }
-  val hyperbus = inject[Hyperbus] // initialize hyperbus
-  val testService = new TestService(testServiceHyperbus)
-  val subscriptions = scala.collection.mutable.MutableList[Subscription]()
-
-  // Unfortunately WsRestServiceApp doesn't provide a Future or any other way to ensure that listener is
-  // bound to socket, so we need this stupid timeout to initialize the listener
-  Thread.sleep(1000)
+class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
 
   "Facade integration" - {
     "http get. Resource configured in RAML" in {
@@ -544,27 +513,5 @@ class FacadeIntegrationTest extends FreeSpec with Matchers with ScalaFutures wit
       str should include (""""userName":"jsmith"""")
       str shouldNot include ("""password""")
     }
-  }
-
-  def testServiceHyperbus: Hyperbus = {
-    val config = inject[Config]
-    val testServiceTransportMgr = new TransportManager(TransportConfigurationLoader.fromConfig(config))
-    val hypeBusGroupKey = "hyperbus.facade.group-name"
-    val defaultHyperbusGroup = if (config.hasPath(hypeBusGroupKey)) Some(config.getString(hypeBusGroupKey)) else None
-    new Hyperbus(testServiceTransportMgr, defaultHyperbusGroup)(ExecutionContext.fromExecutor(newPoolExecutor()))
-  }
-
-  private def newPoolExecutor(): Executor = {
-    val maximumPoolSize: Int = Runtime.getRuntime.availableProcessors() * 16
-    new ThreadPoolExecutor(0, maximumPoolSize, 5 * 60L, TimeUnit.SECONDS, new SynchronousQueue[Runnable])
-  }
-
-  override def afterEach(): Unit = {
-    subscriptions.foreach(hyperbus.off)
-    subscriptions.clear
-  }
-
-  def register(s: Subscription) = {
-    subscriptions += s
   }
 }
