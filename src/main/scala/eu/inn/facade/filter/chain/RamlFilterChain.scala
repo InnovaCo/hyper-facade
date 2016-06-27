@@ -8,7 +8,8 @@ class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
 
   def findRequestFilters(contextWithRequest: ContextWithRequest): Seq[RequestFilter] = {
     val request = contextWithRequest.request
-    requestOrEventFilters(request.uri.pattern.specific, request.method, request.contentType).requestFilters
+    val filters = requestOrEventFilters(request.uri.pattern.specific, request.method, request.contentType).requestFilters
+    filters
   }
 
   def findResponseFilters(context: FacadeRequestContext, response: FacadeResponse): Seq[ResponseFilter] = {

@@ -50,7 +50,7 @@ object FacadeRequestContext {
     headers.foldLeft(Map.newBuilder[String, Seq[String]]) { (facadeRequestHeaders, httpHeader) ⇒
       httpHeader match {
         case basicAuth @ Authorization(credentials: BasicHttpCredentials) ⇒
-          val userPass = s"${credentials.username}: ${credentials.password}"
+          val userPass = s"${credentials.username}:${credentials.password}"
           facadeRequestHeaders += (FacadeHeaders.AUTHORIZATION -> Seq(userPass))
 
         case other ⇒

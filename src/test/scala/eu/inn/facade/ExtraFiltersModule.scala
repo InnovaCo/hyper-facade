@@ -8,4 +8,5 @@ import scaldi.Module
 class ExtraFiltersModule extends Module {
   bind [RamlFilterFactory]           identifiedBy "paged"         to new NoOpFilterFactory
   bind [BasicAuthenticationService]  identifiedBy "authService"   to injected[BasicAuthenticationService]
+  bind [TestService]                 identifiedBy "testService"   to injected[TestService]
 }

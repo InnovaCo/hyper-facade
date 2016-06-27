@@ -91,7 +91,7 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
         inj.getBinding(List(ident)) match {
           case Some(_) ⇒
             val filterFactory = inject[RamlFilterFactory](annotation.name)
-            filterFactory.createFilterChain(target)
+            filterChain ++ filterFactory.createFilterChain(target)
 
           case None ⇒
             log.warn(s"Annotation '${annotation.name}' is not bound")

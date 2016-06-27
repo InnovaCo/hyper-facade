@@ -10,6 +10,12 @@ annotationTypes:
 
 /authentication-failed:
 
+/authorization-failed:
+  (authorize):
+    if: context.authUser.roles has 'qa'
+  (deny):
+    if: "!context.isAuthorized"
+
 /resource:
   (authorize):
     if: context.authUser.roles has 'admin'
