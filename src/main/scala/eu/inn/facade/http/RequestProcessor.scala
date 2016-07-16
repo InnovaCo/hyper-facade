@@ -1,7 +1,5 @@
 package eu.inn.facade.http
 
-import java.net.MalformedURLException
-
 import akka.pattern.AskTimeoutException
 import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfigPaths
@@ -121,6 +119,6 @@ trait RequestProcessor extends Injectable {
     implicit val mcf = cwr.context.clientMessagingContext()
     val errorId = IdGenerator.create()
     log.error(s"Exception #$errorId while handling ${cwr.context}", exception)
-    model.InternalServerError(ErrorBody("internal-server-error", Some(exception.getMessage), errorId = errorId))
+    model.InternalServerError(ErrorBody("internal-server-error", Some(exception.getClass.getName + ": " + exception.getMessage), errorId = errorId))
   }
 }
