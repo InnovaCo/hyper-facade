@@ -5,8 +5,10 @@ import eu.inn.facade.filter.raml.PrivateFilter._
 import eu.inn.facade.model.{EventFilter, ResponseFilter, _}
 import eu.inn.facade.raml.{Annotation, Field}
 import eu.inn.hyperbus.model.{ErrorBody, NotFound}
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.control.NonFatal
 
 class RequestPrivateFilter(val privateAddresses: PrivateAddresses) extends RequestFilter {
   override def apply(context: FacadeRequestContext, request: FacadeRequest)(implicit ec: ExecutionContext): Future[FacadeRequest] = {
@@ -52,6 +54,7 @@ class EventPrivateFilter(val fields: Seq[Field], val privateAddresses: PrivateAd
 }
 
 object PrivateFilter {
+  val log = LoggerFactory.getLogger(getClass)
 
   def filterBody(fields: Seq[Field], body: Value): Value = {
     body match {
@@ -92,7 +95,16 @@ object PrivateFilter {
 
   def isAllowedAddress(requestHeaders: Map[String, Seq[String]], privateAddresses: PrivateAddresses): Boolean = {
     requestHeaders.get(FacadeHeaders.CLIENT_IP) match {
-      case Some(ip :: tail) ⇒ privateAddresses.isAllowedAddress(ip)
+      case Some(ip :: tail) ⇒
+        try {
+          privateAddresses.isAllowedAddress(ip)
+        }
+        catch {
+          case NonFatal(e) ⇒
+            log.error(s"Can't parse IP address: $ip", e)
+            false
+        }
+
       case _ ⇒ false
     }
   }
