@@ -108,6 +108,9 @@ trait RequestProcessor extends Injectable {
       if (e.getCause != null) {
         log.error(s"Request execution interrupted: ${cwr.context}", e)
       }
+      else if (log.isDebugEnabled) {
+        log.debug(s"Request execution interrupted: ${cwr.context}", e)
+      }
       func(e.response)
 
     case NonFatal(nonFatal) ⇒
