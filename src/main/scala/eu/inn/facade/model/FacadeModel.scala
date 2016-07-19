@@ -126,7 +126,9 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
 
   private def contentTypeToSpray(contentType: Option[String]): spray.http.ContentType = {
     contentType match {
-      case None ⇒ `application/json`
+      case None ⇒
+        spray.http.ContentType(`application/json`, `UTF-8`)
+
       case Some(dynamicContentType) ⇒
         val indexOfSlash = dynamicContentType.indexOf('/')
         val (mainType, subType) = indexOfSlash match {
