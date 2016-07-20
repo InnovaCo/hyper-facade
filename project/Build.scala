@@ -45,6 +45,8 @@ object Build extends sbt.Build {
           "com.typesafe.akka"              %% "akka-cluster"                % "2.4.1",
           "com.wandoulabs.akka"            %% "spray-websocket"             % "0.1.4",
           "eu.inn"                         %% "binders-core"                % "0.12.85",
+          "eu.inn"                         %% "expression-parser"           % "0.1.12",
+          "eu.inn"                         %% "auth-service-model"          % "0.1.4",
           "eu.inn"                         %% "hyperbus"                    % "0.1.79",
           "eu.inn"                         %% "hyperbus-model"              % "0.1.79",
           "eu.inn"                         %% "hyperbus-transport"          % "0.1.79",
@@ -61,6 +63,7 @@ object Build extends sbt.Build {
           "io.spray"                       %% "spray-client"                % "1.3.3"     % "test",
           "org.scaldi"                     %% "scaldi"                      % "0.5.7",
           "org.scalatest"                  %% "scalatest"                   % "2.2.6"     % "test",
+          "eu.inn"                         %% "simple-auth-service"         % "0.1.6"     % "test",
           "org.pegdown"                    % "pegdown"                      % "1.4.2"     % "test"
         ),
 
