@@ -110,6 +110,9 @@ trait RequestProcessor extends Injectable {
       if (e.getCause != null) {
         log.error(s"Request execution interrupted: ${cwr.context}", e)
       }
+      else if (log.isDebugEnabled) {
+        log.debug(s"Request execution interrupted: ${cwr.context}", e)
+      }
       func(e.response)
 
     case NonFatal(nonFatal) ⇒
@@ -121,6 +124,6 @@ trait RequestProcessor extends Injectable {
     implicit val mcf = cwr.context.clientMessagingContext()
     val errorId = IdGenerator.create()
     log.error(s"Exception #$errorId while handling ${cwr.context}", exception)
-    model.InternalServerError(ErrorBody("internal-server-error", Some(exception.getMessage), errorId = errorId))
+    model.InternalServerError(ErrorBody("internal-server-error", Some(exception.getClass.getName + ": " + exception.getMessage), errorId = errorId))
   }
 }
