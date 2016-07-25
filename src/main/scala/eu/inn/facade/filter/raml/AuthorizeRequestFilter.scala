@@ -3,21 +3,18 @@ package eu.inn.facade.filter.raml
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.model._
 import eu.inn.facade.model.{ContextStorage, ContextWithRequest}
-import eu.inn.facade.raml.Annotation
-import eu.inn.facade.raml.annotationtypes.authorize
 import org.slf4j.LoggerFactory
+import scaldi.{Injectable, Injector}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class AuthorizeRequestFilter(ifExpression: String) extends RequestFilter with MapBasedConditionalFilter {
+class AuthorizeRequestFilter extends RequestFilter {
 
   override def apply(contextWithRequest: ContextWithRequest)
                     (implicit ec: ExecutionContext): Future[ContextWithRequest] = {
-
     Future {
       val ctx = contextWithRequest.context
-      val authorized = expressionEngine(contextWithRequest.request, ctx).parse(ifExpression)
-      val updatedContextStorage = ctx.contextStorage + (ContextStorage.IS_AUTHORIZED → authorized)
+      val updatedContextStorage = ctx.contextStorage + (ContextStorage.IS_AUTHORIZED → true)
       contextWithRequest.copy (
         context = ctx.copy(
           contextStorage = updatedContextStorage
@@ -27,23 +24,22 @@ class AuthorizeRequestFilter(ifExpression: String) extends RequestFilter with Ma
   }
 }
 
-class AuthorizeFilterFactory extends RamlFilterFactory {
+class AuthorizeFilterFactory(implicit inj: Injector) extends RamlFilterFactory with Injectable {
   val log = LoggerFactory.getLogger(getClass)
+  val predicateEvaluator = inject[PredicateEvaluator]
 
-  override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
-
+  override def createFilters(target: RamlTarget): SimpleFilterChain = {
     target match {
-
-      case TargetResource(_, Annotation(_, Some(auth: authorize))) ⇒
+      case TargetResource(_, _) ⇒
         SimpleFilterChain(
-          requestFilters = Seq(new AuthorizeRequestFilter(auth.getIfExpression)),
+          requestFilters = Seq(new AuthorizeRequestFilter),
           responseFilters = Seq.empty,
           eventFilters = Seq.empty
         )
 
-      case TargetMethod(_, _, Annotation(_, Some(auth: authorize))) ⇒
+      case TargetMethod(_, _, _) ⇒
         SimpleFilterChain(
-          requestFilters = Seq(new AuthorizeRequestFilter(auth.getIfExpression)),
+          requestFilters = Seq(new AuthorizeRequestFilter),
           responseFilters = Seq.empty,
           eventFilters = Seq.empty
         )

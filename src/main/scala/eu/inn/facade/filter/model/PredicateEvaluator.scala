@@ -4,15 +4,15 @@ import eu.inn.facade.model.{ContextStorage, FacadeHeaders, FacadeRequest, Facade
 import eu.inn.facade.model.ContextStorage._
 import eu.inn.parser.{EvaluationEngine, ExpressionEngine, MapBasedEvaluationEngine}
 
-trait ConditionalFilter {
-  def expressionEngine(request: FacadeRequest, context: FacadeRequestContext): ExpressionEngine = {
-    ExpressionEngine(evaluationEngine(request, context))
+trait PredicateEvaluator {
+  def evaluate(predicate: String, request: FacadeRequest, context: FacadeRequestContext): Boolean = {
+    ExpressionEngine(evaluationEngine(request, context)).evaluatePredicate(predicate)
   }
 
   def evaluationEngine(request: FacadeRequest, context: FacadeRequestContext): EvaluationEngine
 }
 
-trait MapBasedConditionalFilter extends ConditionalFilter {
+class MapBackedPredicateEvaluator extends PredicateEvaluator {
   override def evaluationEngine(request: FacadeRequest, context: FacadeRequestContext): EvaluationEngine = {
     MapBasedEvaluationEngine(asMap(request, context))
   }
@@ -32,7 +32,7 @@ trait MapBasedConditionalFilter extends ConditionalFilter {
       ContextStorage.AUTH_USER → authUserMap,
       ContextStorage.IS_AUTHORIZED → context.isAuthorized,
       "ip" → (context.requestHeaders.get(FacadeHeaders.CLIENT_IP) match {
-        case Some(ip :: tail) ⇒ ip
+        case Some(ip :: _) ⇒ ip
         case _ ⇒ None
       })
     )

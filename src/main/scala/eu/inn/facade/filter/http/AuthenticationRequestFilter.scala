@@ -22,7 +22,7 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
                     (implicit ec: ExecutionContext): Future[ContextWithRequest] = {
     val context = contextWithRequest.context
     context.requestHeaders.get(FacadeHeaders.AUTHORIZATION) match {
-      case Some(credentials :: tail) ⇒
+      case Some(credentials :: _) ⇒
         val authRequest = AuthenticationRequest(AuthenticationRequestBody(credentials))
         hyperbus <~ authRequest recover {
           handleHyperbusExceptions(authRequest)

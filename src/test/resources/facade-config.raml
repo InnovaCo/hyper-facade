@@ -9,7 +9,7 @@ types:
     properties:
       statusCode: number
       processedBy:
-        (private):
+        (deny):
         type: string
 
   StatusRequest:
@@ -63,7 +63,7 @@ types:
       fullName: string
       userName: string
       password:
-        (private):
+        (deny):
         type: string
 
   ComplexRequestType:
@@ -87,14 +87,14 @@ types:
         (x-client-ip):
         type: string
       privateField:
-        (private):
+        (deny):
         type: string
       publicField: string
 
 annotationTypes:
   x-client-ip:
   x-client-language:
-  private:
+  deny:
   paged:
   rewrite:
   not-defined:
@@ -166,7 +166,7 @@ traits:
             type: string
 
 /private:
-  (private):
+  (deny):
 
 /unreliable-feed/{content}:
   post:

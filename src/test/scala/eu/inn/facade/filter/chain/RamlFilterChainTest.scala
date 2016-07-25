@@ -2,6 +2,7 @@ package eu.inn.facade.filter.chain
 
 import eu.inn.binders.value.{Null, ObjV}
 import eu.inn.facade.filter.NoOpFilter
+import eu.inn.facade.filter.model.{ConditionalEventFilterWrapper, ConditionalRequestFilterWrapper, ConditionalResponseFilterWrapper}
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
 import eu.inn.facade.modules.Injectors
@@ -24,7 +25,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
       val context = mockContext(request)
       val filters = filterChain.findRequestFilters(ContextWithRequest(context, request))
       filters.length should equal(1)
-      filters.head shouldBe a[RequestPrivateFilter]
+      filters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[DenyRequestFilter]
     }
 
     "annotation based filter chain" in {
@@ -32,7 +33,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
       val context = mockContext(request)
       val filters = filterChain.findRequestFilters(ContextWithRequest(context, request))
       filters.length should equal(1)
-      filters.head shouldBe a[EnrichRequestFilter]
+      filters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[EnrichRequestFilter]
     }
 
     "trait and annotation based filter chain" in {
@@ -40,16 +41,16 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
       val response = FacadeResponse(200, Map.empty, Null)
       val filters = filterChain.findResponseFilters(mockContext(request), response)
 
-      filters.head shouldBe a[NoOpFilter]
-      filters.tail.head shouldBe a[ResponsePrivateFilter]
+      filters.head.asInstanceOf[ConditionalResponseFilterWrapper].filter shouldBe a[NoOpFilter]
+      filters.tail.head.asInstanceOf[ConditionalResponseFilterWrapper].filter shouldBe a[DenyResponseFilter]
     }
 
     "response filter chain (annotation fields)" in {
       val request = FacadeRequest(Uri("/users/{userId}", Map("userId" → "100500")), "get", Map.empty, Null)
       val response = FacadeResponse(200, Map.empty, ObjV("statusCode" → 100500, "processedBy" → "John"))
       val filters = filterChain.findResponseFilters(mockContext(request), response)
-      filters.head shouldBe a[NoOpFilter]
-      filters.tail.head shouldBe a[ResponsePrivateFilter]
+      filters.head.asInstanceOf[ConditionalResponseFilterWrapper].filter shouldBe a[NoOpFilter]
+      filters.tail.head.asInstanceOf[ConditionalResponseFilterWrapper].filter shouldBe a[DenyResponseFilter]
       filters.length should equal(2)
     }
 
@@ -59,7 +60,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )
       val filters = filterChain.findEventFilters(mockContext(request), event)
-      filters.head shouldBe a[EventPrivateFilter]
+      filters.head.asInstanceOf[ConditionalEventFilterWrapper].filter shouldBe a[DenyEventFilter]
       filters.length should equal(1)
     }
 
@@ -72,7 +73,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
       val requestFilters = filterChain.findRequestFilters(ContextWithRequest(context, request))
       val eventFilters = filterChain.findEventFilters(context, event)
 
-      requestFilters.head shouldBe a[RewriteRequestFilter]
+      requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[RewriteRequestFilter]
   //      eventFilters.head shouldBe a[RewriteEventFilter] this shouldn't happen!
     }
 
@@ -85,8 +86,8 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
       val requestFilters = filterChain.findRequestFilters(ContextWithRequest(context, request))
       val eventFilters = filterChain.findEventFilters(mockContext(request), event)
 
-      requestFilters.head shouldBe a[RewriteRequestFilter]
-      eventFilters.head shouldBe a[RewriteEventFilter]
+      requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[RewriteRequestFilter]
+      eventFilters.head.asInstanceOf[ConditionalEventFilterWrapper].filter shouldBe a[RewriteEventFilter]
     }
 
     "rewrite filters. forward request filters, inverted event filters with patterns" in {
@@ -99,9 +100,9 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
       val eventFilters = filterChain.findEventFilters(mockContext(request), event)
       val notMatchedEventFilters = filterChain.findEventFilters(mockContext(request), notMatchedEvent)
 
-      requestFilters.head shouldBe a[RewriteRequestFilter]
-      eventFilters.head shouldBe a[RewriteEventFilter]
-      notMatchedEventFilters.head shouldBe a[RewriteEventFilter]  // we assign filter chain on templated URI, not on formatted one, so despite
+      requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[RewriteRequestFilter]
+      eventFilters.head.asInstanceOf[ConditionalEventFilterWrapper].filter shouldBe a[RewriteEventFilter]
+      notMatchedEventFilters.head.asInstanceOf[ConditionalEventFilterWrapper].filter shouldBe a[RewriteEventFilter]  // we assign filter chain on templated URI, not on formatted one, so despite
                                                                   // formatted URI of this event doesn't match rewritten URI from RAML config,
                                                                   // rewrite filter will be assigned to this event, but will do nothing
     }

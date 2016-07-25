@@ -10,6 +10,8 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
+import spray.http.BasicHttpCredentials
+import spray.http.HttpHeaders.Authorization
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -24,7 +26,7 @@ class AuthenticationRequestFilterTest extends FreeSpec with Matchers with ScalaF
       val unauthorizedRequest = FacadeRequest(
         Uri("/resource"),
         Method.POST,
-        Map(FacadeHeaders.AUTHORIZATION → Seq("login:password")),
+        Map(FacadeHeaders.AUTHORIZATION → Seq(BasicHttpCredentials("login", "password").toString())),
         Map("field" → Text("value"))
       )
       val requestContext = mockContext(unauthorizedRequest)
@@ -40,7 +42,7 @@ class AuthenticationRequestFilterTest extends FreeSpec with Matchers with ScalaF
       val unauthorizedRequest = FacadeRequest(
         Uri("/resource"),
         Method.POST,
-        Map(FacadeHeaders.AUTHORIZATION → Seq("admin:wrong-password")),
+        Map(FacadeHeaders.AUTHORIZATION → Seq(BasicHttpCredentials("admin", "wrong-password").toString())),
         Map("field" → Text("value"))
       )
       val requestContext = mockContext(unauthorizedRequest)
@@ -56,7 +58,7 @@ class AuthenticationRequestFilterTest extends FreeSpec with Matchers with ScalaF
       val request = FacadeRequest(
         Uri("/resource"),
         Method.POST,
-        Map(FacadeHeaders.AUTHORIZATION → Seq("admin:admin")),
+        Map(FacadeHeaders.AUTHORIZATION → Seq(BasicHttpCredentials("admin", "admin").toString())),
         Map("field" → Text("value"))
       )
       val requestContext = mockContext(request)

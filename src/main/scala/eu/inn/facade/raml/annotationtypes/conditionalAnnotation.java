@@ -7,14 +7,14 @@ import javax.xml.bind.annotation.XmlElement;
 
 public class conditionalAnnotation extends CustomType implements RamlAnnotation {
 
-    private String ifExpression;
+    private String predicate;
 
     @XmlElement(name = "if")
-    public String getIfExpression() {
-        return ifExpression;
+    public String getPredicate() {
+        return predicate;
     }
 
-    public void setIfExpression(String ifExpression) {
-        this.ifExpression = ifExpression;
+    public void setPredicate(String predicate) {
+        this.predicate = predicate;
     }
 }

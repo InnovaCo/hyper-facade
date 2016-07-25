@@ -1,6 +1,6 @@
 package eu.inn.facade.filter.model
 
-import eu.inn.facade.model.{ContextWithRequest, FacadeRequest, FacadeRequestContext}
+import eu.inn.facade.model.ContextWithRequest
 
 import scala.concurrent.{ExecutionContext, Future}
 

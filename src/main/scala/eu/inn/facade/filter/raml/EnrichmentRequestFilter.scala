@@ -2,10 +2,11 @@ package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{Obj, Text, Value}
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
-import eu.inn.facade.filter.model.{RamlFilterFactory, RamlTarget, RequestFilter, TargetFields}
+import eu.inn.facade.filter.model._
 import eu.inn.facade.model._
 import eu.inn.facade.raml.{Annotation, Field}
 import org.slf4j.LoggerFactory
+import scaldi.{Injectable, Injector}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -39,7 +40,7 @@ class EnrichRequestFilter(val fields: Seq[Field]) extends RequestFilter {
           case _ ⇒ // do nothing, this annotation doesn't belong to enrichment filter
         }
       }
-      if (shouldFilterNestedFields(ramlField, enrichedFields)) {
+      if (shouldVisitNestedFields(ramlField, enrichedFields)) {
         val fieldName = ramlField.name
         val nestedFields = enrichedFields(fieldName).asMap
         val enrichedNestedFields = enrichFields(ramlField.fields, nestedFields, context)
@@ -49,17 +50,18 @@ class EnrichRequestFilter(val fields: Seq[Field]) extends RequestFilter {
     }
   }
 
-  def shouldFilterNestedFields(ramlField: Field, fields: scala.collection.Map[String, Value]): Boolean = {
+  def shouldVisitNestedFields(ramlField: Field, fields: scala.collection.Map[String, Value]): Boolean = {
     ramlField.fields.nonEmpty &&
       fields.nonEmpty &&
       fields.contains(ramlField.name)
   }
 }
 
-class EnrichmentFilterFactory extends RamlFilterFactory {
+class EnrichmentFilterFactory(implicit inj: Injector) extends RamlFilterFactory with Injectable {
   val log = LoggerFactory.getLogger(getClass)
+  val predicateEvaluator = inject[PredicateEvaluator]
 
-  override def createFilterChain(target: RamlTarget): SimpleFilterChain = {
+  override def createFilters(target: RamlTarget): SimpleFilterChain = {
     target match {
       case TargetFields(_, fields) ⇒
         SimpleFilterChain(

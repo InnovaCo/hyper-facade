@@ -4,7 +4,7 @@ import eu.inn.hyperbus.IdGenerator
 import eu.inn.hyperbus.model.MessagingContextFactory
 import eu.inn.hyperbus.transport.api.uri.Uri
 import spray.http.HttpHeaders.Authorization
-import spray.http.{BasicHttpCredentials, HttpHeader, HttpRequest}
+import spray.http.{HttpHeader, HttpRequest}
 
 case class FacadeRequestContext(
                                  remoteAddress: String,
@@ -49,9 +49,8 @@ object FacadeRequestContext {
   def normalizeHeaders(headers: List[HttpHeader]): Map[String, Seq[String]] = {
     headers.foldLeft(Map.newBuilder[String, Seq[String]]) { (facadeRequestHeaders, httpHeader) ⇒
       httpHeader match {
-        case basicAuth @ Authorization(credentials: BasicHttpCredentials) ⇒
-          val userPass = s"${credentials.username}:${credentials.password}"
-          facadeRequestHeaders += (FacadeHeaders.AUTHORIZATION -> Seq(userPass))
+        case basicAuth @ Authorization(credentials) ⇒
+          facadeRequestHeaders += (FacadeHeaders.AUTHORIZATION -> Seq(credentials.toString))
 
         case other ⇒
           facadeRequestHeaders += (httpHeader.name → Seq(httpHeader.value))
