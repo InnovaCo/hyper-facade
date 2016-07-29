@@ -13,11 +13,11 @@ class DenyFilterFactory(implicit inj: Injector) extends RamlFilterFactory with I
 
   override def createFilters(target: RamlTarget): SimpleFilterChain = {
     target match {
-      case TargetFields(_, fields) ⇒
+      case TargetField(_, field) ⇒
         SimpleFilterChain(
           requestFilters = Seq.empty,
-          responseFilters = Seq(new DenyResponseFilter(fields, predicateEvaluator)),
-          eventFilters = Seq(new DenyEventFilter(fields, predicateEvaluator))
+          responseFilters = Seq(new DenyResponseFilter(field, predicateEvaluator)),
+          eventFilters = Seq(new DenyEventFilter(field, predicateEvaluator))
         )
 
       case TargetResource(_, Annotation(_, Some(deny: deny))) ⇒

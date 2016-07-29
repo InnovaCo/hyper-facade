@@ -5,6 +5,7 @@ import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.{ContextWithRequest, FacadeRequest}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml._
+import eu.inn.facade.utils.FutureUtils
 import eu.inn.facade.{CleanRewriteIndex, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
@@ -21,9 +22,9 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
 
   "EnrichmentFilter" - {
     "add fields if request headers are present" in {
-      val filter = new EnrichRequestFilter(Seq(
-          Field("clientIp", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_IP)), Seq.empty),
-          Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE)), Seq.empty)))
+      val filters = Seq(
+        new EnrichRequestFilter(Field("clientIp", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_IP)))),
+        new EnrichRequestFilter(Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE)))))
 
       val request = FacadeRequest(
         Uri("/resource"),
@@ -33,8 +34,8 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
       )
 
       val requestContext = mockContext(request)
-
-      whenReady(filter.apply(ContextWithRequest(requestContext, request)), Timeout(Span(10, Seconds))) { filteredCWR ⇒
+      val filterChain = FutureUtils.chain(ContextWithRequest(requestContext, request), filters.map(f ⇒ f.apply(_)))
+      whenReady(filterChain, Timeout(Span(10, Seconds))) { filteredCWR ⇒
         val expectedRequest = FacadeRequest(
           Uri("/resource"),
           Method.POST,
@@ -47,8 +48,7 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
     }
 
     "don't add fields if request headers are missed" in {
-      val filter = new EnrichRequestFilter(Seq(
-        Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE)), Seq.empty)))
+      val filter = new EnrichRequestFilter(Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE))))
 
       val initialRequest = FacadeRequest(
         Uri("/resource"),

@@ -8,7 +8,7 @@ import com.mulesoft.raml1.java.parser.model.datamodel.DataElement
 import com.mulesoft.raml1.java.parser.model.methodsAndResources
 import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
 import eu.inn.facade.filter.chain.SimpleFilterChain
-import eu.inn.facade.filter.model.{RamlFilterFactory, TargetFields}
+import eu.inn.facade.filter.model.{RamlFilterFactory, TargetField}
 import eu.inn.facade.model._
 import eu.inn.facade.raml.annotationtypes.rewrite
 import org.slf4j.LoggerFactory
@@ -58,19 +58,41 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
   private def fillTypeTree(typeDefinitions: Map[String, TypeDefinition]): Map[String, TypeDefinition] = {
     typeDefinitions.foldLeft(Map.newBuilder[String, TypeDefinition]) { (tree, typeDefTuple) ⇒
       val (typeName, typeDef) = typeDefTuple
-      val completedTypeDef = typeDef.copy(fields = fillFieldsTypes(typeDef.fields, typeDefinitions))
+      val completedTypeDef = typeDef.copy(fields = fillFieldsTypes(typeDef.fields, None, typeDefinitions))
       tree += typeName → completedTypeDef
     }.result()
   }
 
-  private def fillFieldsTypes(fields: Seq[Field], typeDefinitions: Map[String, TypeDefinition]): Seq[Field] = {
-    fields.foldLeft(Seq.newBuilder[Field]) { (updatedFields, field) ⇒
+  private def fillFieldsTypes(fields: Seq[Field], fieldNamePrefix: Option[String], typeDefinitions: Map[String, TypeDefinition]): Seq[Field] = {
+    val initialFields = Seq.newBuilder[Field] ++= fields
+    fields.foldLeft(initialFields) { (updatedFields, field) ⇒
       val typeDefOpt = typeDefinitions.get(field.typeName)
       val subFields = typeDefOpt match {
-        case Some(typeDef) ⇒ fillFieldsTypes(typeDef.fields, typeDefinitions)
-        case None ⇒ Seq.empty
+        case Some(typeDef) ⇒
+          val subFieldNamePrefix = updatePrefix(field.name, fieldNamePrefix)
+          val rawSubFields = fillFieldsTypes(typeDef.fields, Some(subFieldNamePrefix), typeDefinitions)
+          withNamePrefix(subFieldNamePrefix, rawSubFields)
+
+        case None ⇒
+          Seq.empty
       }
-      updatedFields += field.copy(fields = subFields)
+      updatedFields ++= subFields
+    }.result()
+  }
+
+  private def updatePrefix(fieldName: String, previousPrefix: Option[String]): String = {
+    previousPrefix match {
+      case Some(prefix) ⇒
+        s"$prefix.$fieldName"
+      case None ⇒
+        fieldName
+    }
+  }
+
+  private def withNamePrefix(fieldNamePrefix: String, rawSubFields: Seq[Field]): Seq[Field] = {
+    rawSubFields.foldLeft(Seq.newBuilder[Field]) { (renamedSubFields, subField) ⇒
+      val newName = s"$fieldNamePrefix.${subField.name}"
+      renamedSubFields += subField.copy(name = newName)
     }.result()
   }
 
@@ -78,7 +100,7 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
     val name = ramlField.name
     val typeName = ramlField.`type`.headOption.getOrElse(DataType.DEFAULT_TYPE_NAME)
     val annotations = extractAnnotations(ramlField)
-    val field = Field(name, typeName, annotations, Seq.empty)
+    val field = Field(name, typeName, annotations)
     field
   }
 
@@ -159,8 +181,10 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
             }.result().distinct
 
             val filterChain = filterFactories.map { factory ⇒
-              val target = TargetFields(typeDef.typeName, typeDef.fields) // we should pass all fields to support nested fields filtering
-              factory.createFilterChain(target)
+              typeDef.fields.foldLeft(SimpleFilterChain()) { (chain, field) ⇒
+                val target = TargetField(typeDef.typeName, field) // we should pass all fields to support nested fields filtering
+                chain ++ factory.createFilterChain(target)
+              }
             }.foldLeft (SimpleFilterChain()) { (filterChain, next) ⇒
               filterChain ++ next
             }
@@ -185,7 +209,6 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
           log.error(s"Can't inject filter for annotation ${annotation.name}", e)
       }
     }
-    field.fields.foreach(subField ⇒ fieldFilters(filterFactories, subField))
     filterFactories
   }
 

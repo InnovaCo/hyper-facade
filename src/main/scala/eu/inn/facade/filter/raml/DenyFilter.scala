@@ -7,6 +7,7 @@ import eu.inn.facade.raml.annotationtypes.deny
 import eu.inn.facade.raml.{Annotation, Field}
 import eu.inn.hyperbus.model.{ErrorBody, Forbidden}
 
+import scala.collection.Map
 import scala.concurrent.{ExecutionContext, Future}
 
 class DenyRequestFilter extends RequestFilter {
@@ -23,34 +24,34 @@ class DenyRequestFilter extends RequestFilter {
   }
 }
 
-class DenyResponseFilter(val fields: Seq[Field], predicateEvaluator: PredicateEvaluator) extends ResponseFilter {
+class DenyResponseFilter(val field: Field, predicateEvaluator: PredicateEvaluator) extends ResponseFilter {
 
   override def apply(contextWithRequest: ContextWithRequest, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       response.copy(
-        body = DenyFilter.filterBody(fields, response.body, contextWithRequest, predicateEvaluator)
+        body = DenyFilter.filterBody(field, response.body, contextWithRequest, predicateEvaluator)
       )
     }
   }
 }
 
-class DenyEventFilter(val fields: Seq[Field], predicateEvaluator: PredicateEvaluator) extends EventFilter {
+class DenyEventFilter(val field: Field, predicateEvaluator: PredicateEvaluator) extends EventFilter {
   override def apply(contextWithRequest: ContextWithRequest, event: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       event.copy(
-        body = DenyFilter.filterBody(fields, event.body, contextWithRequest, predicateEvaluator)
+        body = DenyFilter.filterBody(field, event.body, contextWithRequest, predicateEvaluator)
       )
     }
   }
 }
 
 object DenyFilter {
-  def filterBody(fields: Seq[Field], body: Value, contextWithRequest: ContextWithRequest, predicateEvaluator: PredicateEvaluator): Value = {
+  def filterBody(field: Field, body: Value, contextWithRequest: ContextWithRequest, predicateEvaluator: PredicateEvaluator): Value = {
     body match {
       case _: Obj ⇒
-        val filteredFields = filterFields(fields, body.asMap, contextWithRequest, predicateEvaluator)
+        val filteredFields = filterFields(field, body.asMap, contextWithRequest, predicateEvaluator)
         Obj(filteredFields)
 
       case other ⇒
@@ -58,21 +59,26 @@ object DenyFilter {
     }
   }
 
-  def filterFields(ramlFields: Seq[Field], fields: scala.collection.Map[String, Value], contextWithRequest: ContextWithRequest, predicateEvaluator: PredicateEvaluator): scala.collection.Map[String, Value] = {
-    ramlFields.foldLeft(fields) { (nonPrivateFields, ramlField) ⇒
-      if (isPrivateField(ramlField, contextWithRequest, predicateEvaluator))
-        nonPrivateFields - ramlField.name
-      else {
-        if (shouldFilterNestedFields(ramlField, nonPrivateFields)) {
-          val fieldName = ramlField.name
-          val nestedFields = nonPrivateFields(fieldName).asMap
-          val filteredNestedFields = filterFields(ramlField.fields, nestedFields, contextWithRequest, predicateEvaluator)
-          nonPrivateFields + (ramlField.name → Obj(filteredNestedFields))
-        } else
-          nonPrivateFields
-      }
-    }
+  def filterFields(ramlField: Field, fields: scala.collection.Map[String, Value], contextWithRequest: ContextWithRequest, predicateEvaluator: PredicateEvaluator): scala.collection.Map[String, Value] = {
+    if (isPrivateField(ramlField, contextWithRequest, predicateEvaluator))
+      erasePrivateField(ramlField.name, fields)
+    else
+      fields
   }
+
+  def erasePrivateField(pathToField: String, nonPrivateFields: Map[String, Value]): Map[String, Value] = {
+    if (pathToField.contains("."))
+      pathToField.split(".", 1).toList match {
+        case (leadPathSegment :: tailPath :: Nil) ⇒
+          nonPrivateFields.get(leadPathSegment) match {
+            case Some(subFields) ⇒
+              erasePrivateField(tailPath, subFields.asMap)
+          }
+      }
+    else
+      nonPrivateFields - pathToField
+  }
+
 
   def isPrivateField(field: Field, contextWithRequest: ContextWithRequest, predicateEvaluator: PredicateEvaluator): Boolean = {
     field.annotations.find(_.name == Annotation.DENY) match {
@@ -86,11 +92,5 @@ object DenyFilter {
       case None ⇒
         false
     }
-  }
-
-  def shouldFilterNestedFields(ramlField: Field, fields: scala.collection.Map[String, Value]): Boolean = {
-    ramlField.fields.nonEmpty &&
-      fields.nonEmpty &&
-      fields.contains(ramlField.name)
   }
 }

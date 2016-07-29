@@ -6,6 +6,7 @@ import eu.inn.facade.filter.model.{ConditionalEventFilterWrapper, ConditionalReq
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
 import eu.inn.facade.modules.Injectors
+import eu.inn.facade.raml.annotationtypes.{x_client_ip, x_client_language}
 import eu.inn.facade.{CleanRewriteIndex, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
@@ -32,8 +33,15 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
       val request = FacadeRequest(Uri("/status/test-service"), "get", Map.empty, Null)
       val context = mockContext(request)
       val filters = filterChain.findRequestFilters(ContextWithRequest(context, request))
-      filters.length should equal(1)
-      filters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[EnrichRequestFilter]
+      filters.length should equal(2)
+      val firstFilter = filters.head.asInstanceOf[ConditionalRequestFilterWrapper]
+      val secondFilter = filters.last.asInstanceOf[ConditionalRequestFilterWrapper]
+
+      firstFilter.filter shouldBe a[EnrichRequestFilter]
+      firstFilter.annotation.get shouldBe a[x_client_ip]
+
+      secondFilter.filter shouldBe a[EnrichRequestFilter]
+      secondFilter.annotation.get shouldBe a[x_client_language]
     }
 
     "trait and annotation based filter chain" in {

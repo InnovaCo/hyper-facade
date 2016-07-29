@@ -76,7 +76,7 @@ object TypeDefinition {
   }
 }
 
-case class Field(name: String, typeName: String, annotations: Seq[Annotation], fields: Seq[Field])
+case class Field(name: String, typeName: String, annotations: Seq[Annotation])
 
 case class Annotation(name: String, value: Option[RamlAnnotation])
 
