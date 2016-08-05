@@ -14,10 +14,10 @@ annotationTypes:
   (authorize):
     if: context.authUser.roles has 'qa'
   (deny):
-    if: "!context.isAuthorized"
+    if: "context.isAuthorized = false"
 
 /resource:
   (authorize):
     if: context.authUser.roles has 'admin'
   (deny):
-    if: "!context.isAuthorized"
+    if: "context.isAuthorized = false"

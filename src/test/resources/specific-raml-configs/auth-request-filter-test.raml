@@ -9,9 +9,9 @@ annotationTypes:
 
 /auth-resource:
   (authorize):
-    if: context.authUser.id = 123456
+    if: context.authUser.id = "123456"
 
 /auth-method:
   post:
     (authorize):
-      if: context.authUser.id = 123456
+      if: context.authUser.id = "123456"

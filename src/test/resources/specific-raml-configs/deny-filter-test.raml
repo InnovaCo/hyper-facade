@@ -11,19 +11,19 @@ types:
       publicField: number
       privateField:
         (deny):
-          if: "!context.isAuthorized"
+          if: "context.isAuthorized = false"
 
 annotationTypes:
   deny:
 
 /authorized-only-resource:
   (deny):
-    if: "!context.isAuthorized"
+    if: "context.isAuthorized = false"
 
 /authorized-only-method:
   get:
     (deny):
-      if: "!context.isAuthorized"
+      if: "context.isAuthorized = false"
 
 /authorized-only-fields:
   get:
