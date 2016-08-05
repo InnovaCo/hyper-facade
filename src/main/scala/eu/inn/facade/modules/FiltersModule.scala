@@ -2,7 +2,8 @@ package eu.inn.facade.modules
 
 import eu.inn.facade.filter.chain.{FilterChain, RamlFilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.http.{AuthenticationRequestFilter, HttpWsRequestFilter, HttpWsResponseFilter, WsEventFilter}
-import eu.inn.facade.filter.model.{MapBackedPredicateEvaluator, PredicateEvaluator, RamlFilterFactory}
+import eu.inn.facade.filter.model.RamlFilterFactory
+import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.filter.raml._
 import scaldi.Module
 
@@ -23,5 +24,5 @@ class FiltersModule extends Module {
     eventFilters              = Seq(injected[WsEventFilter])
   )
   bind [FilterChain]                identifiedBy "ramlFilterChain"                      to injected[RamlFilterChain]
-  bind [PredicateEvaluator]         identifiedBy "predicateEvaluator"                   to new MapBackedPredicateEvaluator
+  bind [PredicateEvaluator]         identifiedBy "predicateEvaluator"                   to PredicateEvaluator()
 }

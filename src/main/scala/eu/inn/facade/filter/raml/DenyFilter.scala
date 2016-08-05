@@ -1,7 +1,8 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{Obj, Value}
-import eu.inn.facade.filter.model.{EventFilter, PredicateEvaluator, RequestFilter, ResponseFilter}
+import eu.inn.facade.filter.model.{EventFilter, RequestFilter, ResponseFilter}
+import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.model._
 import eu.inn.facade.raml.annotationtypes.deny
 import eu.inn.facade.raml.{Annotation, Field}
@@ -68,7 +69,7 @@ object DenyFilter {
 
   def erasePrivateField(pathToField: String, nonPrivateFields: Map[String, Value]): Map[String, Value] = {
     if (pathToField.contains("."))
-      pathToField.split(".", 1).toList match {
+      pathToField.split(".").toList match {
         case (leadPathSegment :: tailPath :: Nil) ⇒
           nonPrivateFields.get(leadPathSegment) match {
             case Some(subFields) ⇒
@@ -85,7 +86,7 @@ object DenyFilter {
       case Some(Annotation(_, Some(deny: deny))) ⇒
         Option(deny.getPredicate) match {
           case Some(predicate) ⇒
-            predicateEvaluator.evaluate(predicate, contextWithRequest.request, contextWithRequest.context)
+            predicateEvaluator.evaluate(predicate, contextWithRequest)
           case None ⇒
             true
         }

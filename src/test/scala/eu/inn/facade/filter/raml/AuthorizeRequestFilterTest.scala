@@ -3,14 +3,14 @@ package eu.inn.facade.filter.raml
 import eu.inn.authentication.AuthUser
 import eu.inn.binders.value.{Null, Text}
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model.{ContextStorage, ContextWithRequest, FacadeRequest}
 import eu.inn.facade.model.ContextStorage.ExtendFacadeRequestContext
+import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
 import eu.inn.hyperbus.model.Method
 import eu.inn.hyperbus.transport.api.uri.Uri
-import org.scalatest.{FreeSpec, Matchers}
 import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
 import scala.concurrent.ExecutionContext.Implicits.global

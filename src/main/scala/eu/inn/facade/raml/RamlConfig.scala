@@ -69,10 +69,10 @@ object DataType {
   val DEFAULT_TYPE_NAME = "string"
 }
 
-case class TypeDefinition(typeName: String, annotations: Seq[Annotation], fields: Seq[Field])
+case class TypeDefinition(typeName: String, parentTypeName: Option[String], annotations: Seq[Annotation], fields: Seq[Field])
 object TypeDefinition {
   def apply(): TypeDefinition = {
-    TypeDefinition(DataType.DEFAULT_TYPE_NAME, Seq.empty, Seq.empty)
+    TypeDefinition(DataType.DEFAULT_TYPE_NAME, None, Seq.empty, Seq.empty)
   }
 }
 

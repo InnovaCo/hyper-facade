@@ -3,6 +3,7 @@ package eu.inn.facade.filter.raml
 import com.typesafe.config.Config
 import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.facade.filter.model._
+import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.facade.raml.{Annotation, Method, RamlConfigException, RewriteIndexHolder}
 import scaldi.{Injectable, Injector}

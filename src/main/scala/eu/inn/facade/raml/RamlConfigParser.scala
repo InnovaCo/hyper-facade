@@ -48,29 +48,52 @@ class RamlConfigParser(val api: Api)(implicit inj: Injector) extends Injectable 
       }.result()
 
       val typeName = ramlType.name
+      val parentTypeName = ramlType.`type`.isEmpty match {
+        case true ⇒ None
+        case false ⇒ Some(ramlType.`type`.get(0))
+      }
       val annotations = extractAnnotations(ramlType)
-      typesMap += typeName → TypeDefinition(typeName, annotations, fields)
+      typesMap += typeName → TypeDefinition(typeName, parentTypeName, annotations, fields)
     }.result()
 
-    fillTypeTree(typeDefinitions)
+    val withFlattenedFields = flattenFieldStructure(typeDefinitions)
+    withInheritedFields(withFlattenedFields)
   }
 
-  private def fillTypeTree(typeDefinitions: Map[String, TypeDefinition]): Map[String, TypeDefinition] = {
+  private def flattenFieldStructure(typeDefinitions: Map[String, TypeDefinition]): Map[String, TypeDefinition] = {
     typeDefinitions.foldLeft(Map.newBuilder[String, TypeDefinition]) { (tree, typeDefTuple) ⇒
       val (typeName, typeDef) = typeDefTuple
-      val completedTypeDef = typeDef.copy(fields = fillFieldsTypes(typeDef.fields, None, typeDefinitions))
+      val completedTypeDef = typeDef.copy(fields = withFlattenedSubFields(typeDef.fields, None, typeDefinitions))
       tree += typeName → completedTypeDef
     }.result()
   }
 
-  private def fillFieldsTypes(fields: Seq[Field], fieldNamePrefix: Option[String], typeDefinitions: Map[String, TypeDefinition]): Seq[Field] = {
+  def withInheritedFields(types: Map[String, TypeDefinition]): Map[String, TypeDefinition] = {
+    types mapValues { typeDef ⇒
+      typeDef.parentTypeName match {
+        case Some(parentType) ⇒
+          val inheritedFields = types.get(parentType) match {
+            case Some(parentTypeDef) ⇒
+              parentTypeDef.fields
+            case None ⇒
+              Seq()
+          }
+          typeDef.copy(fields = typeDef.fields ++ inheritedFields)
+
+        case None ⇒
+          typeDef
+      }
+    }
+  }
+
+  private def withFlattenedSubFields(fields: Seq[Field], fieldNamePrefix: Option[String], typeDefinitions: Map[String, TypeDefinition]): Seq[Field] = {
     val initialFields = Seq.newBuilder[Field] ++= fields
     fields.foldLeft(initialFields) { (updatedFields, field) ⇒
       val typeDefOpt = typeDefinitions.get(field.typeName)
       val subFields = typeDefOpt match {
         case Some(typeDef) ⇒
           val subFieldNamePrefix = updatePrefix(field.name, fieldNamePrefix)
-          val rawSubFields = fillFieldsTypes(typeDef.fields, Some(subFieldNamePrefix), typeDefinitions)
+          val rawSubFields = withFlattenedSubFields(typeDef.fields, Some(subFieldNamePrefix), typeDefinitions)
           withNamePrefix(subFieldNamePrefix, rawSubFields)
 
         case None ⇒

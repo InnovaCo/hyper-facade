@@ -1,6 +1,7 @@
 package eu.inn.facade.filter.model
 
 import eu.inn.facade.filter.model.ConditionalFilterWrapper._
+import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlAnnotation
 import eu.inn.facade.raml.annotationtypes.conditionalAnnotation
@@ -12,7 +13,7 @@ case class ConditionalRequestFilterWrapper(annotation: Option[RamlAnnotation], f
                     (implicit ec: ExecutionContext): Future[ContextWithRequest] = {
     predicate(annotation) match {
       case Some(p) ⇒
-        if (predicateEvaluator.evaluate(p, contextWithRequest.request, contextWithRequest.context))
+        if (predicateEvaluator.evaluate(p, contextWithRequest))
           filter.apply(contextWithRequest)
         else
           Future(contextWithRequest)
@@ -28,7 +29,7 @@ case class ConditionalResponseFilterWrapper(annotation: Option[RamlAnnotation], 
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     predicate(annotation) match {
       case Some(p) ⇒
-        if (predicateEvaluator.evaluate(p, contextWithRequest.request, contextWithRequest.context))
+        if (predicateEvaluator.evaluate(p, contextWithRequest))
           filter.apply(contextWithRequest, response)
         else
           Future(response)
@@ -44,7 +45,7 @@ case class ConditionalEventFilterWrapper(annotation: Option[RamlAnnotation], fil
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     predicate(annotation) match {
       case Some(p) ⇒
-        if (predicateEvaluator.evaluate(p, contextWithRequest.request, contextWithRequest.context))
+        if (predicateEvaluator.evaluate(p, contextWithRequest))
           filter.apply(contextWithRequest, event)
         else
           Future(event)

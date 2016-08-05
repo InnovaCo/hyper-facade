@@ -2,6 +2,7 @@ package eu.inn.facade.filter.raml
 
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.model._
+import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.raml.Annotation
 import eu.inn.facade.raml.annotationtypes.deny
 import org.slf4j.LoggerFactory

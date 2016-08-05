@@ -1,6 +1,7 @@
 package eu.inn.facade.filter.model
 
 import eu.inn.facade.filter.chain.SimpleFilterChain
+import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.raml.{Annotation, Field, RamlAnnotation}
 
 trait Filter

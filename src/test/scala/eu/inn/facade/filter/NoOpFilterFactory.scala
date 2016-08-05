@@ -2,12 +2,13 @@ package eu.inn.facade.filter
 
 import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.facade.filter.model._
+import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.model._
 
 import scala.concurrent.{ExecutionContext, Future}
 
 class NoOpFilterFactory extends RamlFilterFactory {
-  val predicateEvaluator = new MapBackedPredicateEvaluator
+  val predicateEvaluator = PredicateEvaluator()
 
   override def createFilters(target: RamlTarget): SimpleFilterChain = {
     SimpleFilterChain(

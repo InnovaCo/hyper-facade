@@ -93,5 +93,14 @@ class RamlConfigParserTest extends FreeSpec with Matchers with CleanRewriteIndex
       val rs2 = ramlConfig.resourcesByUri("/test-rewrite-method/some-service").methods(Method(PUT))
       rs2.methodFilters.requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[RewriteRequestFilter]
     }
+
+    "type inheritance" in {
+      val extStatusTypeDef = ramlConfig.resourcesByUri("/ext-status").methods(Method(POST)).requests.ramlContentTypes(None).typeDefinition
+      val fields = extStatusTypeDef.fields
+      fields.size shouldBe 3
+      fields(0).name shouldBe "timestamp"
+      fields(1).name shouldBe "statusCode"
+      fields(2).name shouldBe "processedBy"
+    }
   }
 }

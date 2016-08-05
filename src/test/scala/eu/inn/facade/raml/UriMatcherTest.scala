@@ -2,7 +2,6 @@ package eu.inn.facade.raml
 
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
-import fastparse.all._
 
 class UriMatcherTest extends FreeSpec with Matchers {
 
