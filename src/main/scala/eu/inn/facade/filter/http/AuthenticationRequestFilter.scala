@@ -1,11 +1,11 @@
 package eu.inn.facade.filter.http
 
 import akka.pattern.AskTimeoutException
-import eu.inn.authentication._
-import eu.inn.binders.value._
+import eu.inn.authentication.AuthUser
 import eu.inn.facade.filter.model.RequestFilter
 import eu.inn.facade.model._
 import eu.inn.hyperbus.model._
+import eu.inn.hyperbus.model.annotations.{body, request}
 import eu.inn.hyperbus.transport.api.NoTransportRouteException
 import eu.inn.hyperbus.{Hyperbus, IdGenerator}
 import org.slf4j.LoggerFactory
@@ -26,10 +26,8 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
         val authRequest = AuthenticationRequest(AuthenticationRequestBody(credentials))
         hyperbus <~ authRequest recover {
           handleHyperbusExceptions(authRequest)
-        } map { response: Response[Body] ⇒
-          val authUserValue = response.body.asInstanceOf[DynamicBody].content.authUser
-          val authUser = authUserValue.fromValue[AuthUser]
-          val updatedContextStorage = context.contextStorage + (ContextStorage.AUTH_USER → authUser)
+        } map { response ⇒
+          val updatedContextStorage = context.contextStorage + (ContextStorage.AUTH_USER → response.body.authUser)
           contextWithRequest.copy(
             context = context.copy(
               contextStorage = updatedContextStorage
@@ -42,7 +40,7 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
     }
   }
 
-  def handleHyperbusExceptions(authRequest: AuthenticationRequest): PartialFunction[Throwable, Response[DynamicBody]] = {
+  def handleHyperbusExceptions(authRequest: AuthenticationRequest): PartialFunction[Throwable, Response[AuthenticationResponseBody]] = {
     case hyperbusException: NotFound[ErrorBody] ⇒
       throw new FilterInterruptException(
         FacadeResponse(Unauthorized(ErrorBody("unauthorized"))),
@@ -56,16 +54,36 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
       )
 
     case noRoute: NoTransportRouteException ⇒
-      NotFound(ErrorBody("not-found", Some(s"${authRequest.uri} is not found.")))
+      throw new FilterInterruptException(
+        FacadeResponse(NotFound(ErrorBody("not-found", Some(s"${authRequest.uri} is not found.")))),
+        ""
+      )
 
     case askTimeout: AskTimeoutException ⇒
       val errorId = IdGenerator.create()
       log.error(s"Timeout #$errorId while handling $authRequest")
-      GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${authRequest.uri}'"), errorId = errorId))
+      throw new FilterInterruptException(
+        FacadeResponse(GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${authRequest.uri}'"), errorId = errorId))),
+        ""
+      )
 
     case other: Throwable ⇒
       val errorId = IdGenerator.create()
       log.error(s"error $errorId", other)
-      InternalServerError(ErrorBody("internal-error", errorId = errorId))
+      throw new FilterInterruptException(
+        FacadeResponse(InternalServerError(ErrorBody("internal-error", errorId = errorId))),
+        ""
+      )
   }
 }
+
+@body("application/vnd.auth+json")
+case class AuthenticationRequestBody(credentials: String) extends Body
+
+@body("application/vnd.auth-user+json")
+case class AuthenticationResponseBody(authUser: AuthUser) extends Body
+
+@request(Method.GET, "/auth")
+case class AuthenticationRequest(body: AuthenticationRequestBody)
+  extends Request[Body]
+  with DefinedResponse[Ok[AuthenticationResponseBody]]

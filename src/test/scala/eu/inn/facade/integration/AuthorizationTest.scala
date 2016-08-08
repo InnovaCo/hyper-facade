@@ -1,11 +1,6 @@
 package eu.inn.facade.integration
 
 import akka.actor.ActorSystem
-import eu.inn.authentication.BasicAuthenticationService
-import eu.inn.binders.value.ObjV
-import eu.inn.hyperbus.model.{DynamicBody, Header, Method, Ok}
-import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
-import eu.inn.hyperbus.transport.api.uri.Uri
 import spray.client.pipelining._
 import spray.http
 import spray.http.HttpHeaders.Authorization

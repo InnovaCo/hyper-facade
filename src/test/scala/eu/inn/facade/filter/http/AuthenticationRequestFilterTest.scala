@@ -1,6 +1,7 @@
 package eu.inn.facade.filter.http
 
-import eu.inn.authentication.{AuthUser, BasicAuthenticationService}
+import eu.inn.auth.BasicAuthenticationService
+import eu.inn.authentication.AuthUser
 import eu.inn.binders.value.{Null, Text}
 import eu.inn.facade.MockContext
 import eu.inn.facade.model._
@@ -11,7 +12,6 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 import spray.http.BasicHttpCredentials
-import spray.http.HttpHeaders.Authorization
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
