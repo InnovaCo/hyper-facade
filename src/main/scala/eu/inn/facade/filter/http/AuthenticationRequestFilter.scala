@@ -42,8 +42,9 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
 
   def handleHyperbusExceptions(authRequest: AuthenticationRequest): PartialFunction[Throwable, Response[AuthenticationResponseBody]] = {
     case hyperbusException: NotFound[ErrorBody] ⇒
+      val errorId = IdGenerator.create()
       throw new FilterInterruptException(
-        FacadeResponse(Unauthorized(ErrorBody("unauthorized"))),
+        FacadeResponse(Unauthorized(ErrorBody("unauthorized", errorId = errorId))),
         s"User with credentials ${authRequest.body.credentials} is not authorized!"
       )
 
@@ -54,9 +55,10 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
       )
 
     case noRoute: NoTransportRouteException ⇒
+      val errorId = IdGenerator.create()
       throw new FilterInterruptException(
-        FacadeResponse(NotFound(ErrorBody("not-found", Some(s"${authRequest.uri} is not found.")))),
-        ""
+        FacadeResponse(NotFound(ErrorBody("not-found", Some(s"${authRequest.uri} is not found."), errorId = errorId))),
+        s"Service ${authRequest.uri} is not found"
       )
 
     case askTimeout: AskTimeoutException ⇒
@@ -64,7 +66,7 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
       log.error(s"Timeout #$errorId while handling $authRequest")
       throw new FilterInterruptException(
         FacadeResponse(GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${authRequest.uri}'"), errorId = errorId))),
-        ""
+        s"Timeout while handling $authRequest"
       )
 
     case other: Throwable ⇒
@@ -72,7 +74,7 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
       log.error(s"error $errorId", other)
       throw new FilterInterruptException(
         FacadeResponse(InternalServerError(ErrorBody("internal-error", errorId = errorId))),
-        ""
+        "Internal error"
       )
   }
 }
