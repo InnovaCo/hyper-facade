@@ -1,7 +1,7 @@
 package eu.inn.facade.raml
 
 import eu.inn.facade.CleanRewriteIndex
-import eu.inn.facade.filter.model.{ConditionalEventFilterWrapper, ConditionalRequestFilterWrapper, ConditionalResponseFilterWrapper}
+import eu.inn.facade.filter.model.{ConditionalEventFilterProxy, ConditionalRequestFilterProxy, ConditionalResponseFilterProxy}
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml.Method._
@@ -25,13 +25,13 @@ class RamlConfigParserTest extends FreeSpec with Matchers with CleanRewriteIndex
       statusFilterChain.requestFilters shouldBe Seq.empty
 
       val statusServiceFilterChain = ramlConfig.resourcesByUri("/status/test-service").methods(Method(GET)).requests.ramlContentTypes(None).filters
-      statusServiceFilterChain.requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[EnrichRequestFilter]
+      statusServiceFilterChain.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[EnrichRequestFilter]
     }
 
     "response filters" in {
       val usersFilterChain = ramlConfig.resourcesByUri("/status").methods(Method(GET)).responses(200).ramlContentTypes(None).filters
-      usersFilterChain.responseFilters.head.asInstanceOf[ConditionalResponseFilterWrapper].filter shouldBe a[DenyResponseFilter]
-      usersFilterChain.eventFilters.head.asInstanceOf[ConditionalEventFilterWrapper].filter shouldBe a[DenyEventFilter]
+      usersFilterChain.responseFilters.head.asInstanceOf[ConditionalResponseFilterProxy].filter shouldBe a[DenyResponseFilter]
+      usersFilterChain.eventFilters.head.asInstanceOf[ConditionalEventFilterProxy].filter shouldBe a[DenyEventFilter]
     }
 
     "request filters by contentType" in {
@@ -43,23 +43,23 @@ class RamlConfigParserTest extends FreeSpec with Matchers with CleanRewriteIndex
       val resourceUpdateFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.ramlContentTypes(resourceUpdateContentType.map(ContentType)).filters
       resourceUpdateFilters.requestFilters shouldBe Seq.empty
       val defaultFilters = ramlConfig.resourcesByUri("/reliable-feed/{content:*}").methods(Method(POST)).requests.ramlContentTypes(None).filters
-      defaultFilters.requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[EnrichRequestFilter]
+      defaultFilters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[EnrichRequestFilter]
     }
 
     "annotations on nested fields" in {
       val responseFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).responses(200).ramlContentTypes(None).filters
-      responseFilterChain.responseFilters.head.asInstanceOf[ConditionalResponseFilterWrapper].filter shouldBe a[DenyResponseFilter]
+      responseFilterChain.responseFilters.head.asInstanceOf[ConditionalResponseFilterProxy].filter shouldBe a[DenyResponseFilter]
 
       val requestFilterChain = ramlConfig.resourcesByUri("/complex-resource").methods(Method(POST)).requests.ramlContentTypes(None).filters
-      requestFilterChain.requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[EnrichRequestFilter]
+      requestFilterChain.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[EnrichRequestFilter]
     }
 
     "annotations on parent resource" in {
-      val parentRewriteFilter = ramlConfig.resourcesByUri("/parent").filters.requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter
+      val parentRewriteFilter = ramlConfig.resourcesByUri("/parent").filters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter
       parentRewriteFilter shouldBe a[RewriteRequestFilter]
       parentRewriteFilter.asInstanceOf[RewriteRequestFilter].args.getUri shouldBe "/revault/content/some-service"
 
-      val childRewriteFilter = ramlConfig.resourcesByUri("/parent/child").filters.requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter
+      val childRewriteFilter = ramlConfig.resourcesByUri("/parent/child").filters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter
       childRewriteFilter shouldBe a[RewriteRequestFilter]
       childRewriteFilter.asInstanceOf[RewriteRequestFilter].args.getUri shouldBe "/revault/content/some-service/child"
     }
@@ -85,13 +85,13 @@ class RamlConfigParserTest extends FreeSpec with Matchers with CleanRewriteIndex
 
     "filter (annotation) with arguments" in {
       val rs0 = ramlConfig.resourcesByUri("/test-rewrite/some-service")
-      rs0.filters.requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[RewriteRequestFilter]
+      rs0.filters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[RewriteRequestFilter]
 
       val rs1 = ramlConfig.resourcesByUri("/test-rewrite-method/some-service")
       rs1.filters.requestFilters shouldBe empty
 
       val rs2 = ramlConfig.resourcesByUri("/test-rewrite-method/some-service").methods(Method(PUT))
-      rs2.methodFilters.requestFilters.head.asInstanceOf[ConditionalRequestFilterWrapper].filter shouldBe a[RewriteRequestFilter]
+      rs2.methodFilters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[RewriteRequestFilter]
     }
 
     "type inheritance" in {

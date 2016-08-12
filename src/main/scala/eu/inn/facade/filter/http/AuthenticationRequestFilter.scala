@@ -24,15 +24,15 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
     context.requestHeaders.get(FacadeHeaders.AUTHORIZATION) match {
       case Some(credentials :: _) ⇒
         val authRequest = AuthenticationRequest(AuthenticationRequestBody(credentials))
-        hyperbus <~ authRequest recover {
-          handleHyperbusExceptions(authRequest)
-        } map { response ⇒
+        hyperbus <~ authRequest map { response ⇒
           val updatedContextStorage = context.contextStorage + (ContextStorage.AUTH_USER → response.body.authUser)
           contextWithRequest.copy(
             context = context.copy(
               contextStorage = updatedContextStorage
             )
           )
+        } recover {
+          handleHyperbusExceptions(authRequest)
         }
 
       case None ⇒
@@ -40,7 +40,7 @@ class AuthenticationRequestFilter(implicit inj: Injector) extends RequestFilter 
     }
   }
 
-  def handleHyperbusExceptions(authRequest: AuthenticationRequest): PartialFunction[Throwable, Response[AuthenticationResponseBody]] = {
+  def handleHyperbusExceptions(authRequest: AuthenticationRequest): PartialFunction[Throwable, ContextWithRequest] = {
     case hyperbusException: NotFound[ErrorBody] ⇒
       val errorId = IdGenerator.create()
       throw new FilterInterruptException(

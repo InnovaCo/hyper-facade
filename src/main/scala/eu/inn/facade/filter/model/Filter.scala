@@ -15,33 +15,33 @@ trait RamlFilterFactory {
   final def createFilterChain(target: RamlTarget): SimpleFilterChain = {
     val rawFilterChain = createFilters(target)
     SimpleFilterChain (
-      requestFilters = wrapRequestFilters(rawFilterChain.requestFilters, target, predicateEvaluator),
-      responseFilters = wrapResponseFilters(rawFilterChain.responseFilters, target, predicateEvaluator),
-      eventFilters = wrapEventFilters(rawFilterChain.eventFilters, target, predicateEvaluator)
+      requestFilters = proxifyRequestFilters(rawFilterChain.requestFilters, target, predicateEvaluator),
+      responseFilters = proxifyResponseFilters(rawFilterChain.responseFilters, target, predicateEvaluator),
+      eventFilters = proxifyEventFilters(rawFilterChain.eventFilters, target, predicateEvaluator)
     )
   }
 
-  def wrapRequestFilters(rawFilters: Seq[RequestFilter], ramlTarget: RamlTarget, predicateEvaluator: PredicateEvaluator): Seq[RequestFilter] = {
-    val l = rawFilters.foldLeft(Seq.newBuilder[RequestFilter]) { (wrappedFilters, rawFilter) ⇒
-      annotations(ramlTarget).foldLeft(wrappedFilters) { (wrappedFilters, annotation) ⇒
-        wrappedFilters += ConditionalRequestFilterWrapper(annotation, rawFilter, predicateEvaluator)
+  def proxifyRequestFilters(rawFilters: Seq[RequestFilter], ramlTarget: RamlTarget, predicateEvaluator: PredicateEvaluator): Seq[RequestFilter] = {
+    val l = rawFilters.foldLeft(Seq.newBuilder[RequestFilter]) { (proxifiedFilters, rawFilter) ⇒
+      annotations(ramlTarget).foldLeft(proxifiedFilters) { (proxifiedFilters, annotation) ⇒
+        proxifiedFilters += ConditionalRequestFilterProxy(annotation, rawFilter, predicateEvaluator)
       }
     }.result()
     l
   }
 
-  def wrapResponseFilters(rawFilters: Seq[ResponseFilter], ramlTarget: RamlTarget, predicateEvaluator: PredicateEvaluator): Seq[ResponseFilter] = {
-    rawFilters.foldLeft(Seq.newBuilder[ResponseFilter]) { (wrappedFilters, rawFilter) ⇒
-      annotations(ramlTarget).foldLeft(wrappedFilters) { (wrappedFilters, annotation) ⇒
-        wrappedFilters += ConditionalResponseFilterWrapper(annotation, rawFilter, predicateEvaluator)
+  def proxifyResponseFilters(rawFilters: Seq[ResponseFilter], ramlTarget: RamlTarget, predicateEvaluator: PredicateEvaluator): Seq[ResponseFilter] = {
+    rawFilters.foldLeft(Seq.newBuilder[ResponseFilter]) { (proxifiedFilters, rawFilter) ⇒
+      annotations(ramlTarget).foldLeft(proxifiedFilters) { (proxifiedFilters, annotation) ⇒
+        proxifiedFilters += ConditionalResponseFilterProxy(annotation, rawFilter, predicateEvaluator)
       }
     }.result()
   }
 
-  def wrapEventFilters(rawFilters: Seq[EventFilter], ramlTarget: RamlTarget, predicateEvaluator: PredicateEvaluator): Seq[EventFilter] = {
-    rawFilters.foldLeft(Seq.newBuilder[EventFilter]) { (wrappedFilters, rawFilter) ⇒
-      annotations(ramlTarget).foldLeft(wrappedFilters) { (wrappedFilters, annotation) ⇒
-        wrappedFilters += ConditionalEventFilterWrapper(annotation, rawFilter, predicateEvaluator)
+  def proxifyEventFilters(rawFilters: Seq[EventFilter], ramlTarget: RamlTarget, predicateEvaluator: PredicateEvaluator): Seq[EventFilter] = {
+    rawFilters.foldLeft(Seq.newBuilder[EventFilter]) { (proxifiedFilters, rawFilter) ⇒
+      annotations(ramlTarget).foldLeft(proxifiedFilters) { (proxifiedFilters, annotation) ⇒
+        proxifiedFilters += ConditionalEventFilterProxy(annotation, rawFilter, predicateEvaluator)
       }
     }.result()
   }
