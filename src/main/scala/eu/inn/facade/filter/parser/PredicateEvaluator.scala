@@ -4,6 +4,8 @@ import eu.inn.binders.value.{Obj, _}
 import eu.inn.facade.model.ContextStorage._
 import eu.inn.facade.model._
 import eu.inn.parser.HEval
+import eu.inn.parser.ast.Identifier
+import eu.inn.parser.eval.ValueContext
 import org.slf4j.LoggerFactory
 
 import scala.util.{Failure, Success}
@@ -14,7 +16,11 @@ class PredicateEvaluator {
   val log = LoggerFactory.getLogger(getClass)
 
   def evaluate(predicate: String, contextWithRequest: ContextWithRequest): Boolean = {
-    HEval(predicate, contextWithRequest.toObj) match {
+    val context = new ValueContext(contextWithRequest.toObj) {
+      override def binaryOperation: PartialFunction[(Value, Identifier, Value), Value] = IpParser.binaryOperation
+      override def customOperators = Seq(IpParser.IP_MATCHES)
+    }
+    HEval(predicate, context) match {
       case Success(value: Bool) ⇒
         value.v
       case Failure(ex) ⇒

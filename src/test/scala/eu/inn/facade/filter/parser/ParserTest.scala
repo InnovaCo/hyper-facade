@@ -25,13 +25,13 @@ class ParserTest extends FreeSpec with Matchers {
       ))
       val cwr = ContextWithRequest(context, request)
 
-      PredicateEvaluator().evaluate(""""109.207.13.0 - 109.207.13.255" has context.ip""", cwr) shouldBe true
-      PredicateEvaluator().evaluate(""" "109.207.13.0 - 109.207.13.255" has "109.207.13.2"""", cwr) shouldBe true
-      PredicateEvaluator().evaluate(""" "109.207.10.0 - 109.207.13.1" has context.ip""", cwr) shouldBe false
-      PredicateEvaluator().evaluate(""""109.207.13.0/24" has context.ip""", cwr) shouldBe true
-      PredicateEvaluator().evaluate(""""109.207.13.0/24" has "109.207.13.255"""", cwr) shouldBe true
-      PredicateEvaluator().evaluate(""" "109.207.13.0/24" has "109.207.14.0"""", cwr) shouldBe false
-      PredicateEvaluator().evaluate(""""109.207.12.0/24" has context.ip""", cwr) shouldBe false
+      PredicateEvaluator().evaluate("""context.ip ip matches "109.207.13.0 - 109.207.13.255"""", cwr) shouldBe true
+      PredicateEvaluator().evaluate(""" "109.207.13.2" ip matches "109.207.13.0 - 109.207.13.255"""", cwr) shouldBe true
+      PredicateEvaluator().evaluate(""" context.ip ip matches "109.207.10.0 - 109.207.13.1"""", cwr) shouldBe false
+      PredicateEvaluator().evaluate("""context.ip ip matches "109.207.13.0/24"""", cwr) shouldBe true
+      PredicateEvaluator().evaluate(""""109.207.13.255" ip matches "109.207.13.0/24"""", cwr) shouldBe true
+      PredicateEvaluator().evaluate(""" "109.207.14.0" ip matches "109.207.13.0/24"""", cwr) shouldBe false
+      PredicateEvaluator().evaluate("""context.ip ip matches "109.207.12.0/24"""", cwr) shouldBe false
     }
   }
 }
