@@ -72,7 +72,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   }
 
   def stopStartSubscription: Receive = {
-    case cwr @ ContextWithRequest(_, _, request @ FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _)) ⇒
+    case cwr @ ContextWithRequest(_, _, FacadeRequest(_, ClientSpecificMethod.SUBSCRIBE, _, _)) ⇒
       startSubscription(cwr, 0)
 
     case ContextWithRequest(_, _, FacadeRequest(_, ClientSpecificMethod.UNSUBSCRIBE, _, _)) ⇒
@@ -130,7 +130,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     event.headers.get(Header.REVISION) match {
       // reliable feed
-      case Some(revision :: tail) ⇒
+      case Some(_) ⇒
         log.debug(s"event $event is stashed because resource state is not fetched yet")
         stash()
 
@@ -147,7 +147,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
 
     implicit val ec = executionContext
-    FutureUtils.chain(facadeResponse, cwr.stages.map { stage ⇒
+    FutureUtils.chain(facadeResponse, cwr.stages.map { _ ⇒
       ramlFilterChain.filterResponse(cwr, _ : FacadeResponse)
     }) flatMap { filteredResponse ⇒
       afterFilterChain.filterResponse(cwr, filteredResponse) map { finalResponse ⇒
@@ -158,7 +158,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         else {
           finalResponse.headers.get(FacadeHeaders.CLIENT_REVISION) match {
             // reliable feed
-            case Some(revision :: tail) ⇒
+            case Some(revision :: _) ⇒
               BecomeReliable(revision.toLong)
 
             // unreliable feed
@@ -179,7 +179,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
     implicit val ec = executionContext
 
-    FutureUtils.chain(FacadeRequest(event), cwr.stages.map { stage ⇒
+    FutureUtils.chain(FacadeRequest(event), cwr.stages.map { _ ⇒
       ramlFilterChain.filterEvent(cwr, _ : FacadeRequest)
     }) flatMap { e ⇒
       afterFilterChain.filterEvent(cwr, e) map { filteredRequest ⇒
@@ -197,7 +197,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
                            lastRevisionId: Long,
                            subscriptionSyncTries: Int): Unit = {
     event.headers.get(Header.REVISION) match {
-      case Some(revision :: tail) ⇒
+      case Some(revision :: _) ⇒
         val revisionId = revision.toLong
         if (log.isTraceEnabled) {
           log.trace(s"Processing reliable event #$revisionId $event for ${cwr.context.pathAndQuery}")
@@ -208,7 +208,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
           implicit val ec = executionContext
 
-          FutureUtils.chain(FacadeRequest(event), cwr.stages.map { stage ⇒
+          FutureUtils.chain(FacadeRequest(event), cwr.stages.map { _ ⇒
             ramlFilterChain.filterEvent(cwr, _ : FacadeRequest)
           }) flatMap { e ⇒
             afterFilterChain.filterEvent(cwr, e) map { filteredRequest ⇒

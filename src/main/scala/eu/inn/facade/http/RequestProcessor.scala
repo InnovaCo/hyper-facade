@@ -39,7 +39,7 @@ trait RequestProcessor extends Injectable {
           hyperbus <~ cwrRaml.request.toDynamicRequest recover {
             handleHyperbusExceptions(cwrRaml)
           } flatMap { response ⇒
-            FutureUtils.chain(FacadeResponse(response), cwrRaml.stages.map { stage ⇒
+            FutureUtils.chain(FacadeResponse(response), cwrRaml.stages.map { _ ⇒
               ramlFilterChain.filterResponse(cwrRaml, _: FacadeResponse)
             }) flatMap { r ⇒
               afterFilterChain.filterResponse(cwrRaml, r)
@@ -91,11 +91,11 @@ trait RequestProcessor extends Injectable {
     case hyperbusException: HyperbusException[ErrorBody] ⇒
       hyperbusException
 
-    case noRoute: NoTransportRouteException ⇒
+    case _: NoTransportRouteException ⇒
       implicit val mcf = cwr.context.clientMessagingContext()
       model.NotFound(ErrorBody("not-found", Some(s"'${cwr.context.pathAndQuery}' is not found.")))
 
-    case askTimeout: AskTimeoutException ⇒
+    case _: AskTimeoutException ⇒
       implicit val mcf = cwr.context.clientMessagingContext()
       val errorId = IdGenerator.create()
       log.error(s"Timeout #$errorId while handling ${cwr.context}")

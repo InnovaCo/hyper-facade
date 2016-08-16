@@ -55,7 +55,7 @@ object HttpWsFilter {
   def filterMessage(message: FacadeMessage, uriTransformer: (Uri ⇒ Uri)): (Map[String, Seq[String]], Value) = {
     val headersBuilder = Map.newBuilder[String, Seq[String]]
     message.headers.foreach {
-      case (Header.CONTENT_TYPE, value :: tail) ⇒
+      case (Header.CONTENT_TYPE, value :: _) ⇒
         headersBuilder += FacadeHeaders.CONTENT_TYPE →
           FacadeHeaders.genericContentTypeToHttp(Some(value)).toSeq
 

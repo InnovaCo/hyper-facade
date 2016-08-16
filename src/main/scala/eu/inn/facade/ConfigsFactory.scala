@@ -44,8 +44,6 @@ object ConfigsFactory {
 
 object FacadeConfigPaths {
   val ROOT = "hyper-facade."
-  val PRIVATE_ADDRESSES = ROOT + "private.addresses"
-  val PRIVATE_NETWORKS = ROOT + "private.networks"
   val LOGGERS = ROOT + "loggers"
   val RAML_FILE = ROOT + "raml.file"
   val RAML_ROOT_PATH_PREFIX = ROOT + "raml.root-path"

@@ -35,10 +35,10 @@ class HttpWsRequestFilter(config: Config, ramlConfig: RamlConfig) extends Reques
         var messageIdFound = false
 
         request.headers.foreach {
-          case (FacadeHeaders.CONTENT_TYPE, value :: tail) ⇒
+          case (FacadeHeaders.CONTENT_TYPE, value :: _) ⇒
             headersBuilder += Header.CONTENT_TYPE → FacadeHeaders.httpContentTypeToGeneric(Some(value)).toSeq
 
-          case (FacadeHeaders.CLIENT_MESSAGE_ID, value :: tail) if value.nonEmpty ⇒
+          case (FacadeHeaders.CLIENT_MESSAGE_ID, value :: _) if value.nonEmpty ⇒
             headersBuilder += Header.MESSAGE_ID → Seq(value)
             messageIdFound = true
 
