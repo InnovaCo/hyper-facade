@@ -9,8 +9,8 @@ import org.scalatest.{FreeSpec, Matchers}
 
 class ParserTest extends FreeSpec with Matchers {
 
-  "Parsers" - {
-    "PredicateEvaluator. ip in range" in {
+  "PredicateEvaluator" - {
+    "ip in range" in {
       val request = FacadeRequest(
         Uri("/auth-resource"),
         Method.GET,

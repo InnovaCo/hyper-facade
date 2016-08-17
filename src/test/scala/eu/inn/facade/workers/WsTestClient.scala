@@ -1,4 +1,4 @@
-package eu.inn.facade.http
+package eu.inn.facade.workers
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.io.IO

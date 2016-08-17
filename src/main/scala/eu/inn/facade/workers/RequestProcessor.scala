@@ -1,4 +1,4 @@
-package eu.inn.facade.http
+package eu.inn.facade.workers
 
 import akka.pattern.AskTimeoutException
 import com.typesafe.config.Config

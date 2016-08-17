@@ -1,4 +1,4 @@
-package eu.inn.facade.http
+package eu.inn.facade.workers
 
 import akka.actor._
 import akka.io.{IO, Inet, Tcp}

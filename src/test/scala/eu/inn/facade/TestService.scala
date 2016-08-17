@@ -20,14 +20,14 @@ import scala.concurrent.Future
 @body("feed-test")
 case class FeedTestBody(content: String) extends Body
 
-@request(Method.FEED_POST, "/test-service/reliable")
+@request(Method.FEED_POST, "/resource/reliable-feed")
 case class ReliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
 
-@request(Method.FEED_POST, "/test-service/unreliable")
+@request(Method.FEED_POST, "/resource/unreliable-feed")
 case class UnreliableFeedTestRequest(body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
 
-@request(Method.FEED_PUT, "/status/test-service/{arg}")
-case class UnreliableRewriteFeedTestRequest(arg: String, body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
+@request(Method.FEED_PUT, "/rewritten-resource/{serviceId}")
+case class UnreliableRewriteFeedTestRequest(serviceId: String, body: FeedTestBody, headers: Map[String, Seq[String]]) extends Request[FeedTestBody]
 
 @request(Method.FEED_PUT, "/rewritten-events/{path:*}")
 case class RewriteOutsideFeedTestRequest(path: String, body: DynamicBody, headers: Map[String, Seq[String]]) extends Request[DynamicBody]

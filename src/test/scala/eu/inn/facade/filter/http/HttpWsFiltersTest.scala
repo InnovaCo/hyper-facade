@@ -19,7 +19,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with Injectable with MockContext {
 
-  System.setProperty(FacadeConfigPaths.RAML_FILE, "specific-raml-configs/http-ws-filter-test.raml")
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/http-ws-filter-test.raml")
   implicit val injector = Injectors()
   inject[RamlConfig]
   val afterFilters = inject[FilterChain]("afterFilterChain")

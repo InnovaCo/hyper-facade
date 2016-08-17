@@ -1,0 +1,59 @@
+#%RAML 1.0
+title: Facade API
+version: v1
+mediaType: application/json
+baseUri: https://meta.inn.eu/revault
+types:
+  ResourceState:
+    type: object
+    properties:
+      mode: string
+      resultType: string
+      clientIp:
+        (x-client-ip):
+        type: string
+      clientLanguage:
+        (x-client-language):
+        type: string
+
+  User:
+    type: object
+    properties:
+      fullName: string
+      userName: string
+      password:
+        (deny):
+        type: string
+
+annotationTypes:
+  x-client-ip:
+  x-client-language:
+  deny:
+  rewrite:
+    properties:
+      uri: string
+
+/resource/with-client-ip:
+  get:
+    body:
+      type: ResourceState
+
+/resource-with-reliable-feed:
+
+/original-resource:
+  (rewrite):
+    uri: /rewritten-resource
+
+/original-resource/{serviceId}:
+  (rewrite):
+    uri: /rewritten-resource/{serviceId}
+
+/403-resource:
+  (deny):
+
+/users/{userId}:
+  get:
+    responses:
+      200:
+        body:
+          type: User

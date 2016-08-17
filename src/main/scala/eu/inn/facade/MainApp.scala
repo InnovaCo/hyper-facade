@@ -1,6 +1,6 @@
 package eu.inn.facade
 
-import eu.inn.facade.http.{HttpWorker, WsRestServiceApp}
+import eu.inn.facade.workers.{HttpWorker, WsRestServiceApp}
 import eu.inn.facade.modules.Injectors
 import eu.inn.servicecontrol.api.Service
 import scaldi.Injectable

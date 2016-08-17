@@ -9,7 +9,7 @@ import scaldi.Injectable
 
 class UriTransformerTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable {
 
-  System.setProperty(FacadeConfigPaths.RAML_FILE, "specific-raml-configs/uri-transformer-test.raml")
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/uri-transformer-test.raml")
   implicit val injector = Injectors()
   val ramlConfig = inject[RamlConfig]
 

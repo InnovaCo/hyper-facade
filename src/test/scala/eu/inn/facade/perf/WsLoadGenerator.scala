@@ -6,7 +6,7 @@ import akka.actor.{ActorRef, ActorSystem, Props}
 import eu.inn.binders.value.Null
 import eu.inn.config.ConfigLoader
 import eu.inn.facade.ConfigsFactory
-import eu.inn.facade.http.{Connect, Disconnect, WsTestClient}
+import eu.inn.facade.workers.{Connect, Disconnect, WsTestClient}
 import eu.inn.facade.model.{FacadeHeaders, FacadeRequest}
 import eu.inn.hyperbus.model.Header
 import eu.inn.hyperbus.transport.api.uri.Uri

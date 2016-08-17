@@ -1,6 +1,6 @@
 package eu.inn.facade.raml
 
-import eu.inn.facade.CleanRewriteIndex
+import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths}
 import eu.inn.facade.filter.model.{ConditionalEventFilterProxy, ConditionalRequestFilterProxy, ConditionalResponseFilterProxy}
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.modules.Injectors
@@ -10,16 +10,11 @@ import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
 class RamlConfigParserTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable {
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/raml-config-parser-test.raml")
   implicit val injector = Injectors()
   val ramlConfig = inject[RamlConfig]
 
   "RamlConfig" - {
-//    "traits" in {
-//      ramlConfig.traitNames("/status", POST) shouldBe Seq("rateLimited")
-//      ramlConfig.traitNames("/users/{userId}", GET) shouldBe Seq("secured", "rateLimited")
-//      ramlConfig.traitNames("/users/{userId}", PUT) shouldBe Seq("secured")
-//    }
-
     "request filters" in {
       val statusFilterChain = ramlConfig.resourcesByUri("/status").methods(Method(POST)).requests.ramlContentTypes(None).filters
       statusFilterChain.requestFilters shouldBe Seq.empty
@@ -84,14 +79,11 @@ class RamlConfigParserTest extends FreeSpec with Matchers with CleanRewriteIndex
     }
 
     "filter (annotation) with arguments" in {
-      val rs0 = ramlConfig.resourcesByUri("/test-rewrite/some-service")
-      rs0.filters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[RewriteRequestFilter]
+      val rs0 = ramlConfig.resourcesByUri("/test-rewrite-method")
+      rs0.filters.requestFilters shouldBe empty
 
-      val rs1 = ramlConfig.resourcesByUri("/test-rewrite-method/some-service")
-      rs1.filters.requestFilters shouldBe empty
-
-      val rs2 = ramlConfig.resourcesByUri("/test-rewrite-method/some-service").methods(Method(PUT))
-      rs2.methodFilters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[RewriteRequestFilter]
+      val rs1 = ramlConfig.resourcesByUri("/test-rewrite-method").methods(Method(PUT))
+      rs1.methodFilters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[RewriteRequestFilter]
     }
 
     "type inheritance" in {

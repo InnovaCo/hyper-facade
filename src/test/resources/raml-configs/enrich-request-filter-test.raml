@@ -1,0 +1,29 @@
+#%RAML 1.0
+title: Facade API
+version: v1
+mediaType: application/json
+baseUri: https://meta.inn.eu/revault
+types:
+  ComplexRequestType:
+    type: object
+    properties:
+      name: string
+      value:
+        type: ComplexValue
+
+  ComplexValue:
+    type: object
+    properties:
+      address:
+        (x-client-ip):
+        type: string
+      publicField: string
+
+annotationTypes:
+  x-client-ip:
+  x-client-language:
+
+/complex-resource:
+  post:
+    body:
+      type: ComplexRequestType

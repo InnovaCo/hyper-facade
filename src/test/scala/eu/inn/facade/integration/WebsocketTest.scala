@@ -1,110 +1,32 @@
-package eu.inn.facade.http
+package eu.inn.facade.integration
 
-import akka.actor.ActorSystem
 import eu.inn.binders.json._
 import eu.inn.binders.value.{Null, Obj, ObjV, Text}
 import eu.inn.facade._
-import eu.inn.facade.integration.IntegrationTestBase
+import eu.inn.facade.workers.TestQueue
 import eu.inn.facade.model._
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
 import eu.inn.hyperbus.transport.api.uri.Uri
-import spray.client.pipelining._
-import spray.http
-import spray.http.HttpCharsets._
-import spray.http.HttpHeaders.{RawHeader, `Content-Type`}
-import spray.http._
-
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.io.Source
 
 /**
   * Important: Kafka should be up and running to pass this test
   */
-class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
+class WebsocketTest extends IntegrationTestBase("raml-configs/integration/websocket.raml") {
 
-  "Facade integration" - {
-    "http get. Resource configured in RAML" in {
-      register {
-        testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
-          Ok(DynamicBody(ObjV("a" → "response"))), { request ⇒
-            request.uri shouldBe Uri("/status/test-service")
-            request.body shouldBe DynamicBody(ObjV("emptyParam" → Null, "param" → "1", "clientIp" → "127.0.0.1"))
-          }
-        ).futureValue
-      }
+  "Integration. Websockets" - {
 
-      Source.fromURL("http://localhost:54321/v3/status/test-service?param=1&emptyParam=", "UTF-8").mkString shouldBe """{"a":"response"}"""
-    }
-
-    "http get. Resource is not configured in RAML" in {
-      register {
-        testService.onCommand(RequestMatcher(Some(Uri("/someSecretResource")), Map(Header.METHOD → Specific(Method.GET))),
-          Ok(DynamicBody(Text("response"))), { request ⇒
-            request.uri shouldBe Uri("/someSecretResource")
-            request.body shouldBe DynamicBody(Obj(Map("emptyParam" → Null, "param" → Text("1"))))
-          }
-        ).futureValue
-      }
-      Source.fromURL("http://localhost:54321/v3/someSecretResource?param=1&emptyParam=", "UTF-8").mkString shouldBe """"response""""
-    }
-
-    "http get. Error response" in {
-      register {
-        testService.onCommand(RequestMatcher(Some(Uri("/failed-resource")), Map(Header.METHOD → Specific(Method.GET))),
-          ServiceUnavailable(ErrorBody("service-is-not-available", Some("No connection to DB")))
-        ).futureValue
-      }
-
-      val clientActorSystem = ActorSystem()
-      val pipeline: HttpRequest => Future[HttpResponse] = sendReceive(clientActorSystem, ExecutionContext.fromExecutor(newPoolExecutor()))
-      val uri404 = "http://localhost:54321/v3/test-service/reliable"
-      val response404 = pipeline(Get(http.Uri(uri404))).futureValue
-      response404.entity.asString should include (""""code":"not-found"""")
-      response404.status.intValue shouldBe 404
-
-      val uri503 = "http://localhost:54321/v3/failed-resource"
-      val response503 = pipeline(Get(http.Uri(uri503))).futureValue
-      response503.entity.asString should include (""""code":"service-is-not-available"""")
-      response503.status.intValue shouldBe 503
-
-      Await.result(clientActorSystem.terminate(), Duration.Inf)
-    }
-
-    "http get reliable resource. Check Hyperbus-Revision" in {
-      register {
-        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
-          Ok(DynamicBody(Text("response")), Headers(Map(Header.REVISION → Seq("1"), Header.CONTENT_TYPE → Seq("user-profile"))))
-        ).futureValue
-      }
-
-      val clientActorSystem = ActorSystem()
-      val pipeline: HttpRequest => Future[HttpResponse] = sendReceive(clientActorSystem, ExecutionContext.fromExecutor(newPoolExecutor()))
-      val uri = "http://localhost:54321/v3/test-service/reliable"
-      val response = pipeline(Get(http.Uri(uri))).futureValue
-
-      response.entity.asString shouldBe """"response""""
-      response.headers should contain (RawHeader("Hyperbus-Revision", "1"))
-
-      val mediaType = MediaTypes.register(MediaType.custom("application", "vnd.user-profile+json", true, false))
-      val contentType = ContentType(mediaType, `UTF-8`)
-      response.headers should contain (`Content-Type`(contentType))
-
-      Await.result(clientActorSystem.terminate(), Duration.Inf)
-    }
-
-    "websocket: unreliable feed" in {
+    "unreliable feed" in {
       val q = new TestQueue
-      val client = createWsClient("unreliable-feed-client", "/v3/status/test-service", q.put)
+      val client = createWsClient("unreliable-feed-client", "/v3/upgrade", q.put)
 
       register {
-        testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
+        testService.onCommand(RequestMatcher(Some(Uri("/resource/unreliable-feed")), Map(Header.METHOD → Specific(Method.GET))),
           Ok(DynamicBody(Obj(Map("content" → Text("fullResource")))))
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/v3/test-service/unreliable"), "subscribe",
+      client ! FacadeRequest(Uri("/v3/resource/unreliable-feed"), "subscribe",
         Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
@@ -122,24 +44,24 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
             Header.CORRELATION_ID → Seq("correlationId"))))
       )
 
-      q.next().futureValue shouldBe """{"uri":"/v3/test-service/unreliable","method":"feed:post","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
+      q.next().futureValue shouldBe """{"uri":"/v3/resource/unreliable-feed","method":"feed:post","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
 
-      client ! FacadeRequest(Uri("/v3/test-service/unreliable"), "unsubscribe",
+      client ! FacadeRequest(Uri("/v3/resource-with-unreliable-feed"), "unsubscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
     }
 
-    "websocket: handle error response" in {
+    "handle error response" in {
       val q = new TestQueue
-      val client = createWsClient("error-feed-client", "/v3/status/test-service", q.put)
+      val client = createWsClient("error-feed-client", "/v3/upgrade", q.put)
 
       register {
-        testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
+        testService.onCommand(RequestMatcher(Some(Uri("/500-resource")), Map(Header.METHOD → Specific(Method.GET))),
           eu.inn.hyperbus.model.InternalServerError(ErrorBody("unhandled-exception", Some("Internal server error"), errorId = "123"))
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/v3/test-service/unreliable"), "subscribe",
+      client ! FacadeRequest(Uri("/v3/500-resource"), "subscribe",
           Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
             FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
             FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
@@ -150,9 +72,9 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       resourceState should include (""""code":"unhandled-exception"""")
     }
 
-    "websocket: reliable feed" in {
+    "reliable feed" in {
       val q = new TestQueue
-      val client = createWsClient("reliable-feed-client", "/v3/status/test-service", q.put)
+      val client = createWsClient("reliable-feed-client", "/v3/ugprade", q.put)
 
       val initialResourceState = Ok(
         DynamicBody(Obj(Map("content" → Text("fullResource")))),
@@ -166,7 +88,7 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
           Header.MESSAGE_ID → Seq("messageId"),
           Header.CORRELATION_ID → Seq("correlationId"))))
 
-      val subscriptionRequest = FacadeRequest(Uri("/v3/test-service/reliable"), "subscribe",
+      val subscriptionRequest = FacadeRequest(Uri("/v3/resource/reliable-feed"), "subscribe",
         Map(FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
@@ -196,7 +118,7 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
           Header.CORRELATION_ID → Seq("correlationId"))))
 
       register {
-        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
+        testService.onCommand(RequestMatcher(Some(Uri("/resource/reliable-feed")), Map(Header.METHOD → Specific(Method.GET))),
           initialResourceState,
           // emulate latency between request for full resource state and response
           _ ⇒ Thread.sleep(10000)
@@ -211,7 +133,7 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Revision":["1"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
 
       val receivedEvent1 = q.next().futureValue
-      val queuedEvent = FacadeRequest(Uri("/v3/test-service/reliable"), Method.FEED_POST,
+      val queuedEvent = FacadeRequest(Uri("/v3/resource/reliable-feed"), Method.FEED_POST,
         Map(FacadeHeaders.CLIENT_REVISION → Seq("2"),
           FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
@@ -223,7 +145,7 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       testService.publish(eventRev3)
 
       val receivedEvent2 = q.next().futureValue
-      val directEvent2 = FacadeRequest(Uri("/v3/test-service/reliable"), Method.FEED_POST,
+      val directEvent2 = FacadeRequest(Uri("/v3/resource/reliable-feed"), Method.FEED_POST,
         Map(FacadeHeaders.CLIENT_REVISION → Seq("3"),
           FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
@@ -236,7 +158,7 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       subscriptions.clear
 
       register {
-        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
+        testService.onCommand(RequestMatcher(Some(Uri("/resource/reliable-feed")), Map(Header.METHOD → Specific(Method.GET))),
           updatedResourceState
         ).futureValue
       }
@@ -251,7 +173,7 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       testService.publish(eventGoodRev5)
 
       val receivedEvent3 = q.next().futureValue
-      val directEvent3 = FacadeRequest(Uri("/v3/test-service/reliable"), Method.FEED_POST,
+      val directEvent3 = FacadeRequest(Uri("/v3/resource/reliable-feed"), Method.FEED_POST,
         Map(FacadeHeaders.CLIENT_REVISION → Seq("5"),
           FacadeHeaders.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
@@ -260,23 +182,23 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       )
       receivedEvent3 shouldBe directEvent3.toJson
 
-      client ! FacadeRequest(Uri("/v3/test-service/reliable"), "unsubscribe",
+      client ! FacadeRequest(Uri("/v3/resource/reliable-feed"), "unsubscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null
       )
     }
 
-    "websocket: unreliable events feed with rewrite" in {
+    "unreliable events feed with rewrite" in {
       val q = new TestQueue
-      val client = createWsClient("unreliable-rewrite-feed-client", "/v3/status/test-service/{arg}", q.put)
+      val client = createWsClient("unreliable-rewrite-feed-client", "/v3/upgrade", q.put)
 
       register {
-        testService.onCommand(RequestMatcher(Some(Uri("/status/test-service/{arg}")), Map(Header.METHOD → Specific(Method.GET))),
+        testService.onCommand(RequestMatcher(Some(Uri("/rewritten-resource/{serviceId}")), Map(Header.METHOD → Specific(Method.GET))),
           Ok(DynamicBody(Obj(Map("content" → Text("fullResource-154")))))
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/v3/test-rewrite-with-args/some-service/100500"), "subscribe",
+      client ! FacadeRequest(Uri("/v3/original-resource/100500"), "subscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
         Null
@@ -294,16 +216,16 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
           Header.CORRELATION_ID → Seq("correlationId"))))
       )
 
-      q.next().futureValue shouldBe """{"uri":"/v3/test-rewrite-with-args/some-service/100500","method":"feed:put","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
+      q.next().futureValue shouldBe """{"uri":"/v3/original-resource/100500","method":"feed:put","headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"],"Content-Type":["application/vnd.feed-test+json"]},"body":{"content":"haha"}}"""
 
-      client ! FacadeRequest(Uri("/v3/test-rewrite-with-args/some-service/100500"), "unsubscribe",
+      client ! FacadeRequest(Uri("/v3/original-resource/100500"), "unsubscribe",
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
     }
 
-    "websocket: unreliable events feed with rewrite (not matching of request context)" in {
+    "unreliable events feed with rewrite (not matching of request context)" in {
       val q = new TestQueue
-      val client = createWsClient("unreliable-rewrite-nm-feed-client", "/v3/rewritten-events/{path}", q.put)
+      val client = createWsClient("unreliable-rewrite-nm-feed-client", "/v3/upgrade", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/rewritten-events/{path:*}")), Map(Header.METHOD → Specific(Method.GET))),
@@ -345,12 +267,12 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
     }
 
-    "websocket: get request" in {
+    "get" in {
       val q = new TestQueue
-      val client = createWsClient("get-client", "/v3/status/test-service", q.put)
+      val client = createWsClient("get-client", "/v3/upgrade", q.put)
 
       register {
-        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.GET))),
+        testService.onCommand(RequestMatcher(Some(Uri("/resource")), Map(Header.METHOD → Specific(Method.GET))),
           Ok(
             DynamicBody(Obj(Map("content" → Text("fullResource")))),
             Headers.plain(Map(
@@ -360,7 +282,7 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/v3/test-service/reliable"), Method.GET,
+      client ! FacadeRequest(Uri("/v3/resource"), Method.GET,
         Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
@@ -369,19 +291,19 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Revision":["1"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
     }
 
-    "websocket: post request" in {
+    "post" in {
       val q = new TestQueue
-      val client = createWsClient("post-client", "/v3/status/test-service", q.put)
+      val client = createWsClient("post-client", "/v3/upgrade", q.put)
 
       register {
-        testService.onCommand(RequestMatcher(Some(Uri("/test-service/reliable")), Map(Header.METHOD → Specific(Method.POST))),
+        testService.onCommand(RequestMatcher(Some(Uri("/resource")), Map(Header.METHOD → Specific(Method.POST))),
           Ok(
             DynamicBody(Text("got it")),
             Headers.plain(Map(Header.MESSAGE_ID → Seq("messageId"), Header.CORRELATION_ID → Seq("correlationId"))))
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/v3/test-service/reliable"), Method.POST,
+      client ! FacadeRequest(Uri("/v3/resource"), Method.POST,
         Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
           FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
@@ -391,28 +313,28 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":"got it"}"""
     }
 
-    "websocket: get with rewrite with arguments" in {
+    "get. Rewrite with arguments" in {
       val q = new TestQueue
-      val client = createWsClient("ws-get-rewrite-args-client", "/v3/test-rewrite/some-service/{serviceId}", q.put)
+      val client = createWsClient("ws-get-rewrite-args-client", "/v3/upgrade", q.put)
 
       register {
-        testService.onCommand(RequestMatcher(Some(Uri("/rewritten/some-service/{serviceId}")), Map(Header.METHOD → Specific(Method.GET))),
+        testService.onCommand(RequestMatcher(Some(Uri("/rewritten-resource/{serviceId}")), Map(Header.METHOD → Specific(Method.GET))),
           Ok(DynamicBody(Text("response"))), { request ⇒
-            request.uri shouldBe Uri("/rewritten/some-service/{serviceId}", Map("serviceId" → "100500"))
+            request.uri shouldBe Uri("/rewritten-resource/{serviceId}", Map("serviceId" → "100500"))
           }
         ).futureValue
       }
 
-      client ! FacadeRequest(Uri("/v3/test-rewrite/some-service/100500"), Method.GET,
+      client ! FacadeRequest(Uri("/v3/original-resource/100500"), Method.GET,
         Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId")), Null)
 
       val resourceState = q.next().futureValue
       resourceState should include (""""response"""")
     }
 
-    "websocket: get applies private response filter" in {
+    "get. Deny response filter" in {
       val q = new TestQueue
-      val client = createWsClient("ws-get-private-client", "/v3/test-rewrite/some-service", q.put)
+      val client = createWsClient("ws-get-private-client", "/v3/upgrade", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
@@ -436,9 +358,9 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       resourceState shouldNot include ("""password""")
     }
 
-    "websocket: get applies private event filter" in {
+    "get. Deny event filter" in {
       val q = new TestQueue
-      val client = createWsClient("ws-get-private-event-client", "/v3/test-rewrite/some-service", q.put)
+      val client = createWsClient("ws-get-private-event-client", "/v3/upgrade", q.put)
 
       register {
         testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
@@ -468,50 +390,6 @@ class FacadeIntegrationTest extends IntegrationTestBase("facade-config.raml") {
       val event = q.next().futureValue
       event should include (""""userName":"newsmith"""")
       event shouldNot include ("""password""")
-    }
-
-    "http get with rewrite" in {
-      register {
-        testService.onCommand(RequestMatcher(Some(Uri("/status/test-service")), Map(Header.METHOD → Specific(Method.GET))),
-          Ok(DynamicBody(Text("response"))), { request ⇒
-            request.uri shouldBe Uri("/status/test-service")
-          }
-        ).futureValue
-      }
-
-      Source.fromURL("http://localhost:54321/v3/test-rewrite/some-service", "UTF-8").mkString shouldBe """"response""""
-    }
-
-    "http get with rewrite with arguments" in {
-      register {
-        testService.onCommand(RequestMatcher(Some(Uri("/rewritten/some-service/{serviceId}")), Map(Header.METHOD → Specific(Method.GET))),
-          Ok(DynamicBody(Text("response-with-args"))), { request ⇒
-            request.uri shouldBe Uri("/rewritten/some-service/{serviceId}", Map("serviceId" → "100501"))
-          }
-        ).futureValue
-      }
-
-      Source.fromURL("http://localhost:54321/v3/test-rewrite/some-service/100501", "UTF-8").mkString shouldBe """"response-with-args""""
-    }
-
-    "http get applies private response filter" in {
-      register {
-        testService.onCommand(RequestMatcher(Some(Uri("/users/{userId}")), Map(Header.METHOD → Specific(Method.GET))),
-          Ok(DynamicBody(
-            ObjV(
-              "fullName" → "John Smith",
-              "userName" → "jsmith",
-              "password" → "abyrvalg"
-            )
-          )), { request ⇒
-            request.uri shouldBe Uri("/users/{userId}", Map("userId" → "100500"))
-          }
-        ).futureValue
-      }
-
-      val str = Source.fromURL("http://localhost:54321/v3/users/100500", "UTF-8").mkString
-      str should include (""""userName":"jsmith"""")
-      str shouldNot include ("""password""")
     }
   }
 }

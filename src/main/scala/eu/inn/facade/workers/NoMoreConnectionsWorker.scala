@@ -1,4 +1,4 @@
-package eu.inn.facade.http
+package eu.inn.facade.workers
 
 import akka.actor.{ActorLogging, ActorRefFactory}
 import eu.inn.facade.model.FacadeHeaders

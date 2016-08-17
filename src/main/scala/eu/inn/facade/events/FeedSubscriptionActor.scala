@@ -3,7 +3,7 @@ package eu.inn.facade.events
 import akka.actor._
 import akka.pattern.pipe
 import eu.inn.facade.FacadeConfigPaths
-import eu.inn.facade.http.RequestProcessor
+import eu.inn.facade.workers.RequestProcessor
 import eu.inn.facade.model.{FacadeResponse, _}
 import eu.inn.facade.metrics.MetricKeys
 import eu.inn.facade.raml.Method

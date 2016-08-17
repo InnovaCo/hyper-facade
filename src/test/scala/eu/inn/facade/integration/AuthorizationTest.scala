@@ -9,7 +9,7 @@ import spray.http.{BasicHttpCredentials, HttpRequest, HttpResponse}
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-class AuthorizationTest extends IntegrationTestBase("specific-raml-configs/integration/authorization.raml") {
+class AuthorizationTest extends IntegrationTestBase("raml-configs/integration/authorization.raml") {
 
   "Authorization and authentication integration test" - {
     "http. wrong credentials. 401 unauthorized" in {

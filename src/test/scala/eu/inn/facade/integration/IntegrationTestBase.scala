@@ -4,7 +4,7 @@ import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, Tim
 
 import akka.actor.ActorSystem
 import eu.inn.auth.BasicAuthenticationService
-import eu.inn.facade.http.{HttpWorker, WsRestServiceApp, WsTestClientHelper}
+import eu.inn.facade.workers.{HttpWorker, WsRestServiceApp, WsTestClientHelper}
 import eu.inn.facade.model.{UriSpecificDeserializer, UriSpecificSerializer}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, TestService}

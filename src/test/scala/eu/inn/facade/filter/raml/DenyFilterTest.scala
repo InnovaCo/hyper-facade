@@ -15,7 +15,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class DenyFilterTest extends FreeSpec with Matchers with ScalaFutures with Injectable with CleanRewriteIndex with MockContext {
 
-  System.setProperty(FacadeConfigPaths.RAML_FILE, "specific-raml-configs/deny-filter-test.raml")
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/deny-filter-test.raml")
   implicit val injector = Injectors()
   val ramlFilters = inject[FilterChain]("ramlFilterChain")
 

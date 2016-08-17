@@ -7,7 +7,7 @@ import akka.io.IO
 import akka.pattern.ask
 import eu.inn.binders.value.{Null, Text}
 import eu.inn.facade.filter.model.{RequestFilter, ResponseFilter}
-import eu.inn.facade.http.{Connect, WsTestClient, WsTestWorker}
+import eu.inn.facade.workers.{Connect, WsTestClient, WsTestWorker}
 import eu.inn.facade.model._
 import eu.inn.hyperbus.model.Method
 import eu.inn.hyperbus.transport.api.uri.Uri

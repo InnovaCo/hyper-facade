@@ -7,7 +7,7 @@ import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml.annotationtypes.{x_client_ip, x_client_language}
-import eu.inn.facade.{CleanRewriteIndex, MockContext}
+import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
@@ -16,7 +16,7 @@ import scaldi.Injectable
 // + integrated test with filter lookup when specific != formatted!
 
 class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable with MockContext {
-
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/raml-filter-chain-test.raml")
   implicit val injector = Injectors()
   val filterChain = inject [FilterChain].asInstanceOf[RamlFilterChain]
 
@@ -53,15 +53,6 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
       filters.tail.head.asInstanceOf[ConditionalResponseFilterProxy].filter shouldBe a[DenyResponseFilter]
     }
 
-    "response filter chain (annotation fields)" in {
-      val request = FacadeRequest(Uri("/users/{userId}", Map("userId" → "100500")), "get", Map.empty, Null)
-      val response = FacadeResponse(200, Map.empty, ObjV("statusCode" → 100500, "processedBy" → "John"))
-      val filters = filterChain.findResponseFilters(mockContext(request), response)
-      filters.head.asInstanceOf[ConditionalResponseFilterProxy].filter shouldBe a[NoOpFilter]
-      filters.tail.head.asInstanceOf[ConditionalResponseFilterProxy].filter shouldBe a[DenyResponseFilter]
-      filters.length should equal(2)
-    }
-
     "event filter chain (annotation fields)" in {
       val request = FacadeRequest(Uri("/users/{userId}", Map("userId" → "100500")), "get", Map.empty, Null)
       val event = FacadeRequest(request.uri, "feed:put", Map.empty,
@@ -73,21 +64,21 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
     }
 
     "rewrite filters. forward request filters, inverted event filters" in {
-      val request = FacadeRequest(Uri("/test-rewrite/some-service"), "get", Map.empty, Null)
+      val request = FacadeRequest(Uri("/original-resource"), "get", Map.empty, Null)
       val context = mockContext(request.copy(uri=Uri(request.uri.formatted)))
-      val event = FacadeRequest(Uri("/status/test-service"), "feed:put", Map.empty,
+      val event = FacadeRequest(Uri("/rewritten-resource"), "feed:put", Map.empty,
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )
       val requestFilters = filterChain.findRequestFilters(ContextWithRequest(context, request))
       val eventFilters = filterChain.findEventFilters(context, event)
 
       requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[RewriteRequestFilter]
-  //      eventFilters.head shouldBe a[RewriteEventFilter] this shouldn't happen!
+      eventFilters.head.asInstanceOf[ConditionalEventFilterProxy].filter shouldBe a[RewriteEventFilter]
     }
 
     "rewrite filters with args. forward request filters, inverted event filters" in {
-      val request = FacadeRequest(Uri("/test-rewrite-with-args/some-service/{arg}", Map("arg" → "100500")), "get", Map.empty, Null)
-      val event = FacadeRequest(Uri("/status/test-service/100501"), "feed:put", Map.empty,
+      val request = FacadeRequest(Uri("/original-resource/{arg}", Map("arg" → "100500")), "get", Map.empty, Null)
+      val event = FacadeRequest(Uri("/rewritten-resource/100501"), "feed:put", Map.empty,
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )
       val context = mockContext(request)
@@ -99,7 +90,7 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
     }
 
     "rewrite filters. forward request filters, inverted event filters with patterns" in {
-      val request = FacadeRequest(Uri("/test-rewrite-method/some-service"), "put", Map.empty, Null)
+      val request = FacadeRequest(Uri("/test-rewrite-method"), "put", Map.empty, Null)
       val event = FacadeRequest(Uri("/revault/content/{path:*}", Map("path" → "some-service")), "feed:put", Map.empty, Null)
       val notMatchedEvent = FacadeRequest(Uri("/revault/content/{path:*}", Map("path" → "other-service")), "feed:put", Map.empty, Null)
 
