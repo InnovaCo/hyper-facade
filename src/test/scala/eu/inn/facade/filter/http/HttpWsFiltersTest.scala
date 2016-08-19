@@ -4,7 +4,7 @@ import eu.inn.binders.value._
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.raml.{Method, RamlConfig}
+import eu.inn.facade.raml.{Method, RamlConfiguration}
 import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
 import eu.inn.hyperbus.model.Link
 import eu.inn.hyperbus.model.Links.LinksMap
@@ -21,7 +21,7 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Cl
 
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/http-ws-filter-test.raml")
   implicit val injector = Injectors()
-  inject[RamlConfig]
+  inject[RamlConfiguration]
   val afterFilters = inject[FilterChain]("afterFilterChain")
 
   "HttpWsFiltersTest " - {

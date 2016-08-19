@@ -2,9 +2,9 @@ package eu.inn.facade.filter.chain
 
 import eu.inn.facade.filter.model.{EventFilter, RequestFilter, ResponseFilter}
 import eu.inn.facade.model._
-import eu.inn.facade.raml.{ContentType, Method, RamlConfig, RamlResourceMethodConfig}
+import eu.inn.facade.raml.{ContentType, Method, RamlConfiguration, RamlResourceMethodConfig}
 
-class RamlFilterChain(ramlConfig: RamlConfig) extends FilterChain {
+class RamlFilterChain(ramlConfig: RamlConfiguration) extends FilterChain {
 
   def findRequestFilters(contextWithRequest: ContextWithRequest): Seq[RequestFilter] = {
     val request = contextWithRequest.request

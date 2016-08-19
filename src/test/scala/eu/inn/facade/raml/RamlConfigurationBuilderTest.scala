@@ -9,10 +9,11 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
 
-class RamlConfigParserTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable {
+class RamlConfigurationBuilderTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable {
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/raml-config-parser-test.raml")
   implicit val injector = Injectors()
-  val ramlConfig = inject[RamlConfig]
+  val ramlConfig = inject[RamlConfiguration]
+  val ramlReader = inject[RamlConfigurationReader]
 
   "RamlConfig" - {
     "request filters" in {
@@ -65,16 +66,16 @@ class RamlConfigParserTest extends FreeSpec with Matchers with CleanRewriteIndex
     }
 
     "request URI substitution" in {
-      val parameterRegularMatch = ramlConfig.resourceUri(Uri("/unreliable-feed/someContent"))
+      val parameterRegularMatch = ramlReader.resourceUri(Uri("/unreliable-feed/someContent"), "get")
       parameterRegularMatch shouldBe Uri("/unreliable-feed/{content}", Map("content" → "someContent"))
 
-      val strictUriMatch = ramlConfig.resourceUri(Uri("/unreliable-feed/someContent/someDetails"))
+      val strictUriMatch = ramlReader.resourceUri(Uri("/unreliable-feed/someContent/someDetails"), "get")
       strictUriMatch shouldBe Uri("/unreliable-feed/someContent/someDetails")
 
-      val parameterPathMatch = ramlConfig.resourceUri(Uri("/reliable-feed/someContent/someDetails"))
+      val parameterPathMatch = ramlReader.resourceUri(Uri("/reliable-feed/someContent/someDetails"), "get")
       parameterPathMatch shouldBe Uri("/reliable-feed/{content:*}", Map("content" → "someContent/someDetails"))
 
-      val parameterArgPathMatch = ramlConfig.resourceUri(Uri("/reliable-feed/someContent/{arg}", Map("arg" → "someDetails")))
+      val parameterArgPathMatch = ramlReader.resourceUri(Uri("/reliable-feed/someContent/{arg}", Map("arg" → "someDetails")), "get")
       parameterArgPathMatch shouldBe Uri("/reliable-feed/{content:*}", Map("content" → "someContent/someDetails"))
     }
 

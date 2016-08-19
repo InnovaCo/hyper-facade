@@ -6,7 +6,7 @@ import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.metrics.MetricKeys
 import eu.inn.facade.model._
-import eu.inn.facade.raml.RamlConfig
+import eu.inn.facade.raml.{RamlConfigurationReader, RamlStrictConfigException}
 import eu.inn.facade.utils.FutureUtils
 import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.NoTransportRouteException
@@ -23,7 +23,7 @@ trait RequestProcessor extends Injectable {
   implicit def injector: Injector
   implicit def executionContext: ExecutionContext
   val hyperbus = inject[Hyperbus]
-  val ramlConfig = inject[RamlConfig]
+  val ramlConfig = inject[RamlConfigurationReader]
   val beforeFilterChain = inject[FilterChain]("beforeFilterChain")
   val ramlFilterChain = inject[FilterChain]("ramlFilterChain")
   val afterFilterChain = inject[FilterChain]("afterFilterChain")
@@ -76,14 +76,14 @@ trait RequestProcessor extends Injectable {
   }
 
   def prepareContextAndRequestBeforeRaml(cwr: ContextWithRequest) = {
-    val requestUri = cwr.request.uri
-    val ramlParsedUri = ramlConfig.resourceUri(requestUri)
-    val facadeRequestWithRamlUri = cwr.request.copy(uri = ramlParsedUri)
+    val request = cwr.request
+    val ramlParsedUri = ramlConfig.resourceUri(request.uri, request.method)
+    val facadeRequestWithRamlUri = request.copy(uri = ramlParsedUri)
     cwr.withNextStage(facadeRequestWithRamlUri)
   }
 
   def withTemplatedUri(request: FacadeRequest): FacadeRequest = {
-    val ramlParsedUri = ramlConfig.resourceUri(request.uri)
+    val ramlParsedUri = ramlConfig.resourceUri(request.uri, request.method)
     request.copy(uri = ramlParsedUri)
   }
 
@@ -114,6 +114,12 @@ trait RequestProcessor extends Injectable {
         log.debug(s"Request execution interrupted: ${cwr.context}", e)
       }
       func(e.response)
+
+    case e: RamlStrictConfigException ⇒
+      implicit val mcf = cwr.context.clientMessagingContext()
+      val errorId = IdGenerator.create()
+      log.warn(s"Exception #$errorId while handling ${cwr.context}", e)
+      func(FacadeResponse(NotFound(ErrorBody("not-found", Some("Resource is not found"), errorId = errorId))))
 
     case NonFatal(nonFatal) ⇒
       val response = handleInternalError(nonFatal, cwr)

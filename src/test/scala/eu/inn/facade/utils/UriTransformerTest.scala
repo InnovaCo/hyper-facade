@@ -1,7 +1,7 @@
 package eu.inn.facade.utils
 
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.raml.RamlConfig
+import eu.inn.facade.raml.RamlConfiguration
 import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
@@ -11,7 +11,7 @@ class UriTransformerTest extends FreeSpec with Matchers with CleanRewriteIndex w
 
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/uri-transformer-test.raml")
   implicit val injector = Injectors()
-  val ramlConfig = inject[RamlConfig]
+  val ramlConfig = inject[RamlConfiguration]
 
   "UriTransformerTest" - {
     "Rewrite backward" in {

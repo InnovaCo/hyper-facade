@@ -7,7 +7,7 @@ import eu.inn.binders.value.Null
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.filter.model.RequestFilter
 import eu.inn.facade.model._
-import eu.inn.facade.raml.RamlConfig
+import eu.inn.facade.raml.RamlConfiguration
 import eu.inn.facade.utils.FunctionUtils.chain
 import eu.inn.facade.utils.HalTransformer
 import eu.inn.facade.utils.UriTransformer._
@@ -18,7 +18,7 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class HttpWsRequestFilter(config: Config, ramlConfig: RamlConfig) extends RequestFilter {
+class HttpWsRequestFilter(config: Config, ramlConfig: RamlConfiguration) extends RequestFilter {
   val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
 
   override def apply(contextWithRequest: ContextWithRequest)

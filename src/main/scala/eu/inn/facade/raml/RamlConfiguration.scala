@@ -3,29 +3,7 @@ package eu.inn.facade.raml
 import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.hyperbus.transport.api.uri.Uri
 
-class RamlConfig(
-                  val resourcesByUri: Map[String, ResourceConfig],
-                  val uris: Seq[String]) {
-
-  def traitNames(uriPattern: String, method: String): Seq[String] = {
-    traits(uriPattern, method).map(foundTrait ⇒ foundTrait.name).distinct
-  }
-
-  def resourceUri(requestUri: Uri): Uri = {
-    //todo: lookup in map instead of sequence!
-    val formattedUri = Uri(requestUri.formatted)
-    UriMatcher.matchUri(formattedUri, uris).getOrElse(requestUri)
-  }
-
-  private def traits(uriPattern: String, method: String): Seq[Trait] = {
-    resourcesByUri.get(uriPattern) match {
-      case Some(config) ⇒
-        val traits = config.traits
-        traits.methodSpecificTraits.getOrElse(Method(method), Seq.empty) ++ traits.commonTraits
-      case None ⇒ Seq()
-    }
-  }
-}
+case class RamlConfiguration(resourcesByUri: Map[String, ResourceConfig], uris: Seq[String])
 
 case class ResourceConfig(
                            traits: Traits,
