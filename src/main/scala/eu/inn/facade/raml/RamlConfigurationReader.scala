@@ -12,7 +12,8 @@ class RamlConfigurationReader(ramlConfiguration: RamlConfiguration, config: Conf
 
   def resourceUri(requestUri: Uri, method: String): Uri = {
     val uri = resourceUri(requestUri)
-    if (config.getBoolean(FacadeConfigPaths.RAML_STRICT_CONFIG)) {
+    val isStrictRaml = System.getProperty(FacadeConfigPaths.RAML_STRICT_CONFIG, config.getString(FacadeConfigPaths.RAML_STRICT_CONFIG)).toBoolean
+    if (isStrictRaml) {
       val foundUri = ramlConfiguration.resourcesByUri.get(uri.pattern.specific) match {
         case Some(resourceConfig) ⇒
           if(resourceConfig.methods.isEmpty || resourceConfig.methods.contains(Method(method)))

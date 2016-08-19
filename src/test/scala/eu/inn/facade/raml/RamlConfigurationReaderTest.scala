@@ -1,12 +1,12 @@
 package eu.inn.facade.raml
 
+import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 import scaldi.Injectable
 
-class RamlConfigurationReaderTest extends FreeSpec with Matchers with BeforeAndAfterAll with CleanRewriteIndex with Injectable {
+class RamlConfigurationReaderTest extends FreeSpec with Matchers with BeforeAndAfterAll with Injectable {
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/raml-reader-test.raml")
   System.setProperty(FacadeConfigPaths.RAML_STRICT_CONFIG, "true")
   implicit val injector = Injectors()

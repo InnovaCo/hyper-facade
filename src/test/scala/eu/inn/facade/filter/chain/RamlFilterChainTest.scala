@@ -1,5 +1,6 @@
 package eu.inn.facade.filter.chain
 
+import com.typesafe.config.Config
 import eu.inn.binders.value.{Null, ObjV}
 import eu.inn.facade.filter.NoOpFilter
 import eu.inn.facade.filter.model.{ConditionalEventFilterProxy, ConditionalRequestFilterProxy, ConditionalResponseFilterProxy}
