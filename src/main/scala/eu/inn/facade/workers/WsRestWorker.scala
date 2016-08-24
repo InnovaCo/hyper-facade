@@ -8,6 +8,7 @@ import eu.inn.facade.model._
 import eu.inn.hyperbus.{Hyperbus, IdGenerator}
 import eu.inn.metrics.Metrics
 import scaldi.{Injectable, Injector}
+import spray.can.server.UHttp
 import spray.can.websocket.FrameCommandFailed
 import spray.can.websocket.frame.Frame
 import spray.can.{Http, websocket}
@@ -49,7 +50,7 @@ class WsRestWorker(val serverConnection: ActorRef,
     trackWsTimeToLive.stop()
   }
   // order is really important, watchConnection should be before httpRequests, otherwise there is a memory leak
-  override def receive = watchConnection orElse handshaking orElse httpRequests
+  override def receive = watchConnection orElse businessLogic orElse httpRequests
 
   def watchConnection: Receive = {
     case handshakeRequest@websocket.HandshakeRequest(state) ⇒
@@ -63,18 +64,21 @@ class WsRestWorker(val serverConnection: ActorRef,
       }
       handshaking(handshakeRequest)
 
-    case ev: Http.ConnectionClosed ⇒
-      if (log.isDebugEnabled) {
-        log.debug(s"Connection with $serverConnection/$remoteAddress is closing")
-      }
-      context.stop(serverConnection)
-
     case Terminated(`serverConnection`) ⇒
       if (log.isDebugEnabled) {
         log.debug(s"Connection with $serverConnection/$remoteAddress is terminated")
       }
       context.stop(context.self)
       isConnectionTerminated = true
+
+    case _: Http.ConnectionClosed ⇒
+      if (log.isDebugEnabled) {
+        log.debug(s"Connection with $serverConnection/$remoteAddress is closing")
+      }
+      context.stop(serverConnection)
+
+    case UHttp.Upgraded ⇒
+      self ! websocket.UpgradedToWebSocket
   }
 
   def businessLogic: Receive = {
