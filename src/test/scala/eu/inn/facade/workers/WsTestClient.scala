@@ -2,6 +2,7 @@ package eu.inn.facade.workers
 
 import akka.actor.{Actor, ActorRef, ActorSystem, Props}
 import akka.io.IO
+import akka.pattern.ask
 import akka.util.Timeout
 import eu.inn.facade.model.FacadeMessage
 import org.scalatest.concurrent.ScalaFutures
@@ -15,22 +16,22 @@ import scala.collection.mutable
 import scala.concurrent.{Future, Promise}
 import scala.util.Success
 import scala.util.control.NonFatal
-import akka.pattern.ask
 
-case class Connect()
-case class Disconnect()
+case object Connect
+case object Disconnect
 
 class WsTestClient(connect: Http.Connect, val upgradeRequest: HttpRequest)
                   (implicit actorSystem: ActorSystem) extends WebSocketClientWorker {
 
   override def receive = {
-    case message: Connect ⇒
+    case Connect ⇒
       context.become(handshaking orElse closeLogic)
       IO(UHttp) ! connect
   }
 
   def businessLogic: Receive = {
-    case x @ websocket.UpgradedToWebSocket ⇒ onUpgrade()
+    case websocket.UpgradedToWebSocket ⇒
+      onUpgrade()
 
     case frame: TextFrame ⇒
       onMessage(frame)
@@ -38,12 +39,11 @@ class WsTestClient(connect: Http.Connect, val upgradeRequest: HttpRequest)
     case facadeMessage: FacadeMessage ⇒
       connection ! facadeMessage.toFrame
 
-    case _: Http.ConnectionClosed ⇒
+    case _: Http.ConnectionClosed | Http.Closed ⇒
       context.stop(self)
 
-    case _: Disconnect ⇒
+    case Disconnect ⇒
       connection ! Http.Close
-      context.stop(self)
   }
 
   def onMessage(frame: TextFrame): Unit = ()
@@ -69,7 +69,7 @@ trait WsTestClientHelper extends ScalaFutures {
         onClientUpgradePromise.complete(Success(true))
       }
     }), name)
-    client ! Connect() // init websocket connection
+    client ! Connect // init websocket connection
     try {
       onClientUpgradePromise.future.futureValue
       client

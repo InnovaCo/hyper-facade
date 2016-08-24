@@ -1,0 +1,44 @@
+#%RAML 1.0
+title: Facade API
+version: v1
+mediaType: application/json
+baseUri: https://meta.inn.eu/revault
+types:
+  PerfTestRequest:
+    type: object
+    properties:
+      client-ip:
+        (x-client-ip):
+        type: string
+      client-lang:
+        (x-client-language):
+        type: string
+
+  PerfTestFeedEvent:
+    type: object
+    properties:
+      content: string
+      secretField: string
+        (deny):
+
+annotationTypes:
+  x-client-ip:
+  x-client-language:
+  deny:
+  rewrite:
+
+/perf-test-with-filters/ws:
+  (deny):
+    if: context.ip != "127.0.0.1"
+  (rewrite):
+    uri: /perf-test
+  feed:put:
+    responses:
+      200:
+        body:
+          type: PerfTestFeedEvent
+
+/perf-test:
+  get:
+    body:
+      type: PerfTestRequest

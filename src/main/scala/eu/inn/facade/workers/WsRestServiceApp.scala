@@ -62,7 +62,7 @@ class WsRestServiceApp(implicit inj: Injector)
                     new WsRestRoutes(route),
                     hyperbus,
                     subscriptionsManager,
-                    remoteAddress.getAddress.toString
+                    remoteAddress.getAddress.toString.substring(1) // remove leading slash symbol
                   ), "wrkr-" + connectionId.toHexString
                 )
                 context.watch(worker)

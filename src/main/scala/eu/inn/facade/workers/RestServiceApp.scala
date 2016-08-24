@@ -83,8 +83,8 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   }
 
   override def stopService(controlBreak: Boolean): Unit = {
-    log.info("Stopping Hyperbus Facade...")
-    println("Stopping Hyperbus Facade...")
+    log.info("Stopping Hyper-Facade...")
+    println("Stopping Hyper-Facade...")
     try {
       Await.result(actorSystem.terminate(), shutdownTimeout)
     } catch {
@@ -97,7 +97,7 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
       case t: Throwable ⇒
         log.error("Hyperbus didn't shutdown gracefully", t)
     }
-    log.info("Hyperbus Facade stopped")
+    log.info("Hyper-Facade stopped")
   }
 
   private def respondWithCORSHeaders(allowedOrigins: Seq[String], allowedPaths: Seq[Pattern] = Nil): Directive0 =

@@ -52,10 +52,7 @@ object PredicateEvaluator {
       val contextMap = Map[String, Value](
         ContextStorage.AUTH_USER → authUserMap,
         ContextStorage.IS_AUTHORIZED → context.isAuthorized.toValue,
-        "ip" → (context.requestHeaders.get(FacadeHeaders.CLIENT_IP) match {
-          case Some(ip :: _) ⇒ ip.toValue
-          case _ ⇒ Null
-        })
+        "ip" → context.remoteAddress
       )
       valueMap += ("context" → contextMap)
 

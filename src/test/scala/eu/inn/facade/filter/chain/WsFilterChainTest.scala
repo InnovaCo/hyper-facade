@@ -105,7 +105,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
             Future.successful(b)
         }
         whenReady(binding, Timeout(Span(10, Seconds))) { b ⇒
-          client ! Connect()
+          client ! Connect
 
           whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
             client ! FacadeRequest(
@@ -162,7 +162,7 @@ class WsFilterChainTest extends FreeSpec with Matchers with ScalaFutures {
           Future.successful(b)
       }
       whenReady(binding, Timeout(Span(10, Seconds))) { b ⇒
-        client ! Connect()
+        client ! Connect
 
         whenReady(onClientUpgradePromise.future, Timeout(Span(5, Seconds))) { result ⇒
           client ! FacadeRequest(Uri("/test"), Method.GET,

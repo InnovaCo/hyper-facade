@@ -73,15 +73,16 @@ class TestService(hyperbus: Hyperbus) {
 }
 
 object TestService4WebsocketPerf extends App {
-
+  val RESOURCE_URI = Uri("/perf-test-service/ws")
   val config = ConfigLoader()
   val hyperbus = new HyperbusFactory(config).hyperbus
   val testService = new TestService(hyperbus)
   val eventsPerSecond = config.getInt("perf-test.events-per-second")
   var canStart = new AtomicBoolean(false)
-  TestService.startSeedNode(config)
-  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific("subscribe"))),
-    Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), _ ⇒ canStart.compareAndSet(false, true))
+  testService.onCommand(RequestMatcher(Some(RESOURCE_URI), Map(Header.METHOD → Specific("get"))),
+    Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), { r ⇒
+      canStart.compareAndSet(false, true)
+    })
   while (!canStart.get()) {
     Thread.sleep(1000)
   }
@@ -100,11 +101,46 @@ object TestService4WebsocketPerf extends App {
   }
 }
 
-object TestService4HttpPerf extends App {
+@body("perf-test")
+case class PerfTestEventBody(content: String, secretField: String) extends Body
+
+@request(Method.FEED_PUT, "/perf-test")
+case class PerfTestFeedEvent(body: PerfTestEventBody, headers: Map[String, Seq[String]]) extends Request[PerfTestEventBody]
+
+object TestService4WebsocketPerfWithFilters extends App {
+  val RESOURCE_URI = Uri("/perf-test")  // this uri should match value in perf-test.raml as rewritten uri for "/perf-test-with-filters"
   val config = ConfigLoader()
   val hyperbus = new HyperbusFactory(config).hyperbus
   val testService = new TestService(hyperbus)
-  TestService.startSeedNode(config)
-  testService.onCommand(RequestMatcher(Some(Uri("/test-service/unreliable")), Map(Header.METHOD → Specific(Method.GET))),
+  val eventsPerSecond = config.getInt("perf-test.events-per-second")
+  var canStart = new AtomicBoolean(false)
+  testService.onCommand(RequestMatcher(Some(RESOURCE_URI), Map(Header.METHOD → Specific("get"))),
+    Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), { _ ⇒
+      canStart.compareAndSet(false, true)
+    })
+  while (!canStart.get()) {
+    Thread.sleep(1000)
+  }
+  startLoad()
+
+  def startLoad(): Unit = {
+    println("start load")
+    while (true) {
+      val startTime = System.currentTimeMillis()
+      for (i ← 1 to eventsPerSecond) {
+        testService.publish(PerfTestFeedEvent(PerfTestEventBody("perfEvent", "secret"), Headers()))
+      }
+      val remainingTime = 1000 - (startTime - System.currentTimeMillis())
+      if (remainingTime > 0) Thread.sleep(remainingTime)
+    }
+  }
+}
+
+object TestService4HttpPerf extends App {
+  val RESOURCE_URI = Uri("/resource/state")  // this uri should match value in perf-test.raml as rewritten uri for "/perf-test-service/http"
+  val config = ConfigLoader()
+  val hyperbus = new HyperbusFactory(config).hyperbus
+  val testService = new TestService(hyperbus)
+  testService.onCommand(RequestMatcher(Some(RESOURCE_URI), Map(Header.METHOD → Specific(Method.GET))),
     Ok(DynamicBody(Text("response"))))
 }
