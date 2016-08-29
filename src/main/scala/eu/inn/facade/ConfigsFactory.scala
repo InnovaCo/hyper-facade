@@ -2,26 +2,20 @@ package eu.inn.facade
 
 import java.io.{File, FileNotFoundException}
 
-import com.mulesoft.raml.webpack.holders.JSConsole
-import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.typesafe.config.Config
 import eu.inn.facade.raml.{RamlConfiguration, RamlConfigurationBuilder}
-import eu.inn.facade.utils.raml.JsToLogConsole
+import org.raml.v2.api.RamlModelBuilder
 import scaldi.Injector
 
 object ConfigsFactory {
 
   def ramlConfig(appConfig: Config)(implicit inj: Injector): RamlConfiguration = {
-    val ramlFactory = new JavaNodeFactory()
-    val existingConsole = ramlFactory.getBindings.get("console").asInstanceOf[JSConsole]
-    ramlFactory.getBindings.put("console", new JsToLogConsole(existingConsole.engine))
-
     val ramlConfigPath = ramlFilePath(appConfig)
     val apiFile = new File(ramlConfigPath)
     if (!apiFile.exists()) {
       throw new FileNotFoundException(s"File ${apiFile.getAbsolutePath} doesn't exists")
     }
-    val api = ramlFactory.createApi(apiFile.getAbsolutePath)
+    val api = new RamlModelBuilder().buildApi(ramlConfigPath).getApiV10
     RamlConfigurationBuilder(api).build
   }
 

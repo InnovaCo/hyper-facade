@@ -3,6 +3,7 @@ title: Facade API
 version: v1
 mediaType: application/json
 baseUri: https://meta.inn.eu/revault
+
 types:
   TestRequest:
     type: object
@@ -25,12 +26,22 @@ types:
         (deny):
         type: string
 
+  Conditional:
+    type: object
+    properties:
+      if?:
+
+  WithUri:
+    type: object
+    properties:
+      uri:
+
 annotationTypes:
-  x-client-ip:
-  x-client-language:
-  paged:
-  deny:
-  rewrite:
+  x-client-ip: nil | Conditional
+  x-client-language: nil | Conditional
+  deny: nil | Conditional
+  paged: nil
+  rewrite: [WithUri, Conditional]
 
 /private:
   (deny):

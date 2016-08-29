@@ -2,7 +2,6 @@ package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.Null
 import eu.inn.facade.model.{ContextWithRequest, FacadeRequest}
-import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.facade.raml.{Method, RewriteIndexHolder}
 import eu.inn.facade.{CleanRewriteIndex, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -35,11 +34,5 @@ class RewriteEventFilterTest extends FreeSpec with Matchers with ScalaFutures wi
 
       filteredEvent shouldBe expectedEvent
     }
-  }
-
-  def r(uri: String): rewrite = {
-    val res = new rewrite
-    res.setUri(uri)
-    res
   }
 }

@@ -2,6 +2,7 @@ package eu.inn.facade.raml
 
 import com.typesafe.config.Config
 import eu.inn.facade.FacadeConfigPaths
+import eu.inn.facade.utils.UriMatcher
 import eu.inn.hyperbus.transport.api.uri.Uri
 
 class RamlConfigurationReader(ramlConfiguration: RamlConfiguration, config: Config) {

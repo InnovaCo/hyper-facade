@@ -1,16 +1,15 @@
 package eu.inn.facade.raml
 
-import com.mulesoft.raml1.java.parser.impl.datamodel.ObjectFieldImpl
-import com.mulesoft.raml1.java.parser.model.api.Api
-import com.mulesoft.raml1.java.parser.model.bodies.Response
-import com.mulesoft.raml1.java.parser.model.common.RAMLLanguageElement
-import com.mulesoft.raml1.java.parser.model.datamodel.DataElement
-import com.mulesoft.raml1.java.parser.model.methodsAndResources
-import com.mulesoft.raml1.java.parser.model.methodsAndResources.{Resource, TraitRef}
 import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.facade.filter.model.{RamlFilterFactory, TargetField}
 import eu.inn.facade.model._
-import eu.inn.facade.raml.annotationtypes.rewrite
+import org.raml.v2.api.model.v10.api.Api
+import org.raml.v2.api.model.v10.bodies.Response
+import org.raml.v2.api.model.v10.common.Annotable
+import org.raml.v2.api.model.v10.datamodel.{ObjectTypeDeclaration, TypeDeclaration}
+import org.raml.v2.api.model.v10.methods
+import org.raml.v2.api.model.v10.methods.TraitRef
+import org.raml.v2.api.model.v10.resources.Resource
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
 
@@ -21,7 +20,7 @@ import scala.util.control.NonFatal
 class RamlConfigurationBuilder(val api: Api)(implicit inj: Injector) extends Injectable {
   val log = LoggerFactory.getLogger(getClass)
 
-  var dataTypes: Map[String, TypeDefinition] = parseTypeDefinitions()
+  var dataTypes: Map[String, TypeDefinition] = parseTypeDefinitions
 
   def build: RamlConfiguration = {
     val resourcesByUriAcc = Map.newBuilder[String, ResourceConfig]
@@ -40,9 +39,9 @@ class RamlConfigurationBuilder(val api: Api)(implicit inj: Injector) extends Inj
       urisAcc.result())
   }
 
-  private def parseTypeDefinitions(): Map[String, TypeDefinition] = {
+  private def parseTypeDefinitions: Map[String, TypeDefinition] = {
     val typeDefinitions = api.types().foldLeft(Map.newBuilder[String, TypeDefinition]) { (typesMap, ramlTypeRaw) ⇒
-      val ramlType = ramlTypeRaw.asInstanceOf[ObjectFieldImpl]
+      val ramlType = ramlTypeRaw.asInstanceOf[ObjectTypeDeclaration]
       val fields = ramlType.properties().foldLeft(Seq.newBuilder[Field]) { (parsedFields, ramlField) ⇒
         parsedFields += parseField(ramlField)
       }.result()
@@ -50,40 +49,21 @@ class RamlConfigurationBuilder(val api: Api)(implicit inj: Injector) extends Inj
       val typeName = ramlType.name
       val parentTypeName = ramlType.`type`.isEmpty match {
         case true ⇒ None
-        case false ⇒ Some(ramlType.`type`.get(0))
+        case false ⇒ Some(ramlType.`type`)
       }
       val annotations = extractAnnotations(ramlType)
       typesMap += typeName → TypeDefinition(typeName, parentTypeName, annotations, fields)
     }.result()
 
-    val withFlattenedFields = flattenFieldStructure(typeDefinitions)
-    withInheritedFields(withFlattenedFields)
+    withFlattenedFields(typeDefinitions)
   }
 
-  private def flattenFieldStructure(typeDefinitions: Map[String, TypeDefinition]): Map[String, TypeDefinition] = {
+  private def withFlattenedFields(typeDefinitions: Map[String, TypeDefinition]): Map[String, TypeDefinition] = {
     typeDefinitions.foldLeft(Map.newBuilder[String, TypeDefinition]) { (tree, typeDefTuple) ⇒
       val (typeName, typeDef) = typeDefTuple
       val completedTypeDef = typeDef.copy(fields = withFlattenedSubFields(typeDef.fields, None, typeDefinitions))
       tree += typeName → completedTypeDef
     }.result()
-  }
-
-  def withInheritedFields(types: Map[String, TypeDefinition]): Map[String, TypeDefinition] = {
-    types mapValues { typeDef ⇒
-      typeDef.parentTypeName match {
-        case Some(parentType) ⇒
-          val inheritedFields = types.get(parentType) match {
-            case Some(parentTypeDef) ⇒
-              parentTypeDef.fields
-            case None ⇒
-              Seq()
-          }
-          typeDef.copy(fields = typeDef.fields ++ inheritedFields)
-
-        case None ⇒
-          typeDef
-      }
-    }
   }
 
   private def withFlattenedSubFields(fields: Seq[Field], fieldNamePrefix: Option[String], typeDefinitions: Map[String, TypeDefinition]): Seq[Field] = {
@@ -119,15 +99,15 @@ class RamlConfigurationBuilder(val api: Api)(implicit inj: Injector) extends Inj
     }.result()
   }
 
-  private def parseField(ramlField: DataElement): Field = {
+  private def parseField(ramlField: TypeDeclaration): Field = {
     val name = ramlField.name
-    val typeName = ramlField.`type`.headOption.getOrElse(DataType.DEFAULT_TYPE_NAME)
+    val typeName = ramlField.`type`
     val annotations = extractAnnotations(ramlField)
     val field = Field(name, typeName, annotations)
     field
   }
 
-  private def parseResource(currentUri: String, resource: Resource, parentAnnotations: Seq[Annotation]): (Map[String, ResourceConfig]) = {
+  private def parseResource(currentUri: String, resource: Resource, parentAnnotations: Seq[RamlAnnotation]): (Map[String, ResourceConfig]) = {
     val traits = extractResourceTraits(resource) // todo: eliminate?
 
     val adjustedParentAnnotations = adjustParentAnnotations(resource.relativeUri.value(), parentAnnotations)
@@ -154,7 +134,7 @@ class RamlConfigurationBuilder(val api: Api)(implicit inj: Injector) extends Inj
     builder.result()
   }
 
-  private def extractResourceMethod(currentUri: String, ramlMethod: methodsAndResources.Method, resource: Resource): RamlResourceMethodConfig = {
+  private def extractResourceMethod(currentUri: String, ramlMethod: methods.Method, resource: Resource): RamlResourceMethodConfig = {
     val methodAnnotations = extractAnnotations(ramlMethod)
     val method = Method(ramlMethod.method())
 
@@ -170,15 +150,12 @@ class RamlConfigurationBuilder(val api: Api)(implicit inj: Injector) extends Inj
     RamlResourceMethodConfig(method, methodAnnotations, ramlRequests, ramlResponses.result(), SimpleFilterChain())
   }
 
-  private def adjustParentAnnotations(childResourceRelativeUri: String, parentAnnotations: Seq[Annotation]): Seq[Annotation] = {
-    val adjustedAnnotations = Seq.newBuilder[Annotation]
+  private def adjustParentAnnotations(childResourceRelativeUri: String, parentAnnotations: Seq[RamlAnnotation]): Seq[RamlAnnotation] = {
+    val adjustedAnnotations = Seq.newBuilder[RamlAnnotation]
     parentAnnotations.foreach {
-      case Annotation(Annotation.REWRITE, Some(ann)) ⇒
-        val rewriteAnnotation = ann.asInstanceOf[rewrite]
-        val adjustedRewrittenUri = rewriteAnnotation.getUri + childResourceRelativeUri
-        val adjustedRewriteAnn = new rewrite()
-        adjustedRewriteAnn.setUri(adjustedRewrittenUri)
-        adjustedAnnotations += Annotation(Annotation.REWRITE, Some(adjustedRewriteAnn))
+      case RewriteAnnotation(name, predicate, uri) ⇒
+        val adjustedRewrittenUri = uri + childResourceRelativeUri
+        adjustedAnnotations += RewriteAnnotation(name, predicate, adjustedRewrittenUri)
       case otherAnn ⇒ adjustedAnnotations += otherAnn
     }
     adjustedAnnotations.result()
@@ -245,20 +222,16 @@ class RamlConfigurationBuilder(val api: Api)(implicit inj: Injector) extends Inj
           case None | Some("body") | Some("none") ⇒ None
           case other ⇒ FacadeHeaders.httpContentTypeToGeneric(other)
         }
-        val typeName = body.`type`.get(0)
+        val typeName = body.`type`
         typeNames += (contentType → Option(typeName))
       }
     }.result()
   }
 
-  private def extractAnnotations(ramlField: RAMLLanguageElement): Seq[Annotation] = {
-    val builder = Seq.newBuilder[Annotation]
+  private def extractAnnotations(ramlField: Annotable): Seq[RamlAnnotation] = {
+    val builder = Seq.newBuilder[RamlAnnotation]
     ramlField.annotations.foreach { annotation ⇒
-      val value = annotation.value() match {
-        case x: RamlAnnotation ⇒ Some(x)
-        case _ ⇒ None
-      }
-      builder += Annotation(annotation.value.getRAMLValueName, value)
+      builder += RamlAnnotation(annotation.annotation.name, annotation.structuredValue.properties)
     }
     builder.result()
   }
@@ -276,7 +249,7 @@ class RamlConfigurationBuilder(val api: Api)(implicit inj: Injector) extends Inj
   private def extractTraits(traits: java.util.List[TraitRef]): Seq[Trait] = {
     traits.foldLeft(Seq.newBuilder[Trait]) {
       (accumulator, traitRef) ⇒
-        val traitName = traitRef.value.getRAMLValueName
+        val traitName = traitRef.`trait`().name()
         accumulator += Trait(traitName)
     }.result()
   }
@@ -288,17 +261,17 @@ object RamlConfigurationBuilder {
   }
 }
 
-private[raml] class RamlRequestResponseWrapper(val method: Option[methodsAndResources.Method], val response: Option[Response]) {
+private[raml] class RamlRequestResponseWrapper(val method: Option[methods.Method], val response: Option[Response]) {
 
-  def body: java.util.List[DataElement] = {
-    var bodyList = Seq[DataElement]()
+  def body: java.util.List[TypeDeclaration] = {
+    var bodyList = Seq[TypeDeclaration]()
     if (method.isDefined) bodyList = bodyList ++ method.get.body
     if (response.isDefined) bodyList = bodyList ++ response.get.body
     bodyList
   }
 
-  def headers: java.util.List[DataElement] = {
-    var bodyList = Seq[DataElement]()
+  def headers: java.util.List[TypeDeclaration] = {
+    var bodyList = Seq[TypeDeclaration]()
     if (method.isDefined) bodyList = bodyList ++ method.get.headers
     if (response.isDefined) bodyList = bodyList ++ response.get.headers
     bodyList
@@ -310,7 +283,7 @@ private[raml] object RamlRequestResponseWrapper {
     new RamlRequestResponseWrapper(None, Some(response))
   }
 
-  def apply(method: methodsAndResources.Method): RamlRequestResponseWrapper = {
+  def apply(method: methods.Method): RamlRequestResponseWrapper = {
     new RamlRequestResponseWrapper(Some(method), None)
   }
 }

@@ -1,12 +1,57 @@
 #%RAML 1.0
-title: Example API
-baseUri: http://api.example.com
+title: Facade API
+version: v1
+mediaType: application/json
+baseUri: https://meta.inn.eu/revault
+
+types:
+
+  User:
+    type: object
+    properties:
+      fullName: string
+      userName: string
+      password:
+        (deny):
+        type: string
+      clientIp:
+        (x-client-ip):
+        type: string
+      clientLanguage:
+        (x-client-language):
+        type: string
+
+  Conditional:
+    type: object
+    properties:
+      if?:
+
+  WithUri:
+    type: object
+    properties:
+      uri:
 
 annotationTypes:
-  feed:
-  rewrite:
-    properties:
-      uri: string
+  authorize: nil | Conditional
+  x-client-ip: nil | Conditional
+  x-client-language: nil | Conditional
+  deny: nil | Conditional
+  rewrite: [WithUri, Conditional]
 
-/test:
+/users/{userId}:
   get:
+    (authorize):
+      if: context.authUser.id = "123456"
+    responses:
+      200:
+        body:
+          type: User
+  feed:put:
+    body:
+      application/json:
+        type: User
+
+/events/{path}:
+  feed:put:
+    (rewrite):
+      uri: /rewritten-events/root/{path}

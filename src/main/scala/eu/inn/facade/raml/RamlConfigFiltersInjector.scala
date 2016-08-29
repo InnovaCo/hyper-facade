@@ -79,7 +79,7 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
     updatedRequests.result()
   }
 
-  private def createFilters(uri: String, method: Option[String], annotations: Seq[Annotation]): SimpleFilterChain = {
+  private def createFilters(uri: String, method: Option[String], annotations: Seq[RamlAnnotation]): SimpleFilterChain = {
     annotations.foldLeft(FilterChain.empty) { (filterChain, annotation) ⇒
       val target = method match {
         case Some(m) ⇒ TargetMethod(uri, m, annotation)

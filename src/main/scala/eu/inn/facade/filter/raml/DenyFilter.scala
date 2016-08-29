@@ -4,8 +4,7 @@ import eu.inn.binders.value.{Obj, Value}
 import eu.inn.facade.filter.model.{EventFilter, RequestFilter, ResponseFilter}
 import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.model._
-import eu.inn.facade.raml.annotationtypes.deny
-import eu.inn.facade.raml.{Annotation, Field}
+import eu.inn.facade.raml.{DenyAnnotation, Field, RamlAnnotation}
 import eu.inn.hyperbus.model.{ErrorBody, Forbidden}
 
 import scala.collection.Map
@@ -82,9 +81,9 @@ object DenyFilter {
 
 
   def isPrivateField(field: Field, contextWithRequest: ContextWithRequest, predicateEvaluator: PredicateEvaluator): Boolean = {
-    field.annotations.find(_.name == Annotation.DENY) match {
-      case Some(Annotation(_, Some(deny: deny))) ⇒
-        Option(deny.getPredicate) match {
+    field.annotations.find(_.name == RamlAnnotation.DENY) match {
+      case Some(DenyAnnotation(_, predicateOpt)) ⇒
+        predicateOpt match {
           case Some(predicate) ⇒
             predicateEvaluator.evaluate(predicate, contextWithRequest)
           case None ⇒

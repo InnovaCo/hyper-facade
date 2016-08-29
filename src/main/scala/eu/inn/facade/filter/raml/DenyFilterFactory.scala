@@ -3,8 +3,7 @@ package eu.inn.facade.filter.raml
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.model._
 import eu.inn.facade.filter.parser.PredicateEvaluator
-import eu.inn.facade.raml.Annotation
-import eu.inn.facade.raml.annotationtypes.deny
+import eu.inn.facade.raml.DenyAnnotation
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
 
@@ -21,14 +20,14 @@ class DenyFilterFactory(implicit inj: Injector) extends RamlFilterFactory with I
           eventFilters = Seq(new DenyEventFilter(field, predicateEvaluator))
         )
 
-      case TargetResource(_, Annotation(_, Some(deny: deny))) ⇒
+      case TargetResource(_, DenyAnnotation(_, _)) ⇒
         SimpleFilterChain(
           requestFilters = Seq(new DenyRequestFilter),
           responseFilters = Seq.empty,
           eventFilters = Seq.empty
         )
 
-      case TargetMethod(_, _, Annotation(_, Some(deny: deny))) ⇒
+      case TargetMethod(_, _, DenyAnnotation(_, _)) ⇒
         SimpleFilterChain(
           requestFilters = Seq(new DenyRequestFilter),
           responseFilters = Seq.empty,

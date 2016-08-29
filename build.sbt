@@ -34,7 +34,8 @@ javacOptions ++= Seq(
 resolvers ++= Seq(
   "Innova libs repo" at "http://repproxy.srv.inn.ru/artifactory/libs-release-local",
   "Innova ext repo" at "http://repproxy.srv.inn.ru/artifactory/ext-release-local",
-  Resolver.sonatypeRepo("public")
+  Resolver.sonatypeRepo("public"),
+  Resolver.mavenLocal
 )
 
 //ramlHyperbusSource := file("hyper-facade.raml")
@@ -67,8 +68,7 @@ libraryDependencies ++= Seq(
   "eu.inn"               %% "hyperbus-transport"          % "0.1.79",
   "eu.inn"               %% "hyperbus-t-kafka"            % "0.1.79",
   "eu.inn"               %% "hyperbus-t-distributed-akka" % "0.1.79",
-  "eu.inn"               % "java-raml1-parser"            % "0.0.32",
-  "eu.inn"               % "javascript-module-holders"    % "0.0.32",
+  "org.raml"             % "raml-parser-2"                % "1.0.0-SNAPSHOT",
   "eu.inn"               %% "service-control"             % "0.2.17",
   "eu.inn"               %% "service-config"              % "0.1.6",
   "eu.inn"               %% "service-metrics"             % "0.1.6",

@@ -3,7 +3,18 @@ title: Facade API
 version: v1
 mediaType: application/json
 baseUri: https://meta.inn.eu/revault
+
 types:
+  Conditional:
+    type: object
+    properties:
+      if?:
+
+  WithUri:
+    type: object
+    properties:
+      uri:
+
   ResourceState:
     type: object
     properties:
@@ -26,12 +37,10 @@ types:
         type: string
 
 annotationTypes:
-  x-client-ip:
-  x-client-language:
-  deny:
-  rewrite:
-    properties:
-      uri: string
+  x-client-ip: nil | Conditional
+  x-client-language: nil | Conditional
+  deny: nil | Conditional
+  rewrite: [WithUri, Conditional]
 
 /resource/with-client-ip:
   get:
