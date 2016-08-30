@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.Null
-import eu.inn.facade.model.FacadeRequest
+import eu.inn.facade.model.{ContextWithRequest, FacadeRequest}
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.facade.raml.{Method, RewriteIndexHolder}
 import eu.inn.facade.{CleanRewriteIndex, MockContext}
@@ -26,9 +26,8 @@ class RewriteEventFilterTest extends FreeSpec with Matchers with ScalaFutures wi
         Uri("/rewritten/{service}", Map("service" → "some-service")), Method.POST, Map.empty, Null
       )
 
-      val context = mockContext(request)
-
-      val filteredEvent = filter.apply(context, event).futureValue
+      val cwr = ContextWithRequest(mockContext(request), request)
+      val filteredEvent = filter.apply(cwr, event).futureValue
 
       val expectedEvent = FacadeRequest(
         Uri("/test-rewrite/some-service"), Method.POST, Map.empty,Null

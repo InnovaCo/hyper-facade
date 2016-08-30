@@ -1,0 +1,17 @@
+#%RAML 1.0
+title: Facade API
+version: v1
+mediaType: application/json
+baseUri: https://meta.inn.eu/revault
+
+annotationTypes:
+  authorize:
+
+/auth-resource:
+  (authorize):
+    if: context.authUser.id = "123456"
+
+/auth-method:
+  post:
+    (authorize):
+      if: context.authUser.id = "123456"

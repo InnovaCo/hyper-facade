@@ -56,6 +56,7 @@ case class FacadeRequest(uri: Uri, method: String, headers: Map[String, Seq[Stri
 }
 
 object FacadeRequest {
+
   def apply(request: HttpRequest): FacadeRequest = {
     val pathAndQuery = request.uri.path.toString + {
       if (request.uri.query.nonEmpty)
@@ -115,10 +116,6 @@ case class FacadeResponse(status: Int, headers: Map[String, Seq[String]], body: 
   override def toString = {
     s"FacadeResponse(${this.toJson})"
   }
-
-  /*def contentType: Option[String] = {
-    headers.get(Header.CONTENT_TYPE).flatMap(_.headOption)
-  }*/
 
   def clientContentType: Option[String] = {
     headers.get(FacadeHeaders.CONTENT_TYPE).flatMap(_.headOption)

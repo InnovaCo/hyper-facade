@@ -2,65 +2,91 @@ package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{Obj, Text, Value}
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
+import eu.inn.facade.filter.model._
+import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.model._
 import eu.inn.facade.raml.{Annotation, Field}
+import org.slf4j.LoggerFactory
+import scaldi.{Injectable, Injector}
 
+import scala.collection.Map
 import scala.concurrent.{ExecutionContext, Future}
 
-class EnrichmentFilterFactory extends RamlFilterFactory {
-  def createFilterChain(target: RamlTarget): SimpleFilterChain = {
-    target match {
-      case TargetFields(typeName, fields) ⇒
-        SimpleFilterChain(
-          requestFilters = Seq(new EnrichRequestFilter(fields)),
-          responseFilters = Seq.empty,
-          eventFilters = Seq.empty
-        )
-      case _ ⇒ FilterChain.empty // log warning
-    }
-  }
-}
-
-class EnrichRequestFilter(val fields: Seq[Field]) extends RequestFilter {
-  override def apply(context: FacadeRequestContext, request: FacadeRequest)
-                    (implicit ec: ExecutionContext): Future[FacadeRequest] = {
+class EnrichRequestFilter(val field: Field) extends RequestFilter {
+  override def apply(contextWithRequest: ContextWithRequest)
+                    (implicit ec: ExecutionContext): Future[ContextWithRequest] = {
     Future {
-      val enrichedFields = enrichFields(fields, request.body.asMap, context)
-      request.copy(body = Obj(enrichedFields))
+      val request = contextWithRequest.request
+      val enrichedFields = enrichFields(field, request.body.asMap, contextWithRequest.context)
+      contextWithRequest.copy(
+        request = request.copy(body = Obj(enrichedFields))
+      )
     }
   }
 
-  private def enrichFields(ramlFields: Seq[Field], fields: scala.collection.Map[String, Value], context: FacadeRequestContext): scala.collection.Map[String, Value] = {
-    ramlFields.foldLeft(fields) { (notEnrichedFields, ramlField) ⇒
+  private def enrichFields(ramlField: Field, fields: Map[String, Value], context: FacadeRequestContext): Map[String, Value] = {
       val annotations = ramlField.annotations
-      var enrichedFields = notEnrichedFields
-      annotations.foreach { annotation ⇒
+      annotations.foldLeft(fields) { (enrichedFields, annotation) ⇒
         annotation.name match {
           case Annotation.CLIENT_IP ⇒
-            enrichedFields += ramlField.name → Text(context.remoteAddress)
+            addField(ramlField.name, Text(context.remoteAddress), fields)
 
           case Annotation.CLIENT_LANGUAGE ⇒
             context.requestHeaders.get(FacadeHeaders.CLIENT_LANGUAGE) match {
-              case Some(value :: _) ⇒ enrichedFields += ramlField.name → Text(value) // todo: format of header?
-              case _ ⇒ // do nothing
+              case Some(value :: _) ⇒
+                addField(ramlField.name, Text(value), fields)  // todo: format of header?
+
+              case _ ⇒
+                enrichedFields  // do nothing, because header is missing
             }
 
-          case _ ⇒ // do nothing, this annotation doesn't belong to enrichment filter
+          case _ ⇒
+            enrichedFields// do nothing, this annotation doesn't belong to enrichment filter
         }
       }
-      if (shouldFilterNestedFields(ramlField, enrichedFields)) {
-        val fieldName = ramlField.name
-        val nestedFields = enrichedFields(fieldName).asMap
-        val enrichedNestedFields = enrichFields(ramlField.fields, nestedFields, context)
-        enrichedFields + (fieldName → Obj(enrichedNestedFields))
-      } else
-        enrichedFields
+  }
+
+  def addField(pathToField: String, value: Value, requestFields: Map[String, Value]): Map[String, Value] = {
+    if (pathToField.contains("."))
+      pathToField.split('.').toList match {
+        case (leadPathSegment :: _) ⇒
+          requestFields.get(leadPathSegment) match {
+            case Some(subFields) ⇒
+              val tailPath = pathToField.substring(leadPathSegment.length + 1)
+              requestFields + (leadPathSegment → Obj(addField(tailPath, value, subFields.asMap)))
+          }
+      }
+    else
+      requestFields + (pathToField → value)
+  }
+}
+
+class EnrichmentFilterFactory(implicit inj: Injector) extends RamlFilterFactory with Injectable {
+  val log = LoggerFactory.getLogger(getClass)
+  val predicateEvaluator = inject[PredicateEvaluator]
+
+  override def createFilters(target: RamlTarget): SimpleFilterChain = {
+    target match {
+      case TargetField(_, field) ⇒
+        SimpleFilterChain(
+          requestFilters = createRequestFilters(field),
+          responseFilters = Seq.empty,
+          eventFilters = Seq.empty
+        )
+      case unknownTarget ⇒
+        log.warn(s"Annotations 'x-client-ip' and 'x-client-language' are not supported for target $unknownTarget. Empty filter chain will be created")
+        FilterChain.empty
     }
   }
 
-  def shouldFilterNestedFields(ramlField: Field, fields: scala.collection.Map[String, Value]): Boolean = {
-    ramlField.fields.nonEmpty &&
-      fields.nonEmpty &&
-      fields.contains(ramlField.name)
+  def createRequestFilters(field: Field): Seq[EnrichRequestFilter] = {
+    field.annotations.foldLeft(Seq.newBuilder[EnrichRequestFilter]) { (filters, annotation) ⇒
+        annotation.name match {
+          case Annotation.CLIENT_IP | Annotation.CLIENT_LANGUAGE ⇒
+            filters += new EnrichRequestFilter(field)
+          case _ ⇒
+            filters
+        }
+    }.result()
   }
 }

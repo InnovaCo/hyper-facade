@@ -2,7 +2,7 @@ package eu.inn.facade.filter.http
 
 import eu.inn.binders.value._
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model.FacadeRequest
+import eu.inn.facade.model.{ContextWithRequest, FacadeRequest}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
 import eu.inn.hyperbus.model.Link
@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with Injectable with MockContext {
 
-  System.setProperty(FacadeConfigPaths.RAML_FILE, "specific-raml-configs/http-ws-request-filter-test.raml")
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/http-ws-request-filter-test.raml")
   implicit val injector = Injectors()
   val beforeFilters = inject[FilterChain]("beforeFilterChain")
 
@@ -42,7 +42,7 @@ class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures w
       )
 
       val context = mockContext(request)
-      val filteredRequest = beforeFilters.filterRequest(context, request).futureValue(Timeout(Span(500, Seconds)))
+      val filteredRequest = beforeFilters.filterRequest(ContextWithRequest(context, request)).futureValue(Timeout(Span(500, Seconds))).request
       filteredRequest.uri shouldBe Uri("/test")
 
       val linksMap = filteredRequest.body.__links.fromValue[LinksMap] // binders deserialization magic
@@ -90,7 +90,7 @@ class HttpWsRequestFilterTest extends FreeSpec with Matchers with ScalaFutures w
       )
 
       val context = mockContext(request)
-      val filteredRequest = beforeFilters.filterRequest(context, request).futureValue
+      val filteredRequest = beforeFilters.filterRequest(ContextWithRequest(context, request)).futureValue.request
       filteredRequest.uri shouldBe Uri("/test")
 
       val linksMap = filteredRequest.body.__links.fromValue[LinksMap] // binders deserialization magic

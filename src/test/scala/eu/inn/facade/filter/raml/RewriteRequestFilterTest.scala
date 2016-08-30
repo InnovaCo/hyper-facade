@@ -1,7 +1,7 @@
 package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{ObjV, Text}
-import eu.inn.facade.model.FacadeRequest
+import eu.inn.facade.model.{ContextWithRequest, FacadeRequest}
 import eu.inn.facade.raml._
 import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.facade.{CleanRewriteIndex, MockContext}
@@ -32,7 +32,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       )
 
       val requestContext = mockContext(request)
-      val filteredRequest = filter.apply(requestContext, request).futureValue
+      val filteredRequest = filter.apply(ContextWithRequest(requestContext, request)).futureValue.request
 
       val expectedRequest = FacadeRequest(
         Uri("/rewritten/some-service"),
@@ -56,7 +56,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       )
 
       val requestContext = mockContext(request)
-      val filteredRequest = filter.apply(requestContext, request).futureValue
+      val filteredRequest = filter.apply(ContextWithRequest(requestContext, request)).futureValue.request
 
       val expectedRequest = FacadeRequest(
         Uri("/test-rewrite/some-service/{serviceId}", Map("serviceId" → "100500")),
@@ -78,7 +78,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
       )
       val requestContext = mockContext(request)
 
-      val filteredRequest = filter.apply(requestContext, request).futureValue
+      val filteredRequest = filter.apply(ContextWithRequest(requestContext, request)).futureValue.request
       val expectedRequest = FacadeRequest(
         Uri("/rewritten/some-service"), Method.POST, Map.empty, ObjV("field" → "content"))
 

@@ -43,7 +43,7 @@ object UriMatcher {
 
         case ParameterToken(patternParamName, RegularMatchType) ⇒
           reqUriToken match {
-            case requestUriToken@TextToken(value) ⇒
+            case TextToken(value) ⇒
               args += patternParamName → value
               matchesCorrectly = patternTokenIter.hasNext == reqUriTokenIter.hasNext
             case _ ⇒
@@ -52,9 +52,9 @@ object UriMatcher {
 
         case ParameterToken(paramName, PathMatchType) ⇒
           reqUriToken match {
-            case requestUriToken @ TextToken(value) ⇒
+            case TextToken(value) ⇒
               args += paramName → foldUriTail(value, reqUriTokenIter)
-            case requestUriToken @ ParameterToken(_, PathMatchType) ⇒
+            case ParameterToken(_, PathMatchType) ⇒
               matchesCorrectly = true
             case _ ⇒
               matchesCorrectly = false
@@ -75,7 +75,7 @@ object UriMatcher {
         case Some(SlashToken) ⇒
           if (iter.hasNext) getRequestUriToken(iter, previousToken)
           else SlashToken
-        case Some(other) ⇒ SlashToken
+        case Some(_) ⇒ SlashToken
         case None ⇒ SlashToken
       }
 

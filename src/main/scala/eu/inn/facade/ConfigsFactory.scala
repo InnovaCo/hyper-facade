@@ -5,13 +5,13 @@ import java.io.{File, FileNotFoundException}
 import com.mulesoft.raml.webpack.holders.JSConsole
 import com.mulesoft.raml1.java.parser.core.JavaNodeFactory
 import com.typesafe.config.Config
-import eu.inn.facade.raml.{RamlConfig, RamlConfigParser}
+import eu.inn.facade.raml.{RamlConfiguration, RamlConfigurationBuilder}
 import eu.inn.facade.utils.raml.JsToLogConsole
 import scaldi.Injector
 
 object ConfigsFactory {
 
-  def ramlConfig(appConfig: Config)(implicit inj: Injector): RamlConfig = {
+  def ramlConfig(appConfig: Config)(implicit inj: Injector): RamlConfiguration = {
     val ramlFactory = new JavaNodeFactory()
     val existingConsole = ramlFactory.getBindings.get("console").asInstanceOf[JSConsole]
     ramlFactory.getBindings.put("console", new JsToLogConsole(existingConsole.engine))
@@ -22,7 +22,7 @@ object ConfigsFactory {
       throw new FileNotFoundException(s"File ${apiFile.getAbsolutePath} doesn't exists")
     }
     val api = ramlFactory.createApi(apiFile.getAbsolutePath)
-    RamlConfigParser(api).parseRaml
+    RamlConfigurationBuilder(api).build
   }
 
   private def ramlFilePath(config: Config): String = {
@@ -44,11 +44,10 @@ object ConfigsFactory {
 
 object FacadeConfigPaths {
   val ROOT = "hyper-facade."
-  val PRIVATE_ADDRESSES = ROOT + "private.addresses"
-  val PRIVATE_NETWORKS = ROOT + "private.networks"
   val LOGGERS = ROOT + "loggers"
   val RAML_FILE = ROOT + "raml.file"
   val RAML_ROOT_PATH_PREFIX = ROOT + "raml.root-path"
+  val RAML_STRICT_CONFIG = ROOT + "raml.strict-config"
   val HYPERBUS_GROUP = ROOT + "hyperbus.group-name"
   val INJECT_MODULES = ROOT + "inject-modules"
   val HTTP = ROOT + "http-transport"

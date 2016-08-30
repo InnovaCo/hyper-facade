@@ -1,11 +1,14 @@
 package eu.inn.facade.filter.chain
 
+import com.typesafe.config.Config
 import eu.inn.binders.value.{Null, ObjV}
 import eu.inn.facade.filter.NoOpFilter
+import eu.inn.facade.filter.model.{ConditionalEventFilterProxy, ConditionalRequestFilterProxy, ConditionalResponseFilterProxy}
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.{CleanRewriteIndex, MockContext}
+import eu.inn.facade.raml.annotationtypes.{x_client_ip, x_client_language}
+import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
 import scaldi.Injectable
@@ -14,7 +17,7 @@ import scaldi.Injectable
 // + integrated test with filter lookup when specific != formatted!
 
 class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable with MockContext {
-
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/raml-filter-chain-test.raml")
   implicit val injector = Injectors()
   val filterChain = inject [FilterChain].asInstanceOf[RamlFilterChain]
 
@@ -22,17 +25,24 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
     "resource filter chain" in {
       val request = FacadeRequest(Uri("/private"), "get", Map.empty, Null)
       val context = mockContext(request)
-      val filters = filterChain.findRequestFilters(context, request)
+      val filters = filterChain.findRequestFilters(ContextWithRequest(context, request))
       filters.length should equal(1)
-      filters.head shouldBe a[RequestPrivateFilter]
+      filters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[DenyRequestFilter]
     }
 
     "annotation based filter chain" in {
       val request = FacadeRequest(Uri("/status/test-service"), "get", Map.empty, Null)
       val context = mockContext(request)
-      val filters = filterChain.findRequestFilters(context, request)
-      filters.length should equal(1)
-      filters.head shouldBe a[EnrichRequestFilter]
+      val filters = filterChain.findRequestFilters(ContextWithRequest(context, request))
+      filters.length should equal(2)
+      val firstFilter = filters.head.asInstanceOf[ConditionalRequestFilterProxy]
+      val secondFilter = filters.last.asInstanceOf[ConditionalRequestFilterProxy]
+
+      firstFilter.filter shouldBe a[EnrichRequestFilter]
+      firstFilter.annotation.get shouldBe a[x_client_ip]
+
+      secondFilter.filter shouldBe a[EnrichRequestFilter]
+      secondFilter.annotation.get shouldBe a[x_client_language]
     }
 
     "trait and annotation based filter chain" in {
@@ -40,17 +50,8 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
       val response = FacadeResponse(200, Map.empty, Null)
       val filters = filterChain.findResponseFilters(mockContext(request), response)
 
-      filters.head shouldBe a[NoOpFilter]
-      filters.tail.head shouldBe a[ResponsePrivateFilter]
-    }
-
-    "response filter chain (annotation fields)" in {
-      val request = FacadeRequest(Uri("/users/{userId}", Map("userId" → "100500")), "get", Map.empty, Null)
-      val response = FacadeResponse(200, Map.empty, ObjV("statusCode" → 100500, "processedBy" → "John"))
-      val filters = filterChain.findResponseFilters(mockContext(request), response)
-      filters.head shouldBe a[NoOpFilter]
-      filters.tail.head shouldBe a[ResponsePrivateFilter]
-      filters.length should equal(2)
+      filters.head.asInstanceOf[ConditionalResponseFilterProxy].filter shouldBe a[NoOpFilter]
+      filters.tail.head.asInstanceOf[ConditionalResponseFilterProxy].filter shouldBe a[DenyResponseFilter]
     }
 
     "event filter chain (annotation fields)" in {
@@ -59,49 +60,49 @@ class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex 
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )
       val filters = filterChain.findEventFilters(mockContext(request), event)
-      filters.head shouldBe a[EventPrivateFilter]
+      filters.head.asInstanceOf[ConditionalEventFilterProxy].filter shouldBe a[DenyEventFilter]
       filters.length should equal(1)
     }
 
     "rewrite filters. forward request filters, inverted event filters" in {
-      val request = FacadeRequest(Uri("/test-rewrite/some-service"), "get", Map.empty, Null)
+      val request = FacadeRequest(Uri("/original-resource"), "get", Map.empty, Null)
       val context = mockContext(request.copy(uri=Uri(request.uri.formatted)))
-      val event = FacadeRequest(Uri("/status/test-service"), "feed:put", Map.empty,
+      val event = FacadeRequest(Uri("/rewritten-resource"), "feed:put", Map.empty,
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )
-      val requestFilters = filterChain.findRequestFilters(context, request)
+      val requestFilters = filterChain.findRequestFilters(ContextWithRequest(context, request))
       val eventFilters = filterChain.findEventFilters(context, event)
 
-      requestFilters.head shouldBe a[RewriteRequestFilter]
-  //      eventFilters.head shouldBe a[RewriteEventFilter] this shouldn't happen!
+      requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[RewriteRequestFilter]
+      eventFilters.head.asInstanceOf[ConditionalEventFilterProxy].filter shouldBe a[RewriteEventFilter]
     }
 
     "rewrite filters with args. forward request filters, inverted event filters" in {
-      val request = FacadeRequest(Uri("/test-rewrite-with-args/some-service/{arg}", Map("arg" → "100500")), "get", Map.empty, Null)
-      val event = FacadeRequest(Uri("/status/test-service/100501"), "feed:put", Map.empty,
+      val request = FacadeRequest(Uri("/original-resource/{arg}", Map("arg" → "100500")), "get", Map.empty, Null)
+      val event = FacadeRequest(Uri("/rewritten-resource/100501"), "feed:put", Map.empty,
         ObjV("fullName" → "John Smith", "userName" → "jsmith", "password" → "neverforget")
       )
       val context = mockContext(request)
-      val requestFilters = filterChain.findRequestFilters(context, request)
+      val requestFilters = filterChain.findRequestFilters(ContextWithRequest(context, request))
       val eventFilters = filterChain.findEventFilters(mockContext(request), event)
 
-      requestFilters.head shouldBe a[RewriteRequestFilter]
-      eventFilters.head shouldBe a[RewriteEventFilter]
+      requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[RewriteRequestFilter]
+      eventFilters.head.asInstanceOf[ConditionalEventFilterProxy].filter shouldBe a[RewriteEventFilter]
     }
 
     "rewrite filters. forward request filters, inverted event filters with patterns" in {
-      val request = FacadeRequest(Uri("/test-rewrite-method/some-service"), "put", Map.empty, Null)
+      val request = FacadeRequest(Uri("/test-rewrite-method"), "put", Map.empty, Null)
       val event = FacadeRequest(Uri("/revault/content/{path:*}", Map("path" → "some-service")), "feed:put", Map.empty, Null)
       val notMatchedEvent = FacadeRequest(Uri("/revault/content/{path:*}", Map("path" → "other-service")), "feed:put", Map.empty, Null)
 
       val context = mockContext(request)
-      val requestFilters = filterChain.findRequestFilters(context, request)
+      val requestFilters = filterChain.findRequestFilters(ContextWithRequest(context, request))
       val eventFilters = filterChain.findEventFilters(mockContext(request), event)
       val notMatchedEventFilters = filterChain.findEventFilters(mockContext(request), notMatchedEvent)
 
-      requestFilters.head shouldBe a[RewriteRequestFilter]
-      eventFilters.head shouldBe a[RewriteEventFilter]
-      notMatchedEventFilters.head shouldBe a[RewriteEventFilter]  // we assign filter chain on templated URI, not on formatted one, so despite
+      requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter shouldBe a[RewriteRequestFilter]
+      eventFilters.head.asInstanceOf[ConditionalEventFilterProxy].filter shouldBe a[RewriteEventFilter]
+      notMatchedEventFilters.head.asInstanceOf[ConditionalEventFilterProxy].filter shouldBe a[RewriteEventFilter]  // we assign filter chain on templated URI, not on formatted one, so despite
                                                                   // formatted URI of this event doesn't match rewritten URI from RAML config,
                                                                   // rewrite filter will be assigned to this event, but will do nothing
     }

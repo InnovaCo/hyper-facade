@@ -2,10 +2,11 @@ package eu.inn.facade.filter.raml
 
 import eu.inn.binders.value.{Obj, Text}
 import eu.inn.facade.filter.chain.FilterChain
-import eu.inn.facade.model.FacadeRequest
+import eu.inn.facade.model.{ContextWithRequest, FacadeRequest}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml._
-import eu.inn.facade.{CleanRewriteIndex, MockContext}
+import eu.inn.facade.utils.FutureUtils
+import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
 import org.scalatest.concurrent.ScalaFutures
@@ -16,14 +17,16 @@ import scaldi.Injectable
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with MockContext with Injectable {
+
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/enrich-request-filter-test.raml")
   implicit val injector = Injectors()
   val ramlFilters = inject[FilterChain]("ramlFilterChain")
 
   "EnrichmentFilter" - {
     "add fields if request headers are present" in {
-      val filter = new EnrichRequestFilter(Seq(
-          Field("clientIp", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_IP)), Seq.empty),
-          Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE)), Seq.empty)))
+      val filters = Seq(
+        new EnrichRequestFilter(Field("clientIp", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_IP)))),
+        new EnrichRequestFilter(Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE)))))
 
       val request = FacadeRequest(
         Uri("/resource"),
@@ -33,8 +36,8 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
       )
 
       val requestContext = mockContext(request)
-
-      whenReady(filter.apply(requestContext, request), Timeout(Span(10, Seconds))) { filteredRequest ⇒
+      val filterChain = FutureUtils.chain(ContextWithRequest(requestContext, request), filters.map(f ⇒ f.apply(_)))
+      whenReady(filterChain, Timeout(Span(10, Seconds))) { filteredCWR ⇒
         val expectedRequest = FacadeRequest(
           Uri("/resource"),
           Method.POST,
@@ -42,13 +45,12 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
           Map("field" → Text("value"),
             "clientIp" → Text("127.0.0.1"),
             "acceptLanguage" → Text("ru")))
-        filteredRequest.copy(headers=Map.empty) shouldBe expectedRequest
+        filteredCWR.request.copy(headers=Map.empty) shouldBe expectedRequest
       }
     }
 
     "don't add fields if request headers are missed" in {
-      val filter = new EnrichRequestFilter(Seq(
-        Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE)), Seq.empty)))
+      val filter = new EnrichRequestFilter(Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(Annotation(Annotation.CLIENT_LANGUAGE))))
 
       val initialRequest = FacadeRequest(
         Uri("/resource"),
@@ -58,8 +60,8 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
       )
       val requestContext = mockContext(initialRequest)
 
-      whenReady(filter.apply(requestContext, initialRequest), Timeout(Span(10, Seconds))) { filteredRequest ⇒
-        filteredRequest shouldBe initialRequest
+      whenReady(filter.apply(ContextWithRequest(requestContext, initialRequest)), Timeout(Span(10, Seconds))) { filteredCWR ⇒
+        filteredCWR.request shouldBe initialRequest
       }
     }
 
@@ -72,7 +74,7 @@ class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutur
         )
       )
       val context = mockContext(request)
-      val enrichedRequest = ramlFilters.filterRequest(context, request).futureValue
+      val enrichedRequest = ramlFilters.filterRequest(ContextWithRequest(context, request)).futureValue.request
       val fields = enrichedRequest.body.asMap
       val valueSubFields = fields("value").asMap
       valueSubFields("address") shouldBe Text("127.0.0.1")

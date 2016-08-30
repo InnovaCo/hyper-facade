@@ -8,7 +8,7 @@ import eu.inn.facade.HyperbusFactory
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.model.{DynamicRequest, Header, Headers}
 import eu.inn.hyperbus.transport.api.Subscription
-import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, RequestMatcher, TextMatcher}
+import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, RequestMatcher}
 import eu.inn.hyperbus.transport.api.uri._
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}

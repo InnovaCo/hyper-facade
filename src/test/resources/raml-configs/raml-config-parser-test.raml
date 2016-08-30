@@ -1,0 +1,126 @@
+#%RAML 1.0
+title: Facade API
+version: v1
+mediaType: application/json
+baseUri: https://meta.inn.eu/revault
+
+types:
+  TestRequest:
+    type: object
+    properties:
+      mode: string
+      resultType: string
+      clientIp:
+        (x-client-ip):
+        type: string
+      clientLanguage:
+        (x-client-language):
+        type: string
+
+  Status:
+    type: object
+    properties:
+      statusCode: number
+      processedBy:
+        (deny):
+        type: string
+
+  ReliableResourceState:
+    type: object
+    properties:
+      revisionId: number
+      content: string
+
+  ReliableResourceUpdate:
+    type: object
+    properties:
+      revisionId: number
+      update: string
+
+  ComplexRequestType:
+      type: object
+      properties:
+        name: string
+        value:
+          type: ComplexValue
+
+  ComplexResponseType:
+    type: object
+    properties:
+      name: string
+      value:
+        type: ComplexValue
+
+  ComplexValue:
+    type: object
+    properties:
+      address:
+        (x-client-ip):
+        type: string
+      privateField:
+        (deny):
+        type: string
+      publicField: string
+
+  ExtStatus:
+    type: Status
+    properties:
+      timestamp: string
+
+annotationTypes:
+  x-client-ip:
+  x-client-language:
+  deny:
+  rewrite:
+
+/status:
+  post:
+  get:
+    responses:
+      200:
+        body:
+          type: Status
+  /test-service:
+    get:
+      body:
+        type: TestRequest
+
+/reliable-feed/{content:*}:
+  post:
+    body:
+      application/json:
+        type: TestRequest
+      application/vnd.app-server-status+json:
+        type: ReliableResourceState
+      application/vnd.app-server-status-update+json:
+        type: ReliableResourceUpdate
+
+/unreliable-feed/{content}:
+
+/complex-resource:
+  post:
+    body:
+      type: ComplexRequestType
+    responses:
+      200:
+        body:
+          type: ComplexResponseType
+
+/parent:
+  (rewrite):
+    uri: /revault/content/some-service
+
+  /child:
+
+/parent/external-child:
+
+/test-rewrite-method:
+  get:
+  put:
+    (rewrite):
+      uri: /revault/content/some-service
+
+/ext-status:
+  post:
+    body:
+      type: ExtStatus

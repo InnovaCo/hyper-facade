@@ -8,6 +8,5 @@ trait CleanRewriteIndex extends BeforeAndAfterAll {
 
   override def afterAll(): Unit = {
     RewriteIndexHolder.clearIndex()
-    System.setProperty(FacadeConfigPaths.RAML_FILE, "facade-config.raml")
   }
 }

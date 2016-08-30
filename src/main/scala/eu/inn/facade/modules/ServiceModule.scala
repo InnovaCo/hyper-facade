@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.typesafe.config.Config
 import eu.inn.facade.HyperbusFactory
 import eu.inn.facade.events.SubscriptionsManager
-import eu.inn.facade.http.{HttpWorker, WsRestServiceApp}
+import eu.inn.facade.workers.{HttpWorker, WsRestServiceApp}
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.servicecontrol.api.{Console, Service, ServiceController, ShutdownMonitor}
 import eu.inn.servicecontrol.{ConsoleServiceController, RuntimeShutdownMonitor, StdConsole}

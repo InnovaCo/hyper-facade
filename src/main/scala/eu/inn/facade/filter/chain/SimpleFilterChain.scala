@@ -1,16 +1,16 @@
 package eu.inn.facade.filter.chain
 
+import eu.inn.facade.filter.model._
 import eu.inn.facade.model._
-import scaldi.Injectable
 
 
 case class SimpleFilterChain(
                               requestFilters: Seq[RequestFilter] = Seq.empty,
                               responseFilters: Seq[ResponseFilter] = Seq.empty,
                               eventFilters: Seq[EventFilter] = Seq.empty
-                       ) extends FilterChain with Injectable {
+                       ) extends FilterChain {
 
-  override def findRequestFilters(context: FacadeRequestContext, request: FacadeRequest): Seq[RequestFilter] = requestFilters
+  override def findRequestFilters(contextWithRequest: ContextWithRequest): Seq[RequestFilter] = requestFilters
   override def findResponseFilters(context: FacadeRequestContext, response: FacadeResponse): Seq[ResponseFilter] = responseFilters
   override def findEventFilters(context: FacadeRequestContext, event: FacadeRequest): Seq[EventFilter] = eventFilters
 

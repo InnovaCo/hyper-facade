@@ -1,0 +1,26 @@
+#%RAML 1.0
+title: Facade API
+version: v1
+mediaType: application/json
+baseUri: https://meta.inn.eu/revault
+
+annotationTypes:
+  x-client-ip:
+  x-client-language:
+  private:
+  rewrite:
+    properties:
+      uri: string
+
+# Event Rewrite Test Resources
+/events:
+  (rewrite):
+    uri: /rewritten-events/root
+
+/events/{path}:
+  (rewrite):
+    uri: /rewritten-events/root/{path:*}
+
+/events/legacy:
+
+/rewritten-events/{path:*}:

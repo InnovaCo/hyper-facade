@@ -3,8 +3,8 @@ package eu.inn.facade.filter.http
 import com.typesafe.config.Config
 import eu.inn.binders.value._
 import eu.inn.facade.FacadeConfigPaths
+import eu.inn.facade.filter.model.{EventFilter, ResponseFilter}
 import eu.inn.facade.model._
-import eu.inn.facade.raml.RamlConfig
 import eu.inn.facade.utils.FunctionUtils.chain
 import eu.inn.facade.utils.HalTransformer
 import eu.inn.facade.utils.UriTransformer._
@@ -18,7 +18,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class HttpWsResponseFilter(config: Config) extends ResponseFilter {
   val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
 
-  override def apply(context: FacadeRequestContext, response: FacadeResponse)
+  override def apply(contextWithRequest: ContextWithRequest, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
@@ -34,7 +34,7 @@ class HttpWsResponseFilter(config: Config) extends ResponseFilter {
 
 class WsEventFilter(config: Config) extends EventFilter {
   val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
-  override def apply(context: FacadeRequestContext, request: FacadeRequest)
+  override def apply(contextWithRequest: ContextWithRequest, request: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
     Future {
       val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
@@ -55,7 +55,7 @@ object HttpWsFilter {
   def filterMessage(message: FacadeMessage, uriTransformer: (Uri ⇒ Uri)): (Map[String, Seq[String]], Value) = {
     val headersBuilder = Map.newBuilder[String, Seq[String]]
     message.headers.foreach {
-      case (Header.CONTENT_TYPE, value :: tail) ⇒
+      case (Header.CONTENT_TYPE, value :: _) ⇒
         headersBuilder += FacadeHeaders.CONTENT_TYPE →
           FacadeHeaders.genericContentTypeToHttp(Some(value)).toSeq
 

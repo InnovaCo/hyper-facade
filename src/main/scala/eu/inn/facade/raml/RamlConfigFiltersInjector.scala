@@ -1,7 +1,7 @@
 package eu.inn.facade.raml
 
 import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
-import eu.inn.facade.model.{RamlFilterFactory, TargetMethod, TargetResource}
+import eu.inn.facade.filter.model.{RamlFilterFactory, TargetMethod, TargetResource}
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector, StringIdentifier}
 
@@ -91,7 +91,7 @@ class RamlConfigFiltersInjector(resourcesByUri: Map[String, ResourceConfig])(imp
         inj.getBinding(List(ident)) match {
           case Some(_) ⇒
             val filterFactory = inject[RamlFilterFactory](annotation.name)
-            filterFactory.createFilterChain(target)
+            filterChain ++ filterFactory.createFilterChain(target)
 
           case None ⇒
             log.warn(s"Annotation '${annotation.name}' is not bound")

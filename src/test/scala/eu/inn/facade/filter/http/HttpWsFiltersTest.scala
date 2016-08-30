@@ -4,7 +4,7 @@ import eu.inn.binders.value._
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.raml.{Method, RamlConfig}
+import eu.inn.facade.raml.{Method, RamlConfiguration}
 import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
 import eu.inn.hyperbus.model.Link
 import eu.inn.hyperbus.model.Links.LinksMap
@@ -19,9 +19,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 
 class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with Injectable with MockContext {
 
-  System.setProperty(FacadeConfigPaths.RAML_FILE, "specific-raml-configs/http-ws-filter-test.raml")
+  System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/http-ws-filter-test.raml")
   implicit val injector = Injectors()
-  inject[RamlConfig]
+  inject[RamlConfiguration]
   val afterFilters = inject[FilterChain]("afterFilterChain")
 
   "HttpWsFiltersTest " - {
@@ -44,8 +44,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Cl
         )
       )
 
-      val context = mockContext(request)
-      val filteredResponse = afterFilters.filterResponse(context, response).futureValue(Timeout(Span(300, Seconds)))
+      val cwr = ContextWithRequest(mockContext(request), request)
+      val filteredResponse = afterFilters.filterResponse(cwr, response).futureValue(Timeout(Span(300, Seconds)))
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
       linksMap("some-other1") shouldBe Left(Link(href="/v3/test/abc"))
@@ -74,8 +74,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Cl
         )
       )
 
-      val context = mockContext(request)
-      val filteredEvent = afterFilters.filterEvent(context, event).futureValue
+      val cwr = ContextWithRequest(mockContext(request), request)
+      val filteredEvent = afterFilters.filterEvent(cwr, event).futureValue
       filteredEvent.uri shouldBe Uri("/v3/test")
 
       val linksMap = filteredEvent.body.__links.fromValue[LinksMap] // binders deserialization magic
@@ -100,8 +100,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Cl
         )
       )
 
-      val context = mockContext(request)
-      val filteredResponse = afterFilters.filterResponse(context, response).futureValue
+      val cwr = ContextWithRequest(mockContext(request), request)
+      val filteredResponse = afterFilters.filterResponse(cwr, response).futureValue
 
       filteredResponse.headers("Location") shouldBe Seq("/v3/test-factory/100500")
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
@@ -143,8 +143,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Cl
         )
       )
 
-      val context = mockContext(request)
-      val filteredResponse = afterFilters.filterResponse(context, response).futureValue
+      val cwr = ContextWithRequest(mockContext(request), request)
+      val filteredResponse = afterFilters.filterResponse(cwr, response).futureValue
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
 
@@ -204,8 +204,8 @@ class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with Cl
         )
       )
 
-      val context = mockContext(request)
-      val filteredEvent = afterFilters.filterEvent(context, event).futureValue
+      val cwr = ContextWithRequest(mockContext(request), request)
+      val filteredEvent = afterFilters.filterEvent(cwr, event).futureValue
       filteredEvent.uri shouldBe Uri("/v3/test")
 
       val linksMap = filteredEvent.body.__links.fromValue[LinksMap] // binders deserialization magic

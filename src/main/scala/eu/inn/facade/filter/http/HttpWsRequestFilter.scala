@@ -5,8 +5,9 @@ import java.net.MalformedURLException
 import com.typesafe.config.Config
 import eu.inn.binders.value.Null
 import eu.inn.facade.FacadeConfigPaths
+import eu.inn.facade.filter.model.RequestFilter
 import eu.inn.facade.model._
-import eu.inn.facade.raml.RamlConfig
+import eu.inn.facade.raml.RamlConfiguration
 import eu.inn.facade.utils.FunctionUtils.chain
 import eu.inn.facade.utils.HalTransformer
 import eu.inn.facade.utils.UriTransformer._
@@ -17,13 +18,14 @@ import eu.inn.hyperbus.transport.api.uri.Uri
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class HttpWsRequestFilter(config: Config, ramlConfig: RamlConfig) extends RequestFilter {
+class HttpWsRequestFilter(config: Config, ramlConfig: RamlConfiguration) extends RequestFilter {
   val rewriteCountLimit = config.getInt(FacadeConfigPaths.REWRITE_COUNT_LIMIT)
 
-  override def apply(context: FacadeRequestContext, request: FacadeRequest)
-                    (implicit ec: ExecutionContext): Future[FacadeRequest] = {
+  override def apply(contextWithRequest: ContextWithRequest)
+                    (implicit ec: ExecutionContext): Future[ContextWithRequest] = {
     Future {
       try {
+        val request = contextWithRequest.request
         val rootPathPrefix = config.getString(FacadeConfigPaths.RAML_ROOT_PATH_PREFIX)
         val uriTransformer = chain(removeRootPathPrefix(rootPathPrefix), rewriteLinkForward(_: Uri, rewriteCountLimit, ramlConfig))
         val httpUri = spray.http.Uri(request.uri.pattern.specific)
@@ -33,10 +35,10 @@ class HttpWsRequestFilter(config: Config, ramlConfig: RamlConfig) extends Reques
         var messageIdFound = false
 
         request.headers.foreach {
-          case (FacadeHeaders.CONTENT_TYPE, value :: tail) ⇒
+          case (FacadeHeaders.CONTENT_TYPE, value :: _) ⇒
             headersBuilder += Header.CONTENT_TYPE → FacadeHeaders.httpContentTypeToGeneric(Some(value)).toSeq
 
-          case (FacadeHeaders.CLIENT_MESSAGE_ID, value :: tail) if value.nonEmpty ⇒
+          case (FacadeHeaders.CLIENT_MESSAGE_ID, value :: _) if value.nonEmpty ⇒
             headersBuilder += Header.MESSAGE_ID → Seq(value)
             messageIdFound = true
 
@@ -60,7 +62,9 @@ class HttpWsRequestFilter(config: Config, ramlConfig: RamlConfig) extends Reques
             (transformedBody, other)
         }
 
-        FacadeRequest(requestUri, newMethod, headersBuilder.result(), newBody)
+        contextWithRequest.copy(
+          request = FacadeRequest(requestUri, newMethod, headersBuilder.result(), newBody)
+        )
       } catch {
         case e: MalformedURLException ⇒
           val error = NotFound(ErrorBody("not-found")) // todo: + messagingContext!!!
