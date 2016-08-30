@@ -118,7 +118,7 @@ trait RequestProcessor extends Injectable {
     case e: RamlStrictConfigException ⇒
       implicit val mcf = cwr.context.clientMessagingContext()
       val errorId = IdGenerator.create()
-      log.warn(s"Exception #$errorId while handling ${cwr.context}", e)
+      log.info(s"Exception #$errorId while handling ${cwr.context}", e)
       func(FacadeResponse(NotFound(ErrorBody("not-found", Some("Resource is not found"), errorId = errorId))))
 
     case NonFatal(nonFatal) ⇒
