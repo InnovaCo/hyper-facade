@@ -17,9 +17,7 @@ class ParserTest extends FreeSpec with Matchers {
         Map.empty,
         Map("field" → Text("value"))
       )
-      val context = FacadeRequestContext("someIp", spray.http.Uri.Empty, "path", "get", Map(
-        FacadeHeaders.CLIENT_IP → Seq("109.207.13.2")
-      ), None, Map(
+      val context = FacadeRequestContext("109.207.13.2", spray.http.Uri.Empty, "path", "get", Map.empty, None, Map(
         ContextStorage.IS_AUTHORIZED → true,
         ContextStorage.AUTH_USER → AuthUser("id", Set("qa"), Null)
       ))
