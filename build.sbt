@@ -68,7 +68,7 @@ libraryDependencies ++= Seq(
   "eu.inn"               %% "hyperbus-transport"          % "0.1.79",
   "eu.inn"               %% "hyperbus-t-kafka"            % "0.1.79",
   "eu.inn"               %% "hyperbus-t-distributed-akka" % "0.1.79",
-  "org.raml"             % "raml-parser-2"                % "1.0.0-SNAPSHOT",
+  "eu.inn"               % "raml-parser-2"                % "1.0.1.35",
   "eu.inn"               %% "service-control"             % "0.2.17",
   "eu.inn"               %% "service-config"              % "0.1.6",
   "eu.inn"               %% "service-metrics"             % "0.1.6",
