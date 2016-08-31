@@ -34,8 +34,7 @@ javacOptions ++= Seq(
 resolvers ++= Seq(
   "Innova libs repo" at "http://repproxy.srv.inn.ru/artifactory/libs-release-local",
   "Innova ext repo" at "http://repproxy.srv.inn.ru/artifactory/ext-release-local",
-  Resolver.sonatypeRepo("public"),
-  Resolver.mavenLocal
+  Resolver.sonatypeRepo("public")
 )
 
 //ramlHyperbusSource := file("hyper-facade.raml")
