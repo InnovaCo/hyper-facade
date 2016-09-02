@@ -84,7 +84,6 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
 
   override def stopService(controlBreak: Boolean): Unit = {
     log.info("Stopping Hyper-Facade...")
-    println("Stopping Hyper-Facade...")
     try {
       Await.result(hyperBus.shutdown(shutdownTimeout*4/5), shutdownTimeout)
     } catch {
