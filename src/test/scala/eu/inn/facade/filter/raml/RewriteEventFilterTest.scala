@@ -36,10 +36,4 @@ class RewriteEventFilterTest extends FreeSpec with Matchers with ScalaFutures wi
       filteredEvent shouldBe expectedEvent
     }
   }
-
-  def r(uri: String): rewrite = {
-    val res = new rewrite
-    res.setUri(uri)
-    res
-  }
 }

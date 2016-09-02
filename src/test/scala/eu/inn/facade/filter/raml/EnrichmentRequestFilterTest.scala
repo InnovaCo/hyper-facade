@@ -6,21 +6,21 @@ import eu.inn.facade.model.{ContextWithRequest, FacadeRequest}
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml._
 import eu.inn.facade.utils.FutureUtils
-import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
+import eu.inn.facade.workers.WsRestServiceApp
+import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.transport.api.uri.Uri
+import eu.inn.servicecontrol.api.Service
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{FreeSpec, Matchers}
-import scaldi.Injectable
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class EnrichmentRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with MockContext with Injectable {
+class EnrichmentRequestFilterTest extends TestBase {
 
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/enrich-request-filter-test.raml")
   implicit val injector = Injectors()
   val ramlFilters = inject[FilterChain]("ramlFilterChain")
+  val app = inject[Service].asInstanceOf[WsRestServiceApp]
 
   "EnrichmentFilter" - {
     "add fields if request headers are present" in {

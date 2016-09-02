@@ -5,24 +5,24 @@ import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml.{Method, RamlConfiguration}
-import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
+import eu.inn.facade.workers.WsRestServiceApp
+import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.model.Link
 import eu.inn.hyperbus.model.Links.LinksMap
 import eu.inn.hyperbus.transport.api.uri.Uri
+import eu.inn.servicecontrol.api.Service
 import org.scalatest.concurrent.PatienceConfiguration.Timeout
-import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{FreeSpec, Matchers}
-import scaldi.Injectable
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class HttpWsFiltersTest extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with Injectable with MockContext {
+class HttpWsFiltersTest extends TestBase {
 
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/http-ws-filter-test.raml")
   implicit val injector = Injectors()
   inject[RamlConfiguration]
   val afterFilters = inject[FilterChain]("afterFilterChain")
+  val app = inject[Service].asInstanceOf[WsRestServiceApp]
 
   "HttpWsFiltersTest " - {
     "_links rewriting and formatting (response)" in {

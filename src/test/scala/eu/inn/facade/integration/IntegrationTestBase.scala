@@ -4,22 +4,20 @@ import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, Tim
 
 import akka.actor.ActorSystem
 import eu.inn.auth.BasicAuthenticationService
-import eu.inn.facade.workers.{HttpWorker, WsRestServiceApp, WsTestClientHelper}
 import eu.inn.facade.model.{UriSpecificDeserializer, UriSpecificSerializer}
 import eu.inn.facade.modules.Injectors
-import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, TestService}
+import eu.inn.facade.workers.{HttpWorker, WsRestServiceApp, WsTestClientHelper}
+import eu.inn.facade.{FacadeConfigPaths, TestBase, TestService}
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.transport.api.Subscription
 import eu.inn.servicecontrol.api.Service
-import org.scalatest.concurrent.ScalaFutures
+import org.scalatest.BeforeAndAfterEach
 import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, FreeSpec, Matchers}
-import scaldi.Injectable
 
 import scala.concurrent.duration._
 
-class IntegrationTestBase(val ramlFilePath: String) extends FreeSpec with Matchers with ScalaFutures with CleanRewriteIndex with Injectable
-  with BeforeAndAfterEach with BeforeAndAfterAll with WsTestClientHelper {
+class IntegrationTestBase(val ramlFilePath: String) extends TestBase
+  with BeforeAndAfterEach with WsTestClientHelper {
 
   System.setProperty(FacadeConfigPaths.RAML_FILE, ramlFilePath)
 
@@ -54,10 +52,6 @@ class IntegrationTestBase(val ramlFilePath: String) extends FreeSpec with Matche
   override def afterEach(): Unit = {
     subscriptions.foreach(hyperbus.off)
     subscriptions.clear
-  }
-
-  override def afterAll(): Unit = {
-    app.stopService(true)
   }
 
   def register(s: Subscription) = {
