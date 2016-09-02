@@ -32,4 +32,4 @@ sleep 5
 kill $ZOOKEEPER_PID
 sleep 2
 
-return EXIT_CODE
+return $EXIT_CODE
