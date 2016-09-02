@@ -83,3 +83,5 @@ libraryDependencies ++= Seq(
 )
 
 fork in Test := true
+
+parallelExecution in Test := false
