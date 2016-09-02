@@ -24,7 +24,7 @@ sleep 5
 EXIT_CODE=0
 
 if [ -n "$publish" ] ; then
-  EXIT_CODE = sbt ';set every projectBuildNumber := "'${patch_version:-SNAPSHOT}'"' 'set testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/test-reports")' clean test publish
+  EXIT_CODE = `sbt ';set every projectBuildNumber := "'${patch_version:-SNAPSHOT}'"' 'set testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/test-reports")' clean test publish`
 fi
 
 kill $KAFKA_PID
