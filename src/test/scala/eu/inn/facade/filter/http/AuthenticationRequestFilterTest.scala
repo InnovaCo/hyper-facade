@@ -7,19 +7,26 @@ import eu.inn.facade.MockContext
 import eu.inn.facade.model._
 import eu.inn.facade.modules.Injectors
 import eu.inn.facade.raml.Method
+import eu.inn.facade.workers.WsRestServiceApp
 import eu.inn.hyperbus.transport.api.uri.Uri
+import eu.inn.servicecontrol.api.Service
 import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 import scaldi.Injectable
 import spray.http.BasicHttpCredentials
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class AuthenticationRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with Injectable with MockContext {
+class AuthenticationRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with Injectable with MockContext with BeforeAndAfterAll {
 
   implicit val injector = Injectors()
   inject[BasicAuthenticationService]
+  val app = inject[Service].asInstanceOf[WsRestServiceApp]
   val filter = new AuthenticationRequestFilter
+
+  override def afterAll(): Unit = {
+    app.stopService(true)
+  }
 
   "AuthenticationFilter" - {
     "unauthorized: non-existent user" in {
