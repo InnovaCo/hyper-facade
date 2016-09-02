@@ -21,10 +21,15 @@ KAFKA_PID=$!
 
 sleep 5
 
+EXIT_CODE=0
+
 if [ -n "$publish" ] ; then
-  sbt ';set every projectBuildNumber := "'${patch_version:-SNAPSHOT}'"' 'set testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/test-reports")' clean test publish
+  EXIT_CODE = sbt ';set every projectBuildNumber := "'${patch_version:-SNAPSHOT}'"' 'set testOptions += Tests.Argument(TestFrameworks.ScalaTest, "-h", "target/test-reports")' clean test publish
 fi
 
 kill $KAFKA_PID
 sleep 5
 kill $ZOOKEEPER_PID
+sleep 2
+
+return EXIT_CODE

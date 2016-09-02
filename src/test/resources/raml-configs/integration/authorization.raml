@@ -12,12 +12,12 @@ annotationTypes:
 
 /authorization-failed:
   (authorize):
-    if: context.authUser.roles has 'qa'
+    if: context.authUser.roles has "qa"
   (deny):
     if: "!context.isAuthorized"
 
 /resource:
   (authorize):
-    if: context.authUser.roles has 'admin'
+    if: context.authUser.roles has "admin"
   (deny):
     if: "!context.isAuthorized"
