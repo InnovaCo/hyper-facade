@@ -1,6 +1,7 @@
-package eu.inn.facade
+package eu.inn.facade.modules
 
 import eu.inn.auth.BasicAuthenticationService
+import eu.inn.facade.TestService
 import eu.inn.facade.filter.NoOpFilterFactory
 import eu.inn.facade.filter.model.RamlFilterFactory
 import scaldi.Module

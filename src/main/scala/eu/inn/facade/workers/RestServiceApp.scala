@@ -33,7 +33,7 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   implicit val executionContext = inject [ExecutionContext]
 
   private val rootConf = inject [Config]
-  val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
+  val log = LoggerFactory.getLogger(getClass())
 
   val config = inject [Config]
   val restConfig = config.getConfig(FacadeConfigPaths.HTTP)

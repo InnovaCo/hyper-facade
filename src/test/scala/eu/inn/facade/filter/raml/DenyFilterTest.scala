@@ -3,8 +3,8 @@ package eu.inn.facade.filter.raml
 import eu.inn.binders.value.{Obj, Text}
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
-import eu.inn.facade.modules.Injectors
-import eu.inn.facade.workers.WsRestServiceApp
+import eu.inn.facade.modules.TestInjectors
+import eu.inn.facade.workers.TestWsRestServiceApp
 import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.model.Method
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -15,9 +15,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class DenyFilterTest extends TestBase {
 
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/deny-filter-test.raml")
-  implicit val injector = Injectors()
+  implicit val injector = TestInjectors()
   val ramlFilters = inject[FilterChain]("ramlFilterChain")
-  val app = inject[Service].asInstanceOf[WsRestServiceApp]
+  val app = inject[Service].asInstanceOf[TestWsRestServiceApp]
 
   "DenyFilterTest" - {
     "request. private resource. forbidden" in {

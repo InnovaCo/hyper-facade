@@ -5,9 +5,9 @@ import eu.inn.facade.filter.NoOpFilter
 import eu.inn.facade.filter.model.{ConditionalEventFilterProxy, ConditionalRequestFilterProxy, ConditionalResponseFilterProxy}
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
-import eu.inn.facade.modules.Injectors
+import eu.inn.facade.modules.TestInjectors
 import eu.inn.facade.raml.annotationtypes.{x_client_ip, x_client_language}
-import eu.inn.facade.workers.WsRestServiceApp
+import eu.inn.facade.workers.TestWsRestServiceApp
 import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import eu.inn.servicecontrol.api.Service
@@ -17,9 +17,9 @@ import eu.inn.servicecontrol.api.Service
 
 class RamlFilterChainTest extends TestBase {
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/raml-filter-chain-test.raml")
-  implicit val injector = Injectors()
+  implicit val injector = TestInjectors()
   val filterChain = inject [FilterChain].asInstanceOf[RamlFilterChain]
-  val app = inject[Service].asInstanceOf[WsRestServiceApp]
+  val app = inject[Service].asInstanceOf[TestWsRestServiceApp]
 
   "FilterChainRamlFactory " - {
     "resource filter chain" in {

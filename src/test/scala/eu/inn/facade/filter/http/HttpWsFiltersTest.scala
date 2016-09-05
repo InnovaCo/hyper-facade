@@ -3,9 +3,9 @@ package eu.inn.facade.filter.http
 import eu.inn.binders.value._
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model._
-import eu.inn.facade.modules.Injectors
+import eu.inn.facade.modules.TestInjectors
 import eu.inn.facade.raml.{Method, RamlConfiguration}
-import eu.inn.facade.workers.WsRestServiceApp
+import eu.inn.facade.workers.TestWsRestServiceApp
 import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.model.Link
 import eu.inn.hyperbus.model.Links.LinksMap
@@ -19,10 +19,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 class HttpWsFiltersTest extends TestBase {
 
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/http-ws-filter-test.raml")
-  implicit val injector = Injectors()
+  implicit val injector = TestInjectors()
   inject[RamlConfiguration]
   val afterFilters = inject[FilterChain]("afterFilterChain")
-  val app = inject[Service].asInstanceOf[WsRestServiceApp]
+  val app = inject[Service].asInstanceOf[TestWsRestServiceApp]
 
   "HttpWsFiltersTest " - {
     "_links rewriting and formatting (response)" in {

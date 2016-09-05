@@ -5,8 +5,8 @@ import java.util.concurrent.{Executor, SynchronousQueue, ThreadPoolExecutor, Tim
 import akka.actor.ActorSystem
 import eu.inn.auth.BasicAuthenticationService
 import eu.inn.facade.model.{UriSpecificDeserializer, UriSpecificSerializer}
-import eu.inn.facade.modules.Injectors
-import eu.inn.facade.workers.{HttpWorker, WsRestServiceApp, WsTestClientHelper}
+import eu.inn.facade.modules.TestInjectors
+import eu.inn.facade.workers.{HttpWorker, TestWsRestServiceApp, WsTestClientHelper}
 import eu.inn.facade.{FacadeConfigPaths, TestBase, TestService}
 import eu.inn.hyperbus.Hyperbus
 import eu.inn.hyperbus.transport.api.Subscription
@@ -21,7 +21,7 @@ class IntegrationTestBase(val ramlFilePath: String) extends TestBase
 
   System.setProperty(FacadeConfigPaths.RAML_FILE, ramlFilePath)
 
-  implicit val injector = Injectors()
+  implicit val injector = TestInjectors()
   implicit val actorSystem = inject[ActorSystem]
   implicit val patience = PatienceConfig(scaled(Span(15, Seconds)))
   implicit val timeout = akka.util.Timeout(15.seconds)
@@ -30,7 +30,7 @@ class IntegrationTestBase(val ramlFilePath: String) extends TestBase
 
   val httpWorker = inject[HttpWorker]
 
-  val app = inject[Service].asInstanceOf[WsRestServiceApp]
+  val app = inject[Service].asInstanceOf[TestWsRestServiceApp]
   app.start {
     httpWorker.restRoutes.routes
   }
