@@ -22,5 +22,6 @@ class TestWsRestServiceApp(implicit inj: Injector) extends WsRestServiceApp {
         log.error("ActorSystem wasn't terminated gracefully", t)
     }
     log.info("Hyper-Facade stopped")
+    Thread.sleep(2000)
   }
 }
