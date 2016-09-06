@@ -24,7 +24,7 @@ class IntegrationTestBase(val ramlFilePath: String) extends TestBase
   implicit val injector = TestInjectors()
   implicit val actorSystem = inject[ActorSystem]
   implicit val patience = PatienceConfig(scaled(Span(10, Seconds)))
-  implicit val timeout = akka.util.Timeout(15.seconds)
+  implicit val timeout = akka.util.Timeout(10.seconds)
   implicit val uid = new UriSpecificDeserializer
   implicit val uis = new UriSpecificSerializer
 

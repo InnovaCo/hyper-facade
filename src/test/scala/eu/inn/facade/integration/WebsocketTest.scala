@@ -121,7 +121,7 @@ class WebsocketTest extends IntegrationTestBase("raml-configs/integration/websoc
         testService.onCommand(RequestMatcher(Some(Uri("/resource/reliable-feed")), Map(Header.METHOD → Specific(Method.GET))),
           initialResourceState,
           // emulate latency between request for full resource state and response
-          _ ⇒ Thread.sleep(10000)
+          _ ⇒ Thread.sleep(7000)
         ).futureValue
       }
 
