@@ -9,6 +9,6 @@ abstract class TestBase extends FreeSpec with Matchers with ScalaFutures with Cl
 
   def app: TestWsRestServiceApp
   override def afterAll(): Unit = {
-    app.shutdown
+    app.shutdown()
   }
 }

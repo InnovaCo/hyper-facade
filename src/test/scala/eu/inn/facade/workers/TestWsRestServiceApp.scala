@@ -7,7 +7,7 @@ import scala.concurrent.Await
 class TestWsRestServiceApp(implicit inj: Injector) extends WsRestServiceApp {
 
   override def stopService(controlBreak: Boolean): Unit = ()
-  def shutdown: Unit = {
+  def shutdown(): Unit = {
     log.info("Stopping Hyper-Facade...")
     try {
       Await.result(hyperBus.shutdown(shutdownTimeout*4/5), shutdownTimeout)
@@ -22,5 +22,6 @@ class TestWsRestServiceApp(implicit inj: Injector) extends WsRestServiceApp {
         log.error("ActorSystem wasn't terminated gracefully", t)
     }
     log.info("Hyper-Facade stopped")
+    Thread.sleep(1000)
   }
 }
