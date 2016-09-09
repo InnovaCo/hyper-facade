@@ -34,7 +34,7 @@ class HttpWsRequestFilter(config: Config, ramlConfig: RamlConfiguration) extends
         val headersBuilder = Map.newBuilder[String, Seq[String]]
         var messageIdFound = false
 
-        request.headers.foreach {
+        contextWithRequest.context.requestHeaders.foreach {
           case (FacadeHeaders.CONTENT_TYPE, value :: _) ⇒
             headersBuilder += Header.CONTENT_TYPE → FacadeHeaders.httpContentTypeToGeneric(Some(value)).toSeq
 

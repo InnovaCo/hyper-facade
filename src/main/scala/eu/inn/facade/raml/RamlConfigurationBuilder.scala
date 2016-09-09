@@ -41,19 +41,22 @@ class RamlConfigurationBuilder(val api: Api)(implicit inj: Injector) extends Inj
   }
 
   private def parseTypeDefinitions(): Map[String, TypeDefinition] = {
-    val typeDefinitions = api.types().foldLeft(Map.newBuilder[String, TypeDefinition]) { (typesMap, ramlTypeRaw) ⇒
-      val ramlType = ramlTypeRaw.asInstanceOf[ObjectFieldImpl]
-      val fields = ramlType.properties().foldLeft(Seq.newBuilder[Field]) { (parsedFields, ramlField) ⇒
-        parsedFields += parseField(ramlField)
-      }.result()
+    val typeDefinitions = api.types().foldLeft(Map.newBuilder[String, TypeDefinition]) {
+      case (typesMap, ramlType: ObjectFieldImpl) ⇒
+        val fields = ramlType.properties().foldLeft(Seq.newBuilder[Field]) { (parsedFields, ramlField) ⇒
+          parsedFields += parseField(ramlField)
+        }.result()
 
-      val typeName = ramlType.name
-      val parentTypeName = ramlType.`type`.isEmpty match {
-        case true ⇒ None
-        case false ⇒ Some(ramlType.`type`.get(0))
-      }
-      val annotations = extractAnnotations(ramlType)
-      typesMap += typeName → TypeDefinition(typeName, parentTypeName, annotations, fields)
+        val typeName = ramlType.name
+        val parentTypeName = ramlType.`type`.isEmpty match {
+          case true ⇒ None
+          case false ⇒ Some(ramlType.`type`.get(0))
+        }
+        val annotations = extractAnnotations(ramlType)
+        typesMap += typeName → TypeDefinition(typeName, parentTypeName, annotations, fields)
+
+      case (typesMap, ramlType) ⇒ // there other types possible
+        typesMap
     }.result()
 
     val withFlattenedFields = flattenFieldStructure(typeDefinitions)
