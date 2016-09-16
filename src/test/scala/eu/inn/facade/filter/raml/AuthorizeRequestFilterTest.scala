@@ -5,20 +5,20 @@ import eu.inn.binders.value.{Null, Text}
 import eu.inn.facade.filter.chain.FilterChain
 import eu.inn.facade.model.ContextStorage.ExtendFacadeRequestContext
 import eu.inn.facade.model._
-import eu.inn.facade.modules.Injectors
-import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
+import eu.inn.facade.modules.TestInjectors
+import eu.inn.facade.workers.TestWsRestServiceApp
+import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.model.Method
 import eu.inn.hyperbus.transport.api.uri.Uri
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FreeSpec, Matchers}
-import scaldi.Injectable
+import eu.inn.servicecontrol.api.Service
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class AuthorizeRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with Injectable with CleanRewriteIndex with MockContext {
+class AuthorizeRequestFilterTest extends TestBase {
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/auth-request-filter-test.raml")
-  implicit val injector = Injectors()
+  implicit val injector = TestInjectors()
   val ramlFilters = inject[FilterChain]("ramlFilterChain")
+  val app = inject[Service].asInstanceOf[TestWsRestServiceApp]
 
   "AuthorizeRequestFilterTest" - {
     "resource. not authorized" in {

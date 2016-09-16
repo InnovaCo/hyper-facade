@@ -33,7 +33,7 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
   implicit val executionContext = inject [ExecutionContext]
 
   private val rootConf = inject [Config]
-  val log = LoggerFactory.getLogger(RestServiceApp.this.getClass.getName)
+  val log = LoggerFactory.getLogger(getClass())
 
   val config = inject [Config]
   val restConfig = config.getConfig(FacadeConfigPaths.HTTP)
@@ -84,18 +84,17 @@ class RestServiceApp(implicit inj: Injector) extends SimpleRoutingApp
 
   override def stopService(controlBreak: Boolean): Unit = {
     log.info("Stopping Hyper-Facade...")
-    println("Stopping Hyper-Facade...")
-    try {
-      Await.result(actorSystem.terminate(), shutdownTimeout)
-    } catch {
-      case t: Throwable ⇒
-        log.error("ActorSystem wasn't terminated gracefully", t)
-    }
     try {
       Await.result(hyperBus.shutdown(shutdownTimeout*4/5), shutdownTimeout)
     } catch {
       case t: Throwable ⇒
         log.error("Hyperbus didn't shutdown gracefully", t)
+    }
+    try {
+      Await.result(actorSystem.terminate(), shutdownTimeout)
+    } catch {
+      case t: Throwable ⇒
+        log.error("ActorSystem wasn't terminated gracefully", t)
     }
     log.info("Hyper-Facade stopped")
   }

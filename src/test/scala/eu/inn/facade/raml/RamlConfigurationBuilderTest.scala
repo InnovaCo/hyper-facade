@@ -1,19 +1,20 @@
 package eu.inn.facade.raml
 
-import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths}
 import eu.inn.facade.filter.model.{ConditionalEventFilterProxy, ConditionalRequestFilterProxy, ConditionalResponseFilterProxy}
 import eu.inn.facade.filter.raml._
-import eu.inn.facade.modules.Injectors
+import eu.inn.facade.modules.TestInjectors
 import eu.inn.facade.raml.Method._
+import eu.inn.facade.workers.TestWsRestServiceApp
+import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.transport.api.uri.Uri
-import org.scalatest.{FreeSpec, Matchers}
-import scaldi.Injectable
+import eu.inn.servicecontrol.api.Service
 
-class RamlConfigurationBuilderTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable {
+class RamlConfigurationBuilderTest extends TestBase {
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/raml-config-parser-test.raml")
-  implicit val injector = Injectors()
+  implicit val injector = TestInjectors()
   val ramlConfig = inject[RamlConfiguration]
   val ramlReader = inject[RamlConfigurationReader]
+  val app = inject[Service].asInstanceOf[TestWsRestServiceApp]
 
   "RamlConfig" - {
     "request filters" in {

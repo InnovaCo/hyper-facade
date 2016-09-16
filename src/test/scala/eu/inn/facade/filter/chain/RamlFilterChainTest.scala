@@ -5,20 +5,21 @@ import eu.inn.facade.filter.NoOpFilter
 import eu.inn.facade.filter.model.{ConditionalEventFilterProxy, ConditionalRequestFilterProxy, ConditionalResponseFilterProxy}
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
-import eu.inn.facade.modules.Injectors
-import eu.inn.facade.raml.{EnrichAnnotation, RamlAnnotation}
-import eu.inn.facade.{CleanRewriteIndex, FacadeConfigPaths, MockContext}
+import eu.inn.facade.modules.TestInjectors
+import eu.inn.facade.raml.annotationtypes.{x_client_ip, x_client_language}
+import eu.inn.facade.workers.TestWsRestServiceApp
+import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.transport.api.uri.Uri
-import org.scalatest.{FreeSpec, Matchers}
-import scaldi.Injectable
+import eu.inn.servicecontrol.api.Service
 
 // todo: important to test when specific != formatted!
 // + integrated test with filter lookup when specific != formatted!
 
-class RamlFilterChainTest extends FreeSpec with Matchers with CleanRewriteIndex with Injectable with MockContext {
+class RamlFilterChainTest extends TestBase {
   System.setProperty(FacadeConfigPaths.RAML_FILE, "raml-configs/raml-filter-chain-test.raml")
-  implicit val injector = Injectors()
+  implicit val injector = TestInjectors()
   val filterChain = inject [FilterChain].asInstanceOf[RamlFilterChain]
+  val app = inject[Service].asInstanceOf[TestWsRestServiceApp]
 
   "FilterChainRamlFactory " - {
     "resource filter chain" in {

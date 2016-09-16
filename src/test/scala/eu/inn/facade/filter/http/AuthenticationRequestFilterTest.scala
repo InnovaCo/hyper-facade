@@ -3,22 +3,22 @@ package eu.inn.facade.filter.http
 import eu.inn.auth.BasicAuthenticationService
 import eu.inn.authentication.AuthUser
 import eu.inn.binders.value.{Null, Text}
-import eu.inn.facade.MockContext
+import eu.inn.facade.TestBase
 import eu.inn.facade.model._
-import eu.inn.facade.modules.Injectors
+import eu.inn.facade.modules.TestInjectors
 import eu.inn.facade.raml.Method
+import eu.inn.facade.workers.TestWsRestServiceApp
 import eu.inn.hyperbus.transport.api.uri.Uri
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.{FreeSpec, Matchers}
-import scaldi.Injectable
+import eu.inn.servicecontrol.api.Service
 import spray.http.BasicHttpCredentials
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
-class AuthenticationRequestFilterTest extends FreeSpec with Matchers with ScalaFutures with Injectable with MockContext {
+class AuthenticationRequestFilterTest extends TestBase {
 
-  implicit val injector = Injectors()
+  implicit val injector = TestInjectors()
   inject[BasicAuthenticationService]
+  val app = inject[Service].asInstanceOf[TestWsRestServiceApp]
   val filter = new AuthenticationRequestFilter
 
   "AuthenticationFilter" - {

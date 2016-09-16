@@ -12,7 +12,7 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-class FilterChainTest extends FreeSpec with Matchers with ScalaFutures with MockContext{
+class FilterChainTest extends FreeSpec with Matchers with ScalaFutures with MockContext {
 
   val filterChain = SimpleFilterChain(
     requestFilters = Seq(new TestRequestFilter),
