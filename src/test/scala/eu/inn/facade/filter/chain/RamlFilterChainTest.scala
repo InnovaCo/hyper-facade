@@ -6,7 +6,7 @@ import eu.inn.facade.filter.model.{ConditionalEventFilterProxy, ConditionalReque
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
 import eu.inn.facade.modules.TestInjectors
-import eu.inn.facade.raml.annotationtypes.{x_client_ip, x_client_language}
+import eu.inn.facade.raml.{EnrichAnnotation, RamlAnnotation}
 import eu.inn.facade.workers.TestWsRestServiceApp
 import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.transport.api.uri.Uri

@@ -25,8 +25,8 @@ class EnrichmentRequestFilterTest extends TestBase {
   "EnrichmentFilter" - {
     "add fields if request headers are present" in {
       val filters = Seq(
-        new EnrichRequestFilter(Field("clientIp", DataType.DEFAULT_TYPE_NAME, Seq(EnrichAnnotation(RamlAnnotation.CLIENT_IP, None)))),
-        new EnrichRequestFilter(Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(EnrichAnnotation(RamlAnnotation.CLIENT_LANGUAGE, None)))))
+        new EnrichRequestFilter(Field("clientIp", TypeDefinition.DEFAULT_TYPE_NAME, Seq(EnrichAnnotation(RamlAnnotation.CLIENT_IP, None)))),
+        new EnrichRequestFilter(Field("acceptLanguage", TypeDefinition.DEFAULT_TYPE_NAME, Seq(EnrichAnnotation(RamlAnnotation.CLIENT_LANGUAGE, None)))))
 
       val request = FacadeRequest(
         Uri("/resource"),
@@ -50,7 +50,7 @@ class EnrichmentRequestFilterTest extends TestBase {
     }
 
     "don't add fields if request headers are missed" in {
-      val filter = new EnrichRequestFilter(Field("acceptLanguage", DataType.DEFAULT_TYPE_NAME, Seq(EnrichAnnotation(RamlAnnotation.CLIENT_LANGUAGE, None))))
+      val filter = new EnrichRequestFilter(Field("acceptLanguage", TypeDefinition.DEFAULT_TYPE_NAME, Seq(EnrichAnnotation(RamlAnnotation.CLIENT_LANGUAGE, None))))
 
       val initialRequest = FacadeRequest(
         Uri("/resource"),

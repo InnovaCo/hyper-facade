@@ -25,6 +25,19 @@ types:
       clientLanguage:
         (x-client-language):
 
+  ServiceStatusRequest:
+    type: object
+    properties:
+      serviceType: string
+
+  ServiceStatusResponse:
+    type: object
+    properties:
+      statusCode: number
+      processedBy:
+        (deny):
+          if: "!context.isAuthorized"
+
   Status:
     type: object
     properties:
@@ -79,6 +92,18 @@ annotationTypes:
   x-client-language: nil | Conditional
   deny: nil | Conditional
   rewrite: [WithUri, Conditional]
+
+/service-status:
+  get:
+    body:
+      type: ServiceStatusRequest
+    responses:
+      200:
+        body:
+          type: ServiceStatusResponse
+  post:
+    body:
+      type: TestRequest
 
 /status:
   post:

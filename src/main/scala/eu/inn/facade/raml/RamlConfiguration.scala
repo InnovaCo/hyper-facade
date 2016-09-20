@@ -42,14 +42,12 @@ case class ContentType(mediaType: String)
 
 case class Header(name: String)
 
-object DataType {
-  val DEFAULT_TYPE_NAME = "string"
-}
-
 case class TypeDefinition(typeName: String, parentTypeName: Option[String], annotations: Seq[RamlAnnotation], fields: Seq[Field])
 object TypeDefinition {
+  val DEFAULT_TYPE_NAME = "string"
+
   def apply(): TypeDefinition = {
-    TypeDefinition(DataType.DEFAULT_TYPE_NAME, None, Seq.empty, Seq.empty)
+    TypeDefinition(DEFAULT_TYPE_NAME, None, Seq.empty, Seq.empty)
   }
 }
 

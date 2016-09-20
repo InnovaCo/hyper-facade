@@ -223,6 +223,40 @@ class WebsocketTest extends IntegrationTestBase("raml-configs/integration/websoc
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
     }
 
+    "unreliable events feed. missing correlationId in event" in {
+      val q = new TestQueue
+      val client = createWsClient("unreliable-feed-missing-correlation", "/v3/upgrade", q.put)
+
+      register {
+        testService.onCommand(RequestMatcher(Some(Uri("/resource/unreliable-feed")), Map(Header.METHOD → Specific(Method.GET))),
+          Ok(DynamicBody(Obj(Map("content" → Text("fullResource")))))
+        ).futureValue
+      }
+
+      client ! FacadeRequest(Uri("/v3/resource/unreliable-feed"), "subscribe",
+        Map(Header.CONTENT_TYPE → Seq("application/vnd.feed-test+json"),
+          FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")),
+        Obj(Map("content" → Text("haha")))
+      )
+
+      val resourceState = q.next().futureValue
+      resourceState should startWith("""{"status":200,"headers":{"Hyperbus-Message-Id":""")
+      resourceState should endWith("""body":{"content":"fullResource"}}""")
+
+      testService.publish(UnreliableFeedTestRequest(
+        FeedTestBody("haha"),
+        Headers.plain(Map(
+          Header.MESSAGE_ID → Seq("messageId"))))
+      )
+
+      q.next().futureValue shouldBe """{"uri":"/v3/resource/unreliable-feed","method":"feed:post","headers":{"Hyperbus-Message-Id":["messageId"],"Content-Type":["application/vnd.feed-test+json"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"haha"}}"""
+
+      client ! FacadeRequest(Uri("/v3/resource-with-unreliable-feed"), "unsubscribe",
+        Map(FacadeHeaders.CLIENT_MESSAGE_ID → Seq("messageId"),
+          FacadeHeaders.CLIENT_CORRELATION_ID → Seq("correlationId")), Null)
+    }
+
     "unreliable events feed with rewrite (not matching of request context)" in {
       val q = new TestQueue
       val client = createWsClient("unreliable-rewrite-nm-feed-client", "/v3/upgrade", q.put)
