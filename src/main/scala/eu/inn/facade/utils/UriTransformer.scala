@@ -2,7 +2,7 @@ package eu.inn.facade.utils
 
 import java.net.MalformedURLException
 
-import eu.inn.facade.raml.{Annotation, RamlConfiguration, RewriteIndexHolder}
+import eu.inn.facade.raml.{RamlAnnotation, RamlConfiguration, RewriteIndexHolder}
 import eu.inn.hyperbus.transport.api.matchers.Specific
 import eu.inn.hyperbus.transport.api.uri.{Uri, UriParser}
 import spray.http.Uri.Path
@@ -108,10 +108,11 @@ object UriTransformer {
 
   private def linkIsRewriteable(from: Uri, ramlConfig: RamlConfiguration): Boolean = {
     val emptyScheme = spray.http.Uri(from.pattern.specific).scheme.isEmpty
-    val rewriteAllowed = ramlConfig.resourcesByUri.get(from.pattern.specific) orElse
-      ramlConfig.resourcesByUri.get(from.formatted) match {
+    val resourceConfigOpt = ramlConfig.resourcesByUri.get(from.pattern.specific) orElse
+      ramlConfig.resourcesByUri.get(from.formatted)
+    val rewriteAllowed = resourceConfigOpt match {
       case Some(resourceConfig) ⇒
-        resourceConfig.annotations.exists(ann ⇒ ann.name == Annotation.REWRITE)
+        resourceConfig.annotations.exists(_.name == RamlAnnotation.REWRITE)
       case None ⇒
         true
     }

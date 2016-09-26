@@ -1,4 +1,4 @@
-package eu.inn.facade.raml
+package eu.inn.facade.utils
 
 import eu.inn.hyperbus.transport.api.uri.{PathMatchType, RegularMatchType, Token, _}
 

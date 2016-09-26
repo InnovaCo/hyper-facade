@@ -1,17 +1,15 @@
 package eu.inn.facade.filter.model
 
-import eu.inn.facade.filter.model.ConditionalFilterProxy._
 import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.model._
 import eu.inn.facade.raml.RamlAnnotation
-import eu.inn.facade.raml.annotationtypes.conditionalAnnotation
 
 import scala.concurrent.{ExecutionContext, Future}
 
-case class ConditionalRequestFilterProxy(annotation: Option[RamlAnnotation], filter: RequestFilter, predicateEvaluator: PredicateEvaluator) extends RequestFilter {
+case class ConditionalRequestFilterProxy(annotation: RamlAnnotation, filter: RequestFilter, predicateEvaluator: PredicateEvaluator) extends RequestFilter {
   override def apply(contextWithRequest: ContextWithRequest)
                     (implicit ec: ExecutionContext): Future[ContextWithRequest] = {
-    predicate(annotation) match {
+    annotation.predicate match {
       case Some(p) ⇒
         if (predicateEvaluator.evaluate(p, contextWithRequest))
           filter.apply(contextWithRequest)
@@ -24,10 +22,10 @@ case class ConditionalRequestFilterProxy(annotation: Option[RamlAnnotation], fil
   }
 }
 
-case class ConditionalResponseFilterProxy(annotation: Option[RamlAnnotation], filter: ResponseFilter, predicateEvaluator: PredicateEvaluator) extends ResponseFilter {
+case class ConditionalResponseFilterProxy(annotation: RamlAnnotation, filter: ResponseFilter, predicateEvaluator: PredicateEvaluator) extends ResponseFilter {
   override def apply(contextWithRequest: ContextWithRequest, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
-    predicate(annotation) match {
+    annotation.predicate match {
       case Some(p) ⇒
         if (predicateEvaluator.evaluate(p, contextWithRequest))
           filter.apply(contextWithRequest, response)
@@ -40,10 +38,10 @@ case class ConditionalResponseFilterProxy(annotation: Option[RamlAnnotation], fi
   }
 }
 
-case class ConditionalEventFilterProxy(annotation: Option[RamlAnnotation], filter: EventFilter, predicateEvaluator: PredicateEvaluator) extends EventFilter {
+case class ConditionalEventFilterProxy(annotation: RamlAnnotation, filter: EventFilter, predicateEvaluator: PredicateEvaluator) extends EventFilter {
   override def apply(contextWithRequest: ContextWithRequest, event: FacadeRequest)
                     (implicit ec: ExecutionContext): Future[FacadeRequest] = {
-    predicate(annotation) match {
+    annotation.predicate match {
       case Some(p) ⇒
         if (predicateEvaluator.evaluate(p, contextWithRequest))
           filter.apply(contextWithRequest, event)
@@ -52,24 +50,6 @@ case class ConditionalEventFilterProxy(annotation: Option[RamlAnnotation], filte
 
       case None ⇒
         filter.apply(contextWithRequest, event)
-    }
-  }
-}
-
-object ConditionalFilterProxy {
-  def predicate(annotation: Option[RamlAnnotation]): Option[String] = {
-    annotation match {
-      case Some(ramlAnnotation) ⇒
-        ramlAnnotation match {
-          case conditionalAnnotation: conditionalAnnotation ⇒
-            Option(conditionalAnnotation.getPredicate)
-
-          case _ ⇒
-            None
-        }
-
-      case None ⇒
-        None
     }
   }
 }

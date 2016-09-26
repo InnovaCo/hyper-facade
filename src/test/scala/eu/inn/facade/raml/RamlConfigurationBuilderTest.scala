@@ -54,11 +54,11 @@ class RamlConfigurationBuilderTest extends TestBase {
     "annotations on parent resource" in {
       val parentRewriteFilter = ramlConfig.resourcesByUri("/parent").filters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter
       parentRewriteFilter shouldBe a[RewriteRequestFilter]
-      parentRewriteFilter.asInstanceOf[RewriteRequestFilter].args.getUri shouldBe "/revault/content/some-service"
+      parentRewriteFilter.asInstanceOf[RewriteRequestFilter].uri shouldBe "/revault/content/some-service"
 
       val childRewriteFilter = ramlConfig.resourcesByUri("/parent/child").filters.requestFilters.head.asInstanceOf[ConditionalRequestFilterProxy].filter
       childRewriteFilter shouldBe a[RewriteRequestFilter]
-      childRewriteFilter.asInstanceOf[RewriteRequestFilter].args.getUri shouldBe "/revault/content/some-service/child"
+      childRewriteFilter.asInstanceOf[RewriteRequestFilter].uri shouldBe "/revault/content/some-service/child"
     }
 
     "annotations on external child resource" in {
@@ -92,9 +92,9 @@ class RamlConfigurationBuilderTest extends TestBase {
       val extStatusTypeDef = ramlConfig.resourcesByUri("/ext-status").methods(Method(POST)).requests.ramlContentTypes(None).typeDefinition
       val fields = extStatusTypeDef.fields
       fields.size shouldBe 3
-      fields(0).name shouldBe "timestamp"
-      fields(1).name shouldBe "statusCode"
-      fields(2).name shouldBe "processedBy"
+      assert(fields.exists(_.name == "statusCode"))
+      assert(fields.exists(_.name == "processedBy"))
+      assert(fields.exists(_.name == "timestamp"))
     }
   }
 }

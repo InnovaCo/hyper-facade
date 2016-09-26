@@ -3,6 +3,7 @@ title: Facade API
 version: v1
 mediaType: application/json
 baseUri: https://meta.inn.eu/revault
+
 types:
   ComplexRequestType:
     type: object
@@ -19,9 +20,14 @@ types:
         type: string
       publicField: string
 
+  Conditional:
+    type: object
+    properties:
+      if?:
+
 annotationTypes:
-  x-client-ip:
-  x-client-language:
+  x-client-ip: nil | Conditional
+  x-client-language: nil | Conditional
 
 /complex-resource:
   post:

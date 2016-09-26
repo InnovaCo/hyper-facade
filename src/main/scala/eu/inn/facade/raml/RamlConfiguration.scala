@@ -1,19 +1,18 @@
 package eu.inn.facade.raml
 
 import eu.inn.facade.filter.chain.SimpleFilterChain
-import eu.inn.hyperbus.transport.api.uri.Uri
 
 case class RamlConfiguration(resourcesByUri: Map[String, ResourceConfig], uris: Seq[String])
 
 case class ResourceConfig(
                            traits: Traits,
-                           annotations: Seq[Annotation],
+                           annotations: Seq[RamlAnnotation],
                            methods: Map[Method, RamlResourceMethodConfig],
                            filters: SimpleFilterChain
                          )
 
 case class RamlResourceMethodConfig(method: Method,
-                                    annotations: Seq[Annotation],
+                                    annotations: Seq[RamlAnnotation],
                                     requests: RamlRequests,
                                     responses: Map[Int, RamlResponses],
                                     methodFilters: SimpleFilterChain)
@@ -47,23 +46,11 @@ object DataType {
   val DEFAULT_TYPE_NAME = "string"
 }
 
-case class TypeDefinition(typeName: String, parentTypeName: Option[String], annotations: Seq[Annotation], fields: Seq[Field])
+case class TypeDefinition(typeName: String, parentTypeName: Option[String], annotations: Seq[RamlAnnotation], fields: Seq[Field])
 object TypeDefinition {
   def apply(): TypeDefinition = {
     TypeDefinition(DataType.DEFAULT_TYPE_NAME, None, Seq.empty, Seq.empty)
   }
 }
 
-case class Field(name: String, typeName: String, annotations: Seq[Annotation])
-
-case class Annotation(name: String, value: Option[RamlAnnotation])
-
-object Annotation {
-  val PRIVATE = "private"
-  val CLIENT_LANGUAGE = "x-client-language"
-  val CLIENT_IP = "x-client-ip"
-  val REWRITE = "rewrite"
-  val DENY = "deny"
-
-  def apply(name: String): Annotation = Annotation(name, None)
-}
+case class Field(name: String, typeName: String, annotations: Seq[RamlAnnotation])

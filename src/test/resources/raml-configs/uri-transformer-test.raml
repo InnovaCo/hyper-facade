@@ -4,13 +4,19 @@ version: v1
 mediaType: application/json
 baseUri: https://meta.inn.eu/revault
 
-annotationTypes:
-  x-client-ip:
-  x-client-language:
-  private:
-  rewrite:
+types:
+  Conditional:
+    type: object
     properties:
-      uri: string
+      if?:
+
+  WithUri:
+    type: object
+    properties:
+      uri:
+
+annotationTypes:
+  rewrite: [WithUri, Conditional]
 
 # Event Rewrite Test Resources
 /events:
