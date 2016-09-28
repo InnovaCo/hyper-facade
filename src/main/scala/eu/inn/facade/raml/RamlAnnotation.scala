@@ -13,6 +13,7 @@ object RamlAnnotation {
   val REWRITE = "rewrite"
   val DENY = "deny"
   val AUTHORIZE = "authorize"
+  val EMBED = "embed"
 
   def apply(name: String, properties: Seq[TypeInstanceProperty]): RamlAnnotation = {
     val propMap = properties.map(property ⇒ property.name() → property.value.value().toString).toMap
@@ -42,4 +43,11 @@ case class EnrichAnnotation(name: String,
 
 case class AuthorizeAnnotation(name: String = RamlAnnotation.AUTHORIZE,
                                predicate: Option[String]) extends RamlAnnotation
-case class RegularAnnotation(name: String, predicate: Option[String], properties: Map[String, String] = Map.empty) extends RamlAnnotation
+
+case class RegularAnnotation(name: String,
+                             predicate: Option[String],
+                             properties: Map[String, String] = Map.empty) extends RamlAnnotation
+
+case class EmbedAnnotation(name: String = RamlAnnotation.EMBED,
+                           predicate: Option[String],
+                           relName: String) extends RamlAnnotation
