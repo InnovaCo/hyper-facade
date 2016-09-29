@@ -25,6 +25,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     with RequestProcessor {
 
   val maxSubscriptionTries = config.getInt(FacadeConfigPaths.MAX_SUBSCRIPTION_TRIES)
+  val maxStashedEventsCount = config.getInt(FacadeConfigPaths.FEED_MAX_STASHED_EVENTS_COUNT)
+
   val log = LoggerFactory.getLogger(getClass)
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
@@ -47,23 +49,41 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       processResourceState(cwr, resourceState, subscriptionSyncTries)
 
     case BecomeReliable(lastRevision: Long) ⇒
-      context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
-      log.debug(s"Reliable subscription will be started for ${cwr.context} with revision $lastRevision after unstashing all events")
-      unstash(stashedEvents)
+      if (stashedEvents.isEmpty) {
+        context.become(subscribedReliable(cwr, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
+      } else {
+        context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries, stashedEvents.tail) orElse stopStartSubscription)
+        log.debug(s"Reliable subscription will be started for ${cwr.context} with revision $lastRevision after unstashing all events")
+        unstash(stashedEvents.headOption)
+      }
 
     case BecomeUnreliable ⇒
       context.become(subscribedUnreliable(cwr) orElse stopStartSubscription)
-      unstash(stashedEvents)
+      unstash(stashedEvents.headOption)
       log.debug(s"Unreliable subscription started for ${cwr.context}")
+
+    case RestartSubscription ⇒
+      continueSubscription(cwr, subscriptionSyncTries + 1)
   }
 
-  def waitForUnstash(cwr: ContextWithRequest, lastRevision: Long, subscriptionSyncTries: Int): Receive = {
+  def waitForUnstash(cwr: ContextWithRequest, lastRevision: Long, subscriptionSyncTries: Int, stashedEvents: Seq[StashedEvent]): Receive = {
+    case event: DynamicRequest ⇒
+      context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries, stashedEvents :+ StashedEvent(event)))
+
     case StashedEvent(event) ⇒
       processReliableEvent(cwr, event, lastRevision, subscriptionSyncTries)
+      unstash(stashedEvents.headOption)
 
     case UnstashingCompleted ⇒
       log.debug(s"Reliable subscription started for ${cwr.context} with revision $lastRevision")
-      context.become(subscribedReliable(cwr, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
+      if (stashedEvents.isEmpty) {
+        context.become(subscribedReliable(cwr, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
+      } else {
+        unstash(stashedEvents.headOption)
+      }
+
+    case RestartSubscription ⇒
+      continueSubscription(cwr, subscriptionSyncTries + 1)
   }
 
   def subscribedReliable(cwr: ContextWithRequest, lastRevisionId: Long, subscriptionSyncTries: Int): Receive = {
@@ -112,7 +132,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def continueSubscription(cwr: ContextWithRequest,
                            subscriptionSyncTries: Int): Unit = {
 
-    context.become(subscribing(cwr, subscriptionSyncTries, Seq()) orElse stopStartSubscription)
+    context.become(subscribing(cwr, subscriptionSyncTries, Seq.empty) orElse stopStartSubscription)
 
     implicit val ec = executionContext
 
@@ -141,6 +161,9 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       case Some(_) ⇒
         log.debug(s"event $event is stashed because resource state is not fetched yet")
         context.become(subscribing(cwr, subscriptionSyncTries, stashedEvents :+ StashedEvent(event)))
+        if (stashedEvents.length > maxStashedEventsCount) {
+          self ! RestartSubscription
+        }
 
       // unreliable feed
       case _ ⇒
@@ -257,9 +280,13 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     Uri(uri.pattern, newArgs)
   }
 
-  def unstash(events: Seq[StashedEvent]): Unit = {
-    events.foreach( event ⇒ self ! event)
-    self ! UnstashingCompleted
+  def unstash(event: Option[StashedEvent]): Unit = {
+    event match {
+      case Some(event) ⇒
+        self ! event
+      case None ⇒
+        self ! UnstashingCompleted
+    }
   }
 }
 
