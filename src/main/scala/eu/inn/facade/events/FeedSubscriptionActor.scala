@@ -53,14 +53,18 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         context.become(subscribedReliable(cwr, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
       } else {
         context.become(waitForUnstash(cwr, Some(lastRevision), subscriptionSyncTries, stashedEvents.tail) orElse stopStartSubscription)
-        log.debug(s"Reliable subscription will be started for ${cwr.context} with revision $lastRevision after unstashing all events")
+        log.debug(s"Reliable subscription will be started for ${cwr.context} with revision $lastRevision after unstashing of all events")
         unstash(stashedEvents.headOption)
       }
 
     case BecomeUnreliable ⇒
-      context.become(subscribedUnreliable(cwr) orElse stopStartSubscription)
-      unstash(stashedEvents.headOption)
-      log.debug(s"Unreliable subscription started for ${cwr.context}")
+      if (stashedEvents.isEmpty) {
+        context.become(subscribedUnreliable(cwr) orElse stopStartSubscription)
+      } else {
+        context.become(waitForUnstash(cwr, None, subscriptionSyncTries, stashedEvents.tail) orElse stopStartSubscription)
+        log.debug(s"Unreliable subscription will be started for ${cwr.context} after unstashing of all events")
+        unstash(stashedEvents.headOption)
+      }
 
     case RestartSubscription ⇒
       continueSubscription(cwr, subscriptionSyncTries + 1)
