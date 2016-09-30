@@ -22,8 +22,10 @@ types:
       resultType: string
       clientIp:
         (x-client-ip):
+        type: string
       clientLanguage:
         (x-client-language):
+        type: string
 
   ServiceStatusRequest:
     type: object
@@ -44,6 +46,7 @@ types:
       statusCode: number
       processedBy:
         (deny):
+        type: string
 
   ReliableResourceState:
     type: object
