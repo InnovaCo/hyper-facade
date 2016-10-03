@@ -45,7 +45,7 @@ class HttpWsFiltersTest extends TestBase {
       )
 
       val cwr = ContextWithRequest(mockContext(request), request)
-      val filteredResponse = afterFilters.filterResponse(cwr, response).futureValue(Timeout(Span(300, Seconds)))
+      val filteredResponse = afterFilters.filterResponse(cwr, response).futureValue(Timeout(Span(30, Seconds)))
       val linksMap = filteredResponse.body.__links.fromValue[LinksMap] // binders deserialization magic
       linksMap("self") shouldBe Left(Link(href="/v3/test/1"))
       linksMap("some-other1") shouldBe Left(Link(href="/v3/test/abc"))

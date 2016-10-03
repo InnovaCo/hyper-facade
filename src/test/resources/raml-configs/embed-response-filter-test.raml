@@ -1,0 +1,24 @@
+#%RAML 1.0
+title: Facade API
+version: v1
+mediaType: application/json
+baseUri: https://meta.inn.eu/revault
+
+types:
+  Conditional:
+    type: object
+    properties:
+      if?:
+
+  Relational:
+    type: object
+    properties:
+      rel: string[]
+
+annotationTypes:
+  embed: [Relational, Conditional]
+
+/revelations:
+  get:
+    (embed):
+      rel: ["banner"]
