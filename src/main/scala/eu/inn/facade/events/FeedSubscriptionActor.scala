@@ -54,7 +54,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       } else {
         context.become(waitForUnstash(cwr, Some(lastRevision), subscriptionSyncTries, stashedEvents.tail) orElse stopStartSubscription)
         log.debug(s"Reliable subscription will be started for ${cwr.context} with revision $lastRevision after unstashing of all events")
-        unstash(stashedEvents.headOption)
+        unstash(stashedEvents.head)
       }
 
     case BecomeUnreliable ⇒
@@ -63,7 +63,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       } else {
         context.become(waitForUnstash(cwr, None, subscriptionSyncTries, stashedEvents.tail) orElse stopStartSubscription)
         log.debug(s"Unreliable subscription will be started for ${cwr.context} after unstashing of all events")
-        unstash(stashedEvents.headOption)
+        unstash(stashedEvents.head)
       }
 
     case RestartSubscription ⇒
@@ -81,7 +81,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         case None ⇒
           processUnreliableEvent(cwr, event)
       }
-      unstash(stashedEvents.headOption)
+      if (stashedEvents.isEmpty) {
+        self ! UnstashingCompleted
+      } else {
+        context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries, stashedEvents.tail))
+        unstash(stashedEvents.head)
+      }
 
     case UnstashingCompleted ⇒
       log.debug(s"Reliable subscription started for ${cwr.context} with revision $lastRevision")
@@ -93,7 +98,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
             context.become(subscribedUnreliable(cwr) orElse stopStartSubscription)
         }
       } else {
-        unstash(stashedEvents.headOption)
+        context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries, stashedEvents.tail))
+        unstash(stashedEvents.head)
       }
 
     case RestartSubscription ⇒
@@ -155,6 +161,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       val correlationId = cwrRaml.request.headers.getOrElse(Header.CORRELATION_ID,
         cwrRaml.request.headers(Header.MESSAGE_ID)).head
       val subscriptionUri = getSubscriptionUri(cwrRaml.request)
+      subscriptionManager.off(self)
       subscriptionManager.subscribe(self, subscriptionUri, correlationId)
       implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
       hyperbus <~ cwrRaml.request.copy(method = Method.GET).toDynamicRequest
@@ -185,7 +192,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
   }
 
-  def processResourceState(cwr: ContextWithRequest, resourceState: Response[DynamicBody], subscriptionSyncTries: Int) = {
+  def processResourceState(cwr: ContextWithRequest, resourceState: Response[DynamicBody], subscriptionSyncTries: Int): Unit = {
     val facadeResponse = FacadeResponse(resourceState)
     if (log.isTraceEnabled) {
       log.trace(s"Processing resource state $resourceState for ${cwr.context.pathAndQuery}")
@@ -294,13 +301,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     Uri(uri.pattern, newArgs)
   }
 
-  def unstash(event: Option[StashedEvent]): Unit = {
-    event match {
-      case Some(event) ⇒
-        self ! event
-      case None ⇒
-        self ! UnstashingCompleted
-    }
+  def unstash(event: StashedEvent): Unit = {
+    self ! event
   }
 }
 
