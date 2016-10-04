@@ -40,7 +40,11 @@ class EmbedResponseFilter(relName: String)(implicit inj: Injector) extends Respo
             links.get(relName) match {
               case Some(links: Lst) ⇒ // json+hal when link is array
                 links.v.foldLeft(Seq.newBuilder[Uri]) { (uris, linkValue) ⇒
-                  uris += formattedUri(linkValue, body)
+                  if (linkValue.href.isDefined) {
+                    uris += formattedUri(linkValue, body)
+                  } else {
+                    uris
+                  }
                 }.result()
               case Some(linkValue: Value) ⇒ // json+hal - single link
                 Seq(formattedUri(linkValue, body))
@@ -67,17 +71,17 @@ class EmbedResponseFilter(relName: String)(implicit inj: Injector) extends Respo
   private def embed(uri: Uri, body: Value, cwr: ContextWithRequest)(implicit ec: ExecutionContext): Future[Value] = {
     val request = FacadeRequest(uri, Method.GET, cwr.request.headers, Null).toDynamicRequest
     hyperbus <~ request recover {
-      handleHyperbusExceptions(cwr)
-    } map( response ⇒ response.body.content)
+      handleHyperbusExceptions(cwr, uri)
+    } map( response ⇒ response.body.content + body)
   }
 
-  private def handleHyperbusExceptions(cwr: ContextWithRequest) : PartialFunction[Throwable, Response[DynamicBody]] = {
+  private def handleHyperbusExceptions(cwr: ContextWithRequest, uri: Uri) : PartialFunction[Throwable, Response[DynamicBody]] = {
     case hyperbusException: HyperbusException[ErrorBody] ⇒
       hyperbusException
 
     case _: NoTransportRouteException ⇒
       implicit val mcf = cwr.context.clientMessagingContext()
-      model.NotFound(ErrorBody("not-found", Some(s"'${cwr.context.pathAndQuery}' is not found.")))
+      model.NotFound(ErrorBody("not-found", Some(s"'$uri' is not found.")))
 
     case _: AskTimeoutException ⇒
       implicit val mcf = cwr.context.clientMessagingContext()
