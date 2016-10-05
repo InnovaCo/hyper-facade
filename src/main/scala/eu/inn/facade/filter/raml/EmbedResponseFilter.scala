@@ -19,20 +19,35 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.util.control.NonFatal
 
 class EmbedResponseFilter(relName: String)(implicit inj: Injector) extends ResponseFilter with Injectable {
-  val log = LoggerFactory.getLogger(getClass)
-  val hyperbus = inject[Hyperbus]
+  private val hyperbus = inject[Hyperbus]
 
   override def apply(contextWithRequest: ContextWithRequest, response: FacadeResponse)
                     (implicit ec: ExecutionContext): Future[FacadeResponse] = {
-    val links = extractLinks(response.body)
-    FutureUtils.chain(response.body, links.map(uri ⇒ embed(uri, _: Value, contextWithRequest))) map { updatedBody ⇒
+    val links = EmbedFilter.extractLinks(relName, response.body)
+    FutureUtils.chain(response.body, links.map(uri ⇒ EmbedFilter.embed(uri, _: Value, contextWithRequest, hyperbus))) map { updatedBody ⇒
       response.copy(
         body = updatedBody
       )
     }
   }
+}
 
-  private def extractLinks(body: Value): Seq[Uri] = {
+class EmbedEventFilter(relName: String)(implicit inj: Injector) extends EventFilter with Injectable {
+  override def apply(contextWithRequest: ContextWithRequest, event: FacadeRequest)
+                    (implicit ec: ExecutionContext): Future[FacadeRequest] = {
+    val links = EmbedFilter.extractLinks(relName, event.body)
+    val hyperbus = inject[Hyperbus]
+    FutureUtils.chain(event.body, links.map(uri ⇒ EmbedFilter.embed(uri, _: Value, contextWithRequest, hyperbus))) map { updatedBody ⇒
+      event.copy(
+        body = updatedBody
+      )
+    }
+  }
+}
+
+object EmbedFilter {
+  private val log = LoggerFactory.getLogger(getClass)
+  def extractLinks(relName: String, body: Value): Seq[Uri] = {
     body match {
       case Obj(fields) ⇒
         fields.get("_links") match {
@@ -58,7 +73,7 @@ class EmbedResponseFilter(relName: String)(implicit inj: Injector) extends Respo
   private def formattedUri(linkValue: Value, body: Value): Uri = {
     val href = linkValue.href.asString
     if (linkValue.templated.fromValue[Option[Boolean]].contains(true)) { // templated link, have to format
-      val tokens = UriParser.extractParameters(href)
+    val tokens = UriParser.extractParameters(href)
       val args = tokens.map { arg ⇒
         arg → body.asMap(arg).asString             // todo: support inner fields + handle exception if not exists?
       }.toMap
@@ -68,7 +83,7 @@ class EmbedResponseFilter(relName: String)(implicit inj: Injector) extends Respo
     }
   }
 
-  private def embed(uri: Uri, body: Value, cwr: ContextWithRequest)(implicit ec: ExecutionContext): Future[Value] = {
+  def embed(uri: Uri, body: Value, cwr: ContextWithRequest, hyperbus: Hyperbus)(implicit ec: ExecutionContext): Future[Value] = {
     val request = FacadeRequest(uri, Method.GET, cwr.request.headers, Null).toDynamicRequest
     hyperbus <~ request recover {
       handleHyperbusExceptions(cwr, uri)
@@ -102,7 +117,7 @@ class EmbedResponseFilter(relName: String)(implicit inj: Injector) extends Respo
 }
 
 class EmbedFilterFactory (implicit inj: Injector) extends RamlFilterFactory with Injectable {
-  val log = LoggerFactory.getLogger(getClass)
+  private val log = LoggerFactory.getLogger(getClass)
   val predicateEvaluator = inject[PredicateEvaluator]
 
   override def createFilters(target: RamlTarget): SimpleFilterChain = {
