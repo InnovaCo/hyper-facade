@@ -11,6 +11,7 @@ import eu.inn.hyperbus.transport.api.Subscription
 import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, RequestMatcher}
 import eu.inn.hyperbus.transport.api.uri._
 import org.slf4j.LoggerFactory
+import rx.lang.scala.Observer
 import scaldi.{Injectable, Injector}
 
 import scala.collection.concurrent.TrieMap
@@ -42,8 +43,8 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
       addClient(initialSubscription)
 
       val methodFilter = Map(Header.METHOD → RegexMatcher("^feed:.*$"))
-      hyperbus.onEvent(RequestMatcher(Some(groupUri), methodFilter), groupName) { eventRequest: DynamicRequest ⇒
-        Future{
+      val observer = new Observer[DynamicRequest] {
+        override def onNext(eventRequest: DynamicRequest): Unit = {
           log.debug(s"Event received ($groupName): $eventRequest")
           import scala.collection.JavaConversions._
           for (consumer: ClientSubscriptionData ← clientSubscriptions) {
@@ -63,7 +64,8 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
             }
           }
         }
-      } onSuccess {
+      }
+      hyperbus.onEvent(RequestMatcher(Some(groupUri), methodFilter), groupName, observer) onSuccess {
         case subscription: Subscription ⇒ hyperbusSubscription = Some(subscription)
       }
 

@@ -29,8 +29,9 @@ types:
     type: object
     properties:
       content: string
-      secretField: string
+      secretField:
         (deny):
+        type: string
 
 annotationTypes:
   x-client-ip: nil | Conditional
