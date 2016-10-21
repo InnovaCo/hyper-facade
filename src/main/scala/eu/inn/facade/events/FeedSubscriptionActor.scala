@@ -1,5 +1,6 @@
 package eu.inn.facade.events
 
+import java.nio.BufferOverflowException
 import java.util.concurrent.atomic.AtomicReference
 
 import akka.actor._
@@ -334,6 +335,18 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
               }
           }
           currentFilteringFuture.set(Some(newCurrentFilteringFuture))
+        }
+      }
+
+      override def onError(error: Throwable): Unit = {
+        error match {
+          case _ : BufferOverflowException ⇒
+            log.error(s"Backpressure overflow. Restarting...")
+            self ! RestartSubscription
+
+          case other ⇒
+            log.error(s"Error has occured on event processing. Restarting... $other")
+            self ! RestartSubscription
         }
       }
     }

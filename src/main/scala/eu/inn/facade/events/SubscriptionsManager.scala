@@ -15,7 +15,7 @@ import rx.lang.scala.Observer
 import scaldi.{Injectable, Injector}
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class SubscriptionsManager(implicit inj: Injector) extends Injectable {
 
@@ -63,6 +63,10 @@ class SubscriptionsManager(implicit inj: Injector) extends Injectable {
                 log.error("Can't forward subscription event", t)
             }
           }
+        }
+
+        override def onError(error: Throwable): Unit = {
+          log.error(s"Error has occured on event consumption from Hyperbus. $error")
         }
       }
       hyperbus.onEvent(RequestMatcher(Some(groupUri), methodFilter), groupName, observer) onSuccess {
