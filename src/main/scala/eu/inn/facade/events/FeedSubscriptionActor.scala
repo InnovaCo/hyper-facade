@@ -60,7 +60,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           log.debug(s"Reliable subscription will be started for ${cwr.context} with revision $lastRevision after unstashing of all events")
           unstash(stashedEvents.headOption)
         }
-      } subscribe(reliableEventsObserver(cwr))
+      } onBackpressureBuffer(maxStashedEventsCount) subscribe(reliableEventsObserver(cwr))
 
     case BecomeUnreliable ⇒
       if (stashedEvents.isEmpty) {
@@ -68,7 +68,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       } else {
         Observable[DynamicRequest] { subscriber ⇒
           context.become(waitForUnstash(cwr, None, subscriptionSyncTries, stashedEvents.tail, subscriber) orElse stopStartSubscription)
-        } subscribe(reliableEventsObserver(cwr))
+        } onBackpressureBuffer(maxStashedEventsCount) subscribe(reliableEventsObserver(cwr))
         log.debug(s"Unreliable subscription will be started for ${cwr.context} after unstashing of all events")
         unstash(stashedEvents.headOption)
       }
