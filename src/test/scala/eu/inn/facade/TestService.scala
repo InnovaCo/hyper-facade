@@ -67,6 +67,15 @@ class TestService(hyperbus: Hyperbus) {
     }
   }
 
+  def onCommand1(matcher: RequestMatcher, response:(() ⇒ Response[Body]), optionalTestCallback: (DynamicRequest ⇒ Unit) = _ ⇒ ()) = {
+    hyperbus.onCommand(matcher) { request: DynamicRequest ⇒
+      Future {
+        optionalTestCallback(request)
+        response()
+      }
+    }
+  }
+
   def unsubscribe(subscription: Subscription) = {
     hyperbus.off(subscription)
   }
@@ -114,8 +123,9 @@ object TestService4WebsocketPerfWithFilters extends App {
   val testService = new TestService(hyperbus)
   val eventsPerSecond = config.getInt("perf-test.events-per-second")
   var canStart = new AtomicBoolean(false)
-  testService.onCommand(RequestMatcher(Some(RESOURCE_URI), Map(Header.METHOD → Specific("get"))),
-    Ok(DynamicBody(Obj(Map("content" → Text("fullResource"))))), { _ ⇒
+  var revision = 1
+  testService.onCommand1(RequestMatcher(Some(RESOURCE_URI), Map(Header.METHOD → Specific("get"))),
+    state, { _ ⇒
       canStart.compareAndSet(false, true)
     })
   while (!canStart.get()) {
@@ -128,11 +138,18 @@ object TestService4WebsocketPerfWithFilters extends App {
     while (true) {
       val startTime = System.currentTimeMillis()
       for (i ← 1 to eventsPerSecond) {
-        testService.publish(PerfTestFeedEvent(PerfTestEventBody("perfEvent", "secret"), Headers()))
+        revision += 1
+        println(revision)
+        testService.publish(PerfTestFeedEvent(PerfTestEventBody("perfEvent", "secret"), Headers.plain(Map("revision" → Seq(s"$revision"), "messageId" → Seq("m")))))
       }
       val remainingTime = 1000 - (startTime - System.currentTimeMillis())
       if (remainingTime > 0) Thread.sleep(remainingTime)
     }
+  }
+
+  def state(): Response[Body] = {
+    println(s"here $revision")
+    Ok(DynamicBody(Obj(Map("content" → Text("fullResource")))), Headers.plain(Map("revision" → Seq(s"$revision"), "messageId" → Seq("m"))))
   }
 }
 
