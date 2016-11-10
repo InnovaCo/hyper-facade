@@ -3,7 +3,6 @@ package eu.inn.facade.filter.raml
 import eu.inn.binders.value.{ObjV, Text}
 import eu.inn.facade.model.{ContextWithRequest, FacadeRequest}
 import eu.inn.facade.raml._
-import eu.inn.facade.raml.annotationtypes.rewrite
 import eu.inn.facade.{CleanRewriteIndex, MockContext}
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.concurrent.ScalaFutures
@@ -20,10 +19,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
 
   "RewriteRequestFilter" - {
     "simple rewrite" in {
-      val args = new rewrite()
-      args.setUri("/rewritten/some-service")
-      val filter = new RewriteRequestFilter(args)
-
+      val filter = new RewriteRequestFilter("/rewritten/some-service")
       val request = FacadeRequest(
         Uri("/test-rewrite/some-service"),
         Method.GET,
@@ -44,10 +40,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
     }
 
     "rewrite with arguments" in {
-      val args = new rewrite()
-      args.setUri("/test-rewrite/some-service/{serviceId}")
-      val filter = new RewriteRequestFilter(args)
-
+      val filter = new RewriteRequestFilter("/test-rewrite/some-service/{serviceId}")
       val request = FacadeRequest(
         Uri("/rewritten/some-service/{serviceId}", Map("serviceId" → "100500")),
         Method.GET,
@@ -69,10 +62,7 @@ class RewriteRequestFilterTest extends FreeSpec with Matchers with ScalaFutures 
     }
 
     "rewrite links" in {
-      val args = new rewrite()
-      args.setUri("/rewritten/some-service")
-
-      val filter = new RewriteRequestFilter(args)
+      val filter = new RewriteRequestFilter("/rewritten/some-service")
       val request = FacadeRequest(
         Uri("/test-rewrite/some-service"), Method.POST, Map.empty, ObjV("field" → "content")
       )

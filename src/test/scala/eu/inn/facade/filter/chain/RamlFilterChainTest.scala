@@ -6,7 +6,7 @@ import eu.inn.facade.filter.model.{ConditionalEventFilterProxy, ConditionalReque
 import eu.inn.facade.filter.raml._
 import eu.inn.facade.model.{FacadeRequest, _}
 import eu.inn.facade.modules.TestInjectors
-import eu.inn.facade.raml.annotationtypes.{x_client_ip, x_client_language}
+import eu.inn.facade.raml.{EnrichAnnotation, RamlAnnotation}
 import eu.inn.facade.workers.TestWsRestServiceApp
 import eu.inn.facade.{FacadeConfigPaths, TestBase}
 import eu.inn.hyperbus.transport.api.uri.Uri
@@ -39,10 +39,14 @@ class RamlFilterChainTest extends TestBase {
       val secondFilter = filters.last.asInstanceOf[ConditionalRequestFilterProxy]
 
       firstFilter.filter shouldBe a[EnrichRequestFilter]
-      firstFilter.annotation.get shouldBe a[x_client_ip]
+      val firstAnnotation = firstFilter.annotation
+      firstAnnotation shouldBe a[EnrichAnnotation]
+      firstAnnotation.name shouldBe RamlAnnotation.CLIENT_IP
 
       secondFilter.filter shouldBe a[EnrichRequestFilter]
-      secondFilter.annotation.get shouldBe a[x_client_language]
+      val secondAnnotation = secondFilter.annotation
+      secondAnnotation shouldBe a[EnrichAnnotation]
+      secondAnnotation.name shouldBe RamlAnnotation.CLIENT_LANGUAGE
     }
 
     "trait and annotation based filter chain" in {

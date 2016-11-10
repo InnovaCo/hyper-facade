@@ -1,5 +1,6 @@
 package eu.inn.facade.raml
 
+import eu.inn.facade.utils.UriMatcher
 import eu.inn.hyperbus.transport.api.uri.Uri
 import org.scalatest.{FreeSpec, Matchers}
 

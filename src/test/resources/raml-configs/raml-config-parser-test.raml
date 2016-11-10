@@ -5,6 +5,16 @@ mediaType: application/json
 baseUri: https://meta.inn.eu/revault
 
 types:
+  Conditional:
+    type: object
+    properties:
+      if?:
+
+  WithUri:
+    type: object
+    properties:
+      uri:
+
   TestRequest:
     type: object
     properties:
@@ -12,10 +22,8 @@ types:
       resultType: string
       clientIp:
         (x-client-ip):
-        type: string
       clientLanguage:
         (x-client-language):
-        type: string
 
   Status:
     type: object
@@ -23,7 +31,6 @@ types:
       statusCode: number
       processedBy:
         (deny):
-        type: string
 
   ReliableResourceState:
     type: object
@@ -68,10 +75,10 @@ types:
       timestamp: string
 
 annotationTypes:
-  x-client-ip:
-  x-client-language:
-  deny:
-  rewrite:
+  x-client-ip: nil | Conditional
+  x-client-language: nil | Conditional
+  deny: nil | Conditional
+  rewrite: [WithUri, Conditional]
 
 /status:
   post:

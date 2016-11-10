@@ -2,7 +2,7 @@ package eu.inn.facade.filter.model
 
 import eu.inn.facade.filter.chain.SimpleFilterChain
 import eu.inn.facade.filter.parser.PredicateEvaluator
-import eu.inn.facade.raml.{Annotation, Field, RamlAnnotation}
+import eu.inn.facade.raml.{Field, RamlAnnotation}
 
 trait Filter
 
@@ -49,20 +49,20 @@ trait RamlFilterFactory {
 
 sealed trait RamlTarget
 object RamlTarget {
-  def annotations(ramlTarget: RamlTarget): Seq[Option[RamlAnnotation]] = {
+  def annotations(ramlTarget: RamlTarget): Seq[RamlAnnotation] = {
     ramlTarget match {
-      case TargetResource(_, Annotation(_, ann)) ⇒
+      case TargetResource(_, ann) ⇒
         Seq(ann)
-      case TargetMethod(_, _, Annotation(_, ann)) ⇒
+      case TargetMethod(_, _, ann) ⇒
         Seq(ann)
       case TargetField(_, field) ⇒
-        field.annotations.foldLeft(Seq.newBuilder[Option[RamlAnnotation]]) { (ramlAnnotations, fieldAnnotation) ⇒
-          ramlAnnotations += fieldAnnotation.value
+        field.annotations.foldLeft(Seq.newBuilder[RamlAnnotation]) { (ramlAnnotations, fieldAnnotation) ⇒
+          ramlAnnotations += fieldAnnotation
         }.result()
     }
   }
 }
 
-case class TargetResource(uri: String, annotation: Annotation) extends RamlTarget
-case class TargetMethod(uri: String, method: String, annotation: Annotation) extends RamlTarget
+case class TargetResource(uri: String, annotation: RamlAnnotation) extends RamlTarget
+case class TargetMethod(uri: String, method: String, annotation: RamlAnnotation) extends RamlTarget
 case class TargetField(typeName: String, field: Field) extends RamlTarget

@@ -5,7 +5,7 @@ import eu.inn.facade.filter.chain.{FilterChain, SimpleFilterChain}
 import eu.inn.facade.filter.model._
 import eu.inn.facade.filter.parser.PredicateEvaluator
 import eu.inn.facade.model._
-import eu.inn.facade.raml.{Annotation, Field}
+import eu.inn.facade.raml.{EnrichAnnotation, Field, RamlAnnotation}
 import org.slf4j.LoggerFactory
 import scaldi.{Injectable, Injector}
 
@@ -28,10 +28,10 @@ class EnrichRequestFilter(val field: Field) extends RequestFilter {
       val annotations = ramlField.annotations
       annotations.foldLeft(fields) { (enrichedFields, annotation) ⇒
         annotation.name match {
-          case Annotation.CLIENT_IP ⇒
+          case RamlAnnotation.CLIENT_IP ⇒
             addField(ramlField.name, Text(context.remoteAddress), fields)
 
-          case Annotation.CLIENT_LANGUAGE ⇒
+          case RamlAnnotation.CLIENT_LANGUAGE ⇒
             context.requestHeaders.get(FacadeHeaders.CLIENT_LANGUAGE) match {
               case Some(value :: _) ⇒
                 addField(ramlField.name, Text(value), fields)  // todo: format of header?
@@ -81,8 +81,8 @@ class EnrichmentFilterFactory(implicit inj: Injector) extends RamlFilterFactory 
 
   def createRequestFilters(field: Field): Seq[EnrichRequestFilter] = {
     field.annotations.foldLeft(Seq.newBuilder[EnrichRequestFilter]) { (filters, annotation) ⇒
-        annotation.name match {
-          case Annotation.CLIENT_IP | Annotation.CLIENT_LANGUAGE ⇒
+        annotation match {
+          case EnrichAnnotation(_, _) ⇒
             filters += new EnrichRequestFilter(field)
           case _ ⇒
             filters

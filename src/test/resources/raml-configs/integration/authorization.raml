@@ -4,9 +4,15 @@ version: v1
 mediaType: application/json
 baseUri: https://meta.inn.eu/revault
 
+types:
+  Conditional:
+    type: object
+    properties:
+      if?:
+
 annotationTypes:
-  authorize:
-  deny:
+  authorize: nil | Conditional
+  deny: nil | Conditional
 
 /authentication-failed:
 

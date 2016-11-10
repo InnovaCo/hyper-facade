@@ -13,8 +13,13 @@ types:
         (deny):
           if: "!context.isAuthorized"
 
+  Conditional:
+    type: object
+    properties:
+      if?:
+
 annotationTypes:
-  deny:
+  deny: nil | Conditional
 
 /authorized-only-resource:
   (deny):

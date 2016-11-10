@@ -1,10 +1,13 @@
 package eu.inn.facade.events
 
+import java.nio.BufferOverflowException
+import java.util.concurrent.atomic.AtomicReference
+
 import akka.actor._
 import akka.pattern.pipe
 import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.workers.RequestProcessor
-import eu.inn.facade.model.{FacadeResponse, _}
+import eu.inn.facade.model.{FacadeRequest, FacadeResponse, _}
 import eu.inn.facade.metrics.MetricKeys
 import eu.inn.facade.raml.Method
 import eu.inn.facade.utils.FutureUtils
@@ -13,19 +16,21 @@ import eu.inn.hyperbus.model._
 import eu.inn.hyperbus.transport.api.matchers.{RegexMatcher, TextMatcher}
 import eu.inn.hyperbus.transport.api.uri._
 import org.slf4j.LoggerFactory
+import rx.lang.scala.{Observable, Observer}
 import scaldi.Injector
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 class FeedSubscriptionActor(websocketWorker: ActorRef,
                             hyperbus: Hyperbus,
                             subscriptionManager: SubscriptionsManager)
                            (implicit val injector: Injector)
   extends Actor
-    with Stash
     with RequestProcessor {
 
   val maxSubscriptionTries = config.getInt(FacadeConfigPaths.MAX_SUBSCRIPTION_TRIES)
+  val maxStashedEventsCount = config.getInt(FacadeConfigPaths.FEED_MAX_STASHED_EVENTS_COUNT)
+
   val log = LoggerFactory.getLogger(getClass)
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
@@ -40,27 +45,76 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       continueSubscription(cwr, subscriptionSyncTries)
   }
 
-  def subscribing(cwr: ContextWithRequest, subscriptionSyncTries: Int): Receive = {
+  def subscribing(cwr: ContextWithRequest, subscriptionSyncTries: Int, stashedEvents: Vector[StashedEvent]): Receive = {
     case event: DynamicRequest ⇒
-      processEventWhileSubscribing(cwr, event)
+      processEventWhileSubscribing(cwr, event, subscriptionSyncTries, stashedEvents)
 
     case resourceState: Response[DynamicBody] @unchecked ⇒
       processResourceState(cwr, resourceState, subscriptionSyncTries)
 
     case BecomeReliable(lastRevision: Long) ⇒
-      context.become(subscribedReliable(cwr, lastRevision, subscriptionSyncTries) orElse stopStartSubscription)
-      unstashAll()
-      log.debug(s"Reliable subscription started for ${cwr.context} with revision $lastRevision")
+      Observable[DynamicRequest] { subscriber ⇒
+        if (stashedEvents.isEmpty) {
+          context.become(subscribedReliable(cwr, lastRevision, subscriptionSyncTries, subscriber) orElse stopStartSubscription)
+      } else {
+          context.become(waitForUnstash(cwr, Some(lastRevision), subscriptionSyncTries, stashedEvents.tail, subscriber) orElse stopStartSubscription)
+          log.debug(s"Reliable subscription will be started for ${cwr.context} with revision $lastRevision after unstashing of all events")
+          unstash(stashedEvents.headOption)
+        }
+      } onBackpressureBuffer(maxStashedEventsCount) subscribe(reliableEventsObserver(cwr))
 
     case BecomeUnreliable ⇒
-      context.become(subscribedUnreliable(cwr) orElse stopStartSubscription)
-      unstashAll()
-      log.debug(s"Unreliable subscription started for ${cwr.context}")
+      if (stashedEvents.isEmpty) {
+        context.become(subscribedUnreliable(cwr) orElse stopStartSubscription)
+      } else {
+        Observable[DynamicRequest] { subscriber ⇒
+          context.become(waitForUnstash(cwr, None, subscriptionSyncTries, stashedEvents.tail, subscriber) orElse stopStartSubscription)
+        } onBackpressureBuffer(maxStashedEventsCount) subscribe(reliableEventsObserver(cwr))
+        log.debug(s"Unreliable subscription will be started for ${cwr.context} after unstashing of all events")
+        unstash(stashedEvents.headOption)
+      }
+
+    case RestartSubscription ⇒
+      continueSubscription(cwr, subscriptionSyncTries + 1)
   }
 
-  def subscribedReliable(cwr: ContextWithRequest, lastRevisionId: Long, subscriptionSyncTries: Int): Receive = {
+  def waitForUnstash(cwr: ContextWithRequest,
+                     lastRevision: Option[Long],
+                     subscriptionSyncTries: Int,
+                     stashedEvents: Vector[StashedEvent],
+                     subscriber: Observer[DynamicRequest]): Receive = {
     case event: DynamicRequest ⇒
-      processReliableEvent(cwr, event, lastRevisionId, subscriptionSyncTries)
+      context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries, stashedEvents :+ StashedEvent(event), subscriber))
+
+    case StashedEvent(event) ⇒
+      lastRevision match {
+        case Some(revision) ⇒
+          processReliableEvent(cwr, event, revision, subscriptionSyncTries, subscriber)
+        case None ⇒
+          processUnreliableEvent(cwr, event)
+      }
+      unstash(stashedEvents.headOption)
+
+    case UnstashingCompleted ⇒
+      log.debug(s"Reliable subscription started for ${cwr.context} with revision $lastRevision")
+      if (stashedEvents.isEmpty) {
+        lastRevision match {
+          case Some(revision) ⇒
+            context.become(subscribedReliable(cwr, revision, subscriptionSyncTries, subscriber) orElse stopStartSubscription)
+          case None ⇒
+            context.become(subscribedUnreliable(cwr) orElse stopStartSubscription)
+        }
+      } else {
+        unstash(stashedEvents.headOption)
+      }
+
+    case RestartSubscription ⇒
+      continueSubscription(cwr, subscriptionSyncTries + 1)
+  }
+
+  def subscribedReliable(cwr: ContextWithRequest, lastRevisionId: Long, subscriptionSyncTries: Int, subscriber: Observer[DynamicRequest]): Receive = {
+    case event: DynamicRequest ⇒
+      processReliableEvent(cwr, event, lastRevisionId, subscriptionSyncTries, subscriber)
 
     case RestartSubscription ⇒
       continueSubscription(cwr, subscriptionSyncTries + 1)
@@ -104,7 +158,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def continueSubscription(cwr: ContextWithRequest,
                            subscriptionSyncTries: Int): Unit = {
 
-    context.become(subscribing(cwr, subscriptionSyncTries) orElse stopStartSubscription)
+    context.become(subscribing(cwr, subscriptionSyncTries, Vector.empty) orElse stopStartSubscription)
 
     implicit val ec = executionContext
 
@@ -113,6 +167,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       val correlationId = cwrRaml.request.headers.getOrElse(Header.CORRELATION_ID,
         cwrRaml.request.headers(Header.MESSAGE_ID)).head
       val subscriptionUri = getSubscriptionUri(cwrRaml.request)
+      subscriptionManager.off(self)
       subscriptionManager.subscribe(self, subscriptionUri, correlationId)
       implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
       hyperbus <~ cwrRaml.request.copy(method = Method.GET).toDynamicRequest
@@ -123,7 +178,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     } pipeTo self
   }
 
-  def processEventWhileSubscribing(cwr: ContextWithRequest, event: DynamicRequest): Unit = {
+  def processEventWhileSubscribing(cwr: ContextWithRequest, event: DynamicRequest, subscriptionSyncTries: Int, stashedEvents: Vector[StashedEvent]): Unit = {
     if (log.isTraceEnabled) {
       log.trace(s"Processing event while subscribing $event for ${cwr.context.pathAndQuery}")
     }
@@ -132,7 +187,10 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       // reliable feed
       case Some(_) ⇒
         log.debug(s"event $event is stashed because resource state is not fetched yet")
-        stash()
+        context.become(subscribing(cwr, subscriptionSyncTries, stashedEvents :+ StashedEvent(event)))
+        if (stashedEvents.length > maxStashedEventsCount) {
+          self ! RestartSubscription
+        }
 
       // unreliable feed
       case _ ⇒
@@ -195,7 +253,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def processReliableEvent(cwr: ContextWithRequest,
                            event: DynamicRequest,
                            lastRevisionId: Long,
-                           subscriptionSyncTries: Int): Unit = {
+                           subscriptionSyncTries: Int,
+                           subscriber: Observer[DynamicRequest]): Unit = {
     event.headers.get(Header.REVISION) match {
       case Some(revision :: _) ⇒
         val revisionId = revision.toLong
@@ -204,21 +263,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         }
 
         if (revisionId == lastRevisionId + 1) {
-          context.become(subscribedReliable(cwr, lastRevisionId + 1, 0) orElse stopStartSubscription)
-
-          implicit val ec = executionContext
-
-          FutureUtils.chain(FacadeRequest(event), cwr.stages.map { _ ⇒
-            ramlFilterChain.filterEvent(cwr, _ : FacadeRequest)
-          }) flatMap { e ⇒
-            afterFilterChain.filterEvent(cwr, e) map { filteredRequest ⇒
-              websocketWorker ! filteredRequest
-            }
-          } recover handleFilterExceptions(cwr) { response ⇒
-            if (log.isDebugEnabled) {
-              log.debug(s"Event is discarded for ${cwr.context} with filter response $response")
-            }
-          }
+          subscriber.onNext(event)
+          context.become(subscribedReliable(cwr, lastRevisionId + 1, 0, subscriber) orElse stopStartSubscription)
         }
         else
         if (revisionId > lastRevisionId + 1) {
@@ -248,12 +294,71 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }.toMap
     Uri(uri.pattern, newArgs)
   }
+
+  def unstash(event: Option[StashedEvent]): Unit = {
+    event match {
+      case Some(event) ⇒
+        self ! event
+      case None ⇒
+        self ! UnstashingCompleted
+    }
+  }
+
+  def reliableEventsObserver(cwr: ContextWithRequest): Observer[DynamicRequest] = {
+    implicit val ec = executionContext
+    new Observer[DynamicRequest] {
+      val currentFilteringFuture = new AtomicReference[Option[Future[Unit]]](None)
+      override def onNext(event: DynamicRequest): Unit = {
+        val filteringFuture = FutureUtils.chain(FacadeRequest(event), cwr.stages.map { _ ⇒
+          ramlFilterChain.filterEvent(cwr, _: FacadeRequest)
+        }) flatMap { e ⇒
+          afterFilterChain.filterEvent(cwr, e)
+        }
+        if (currentFilteringFuture.get().isEmpty) {
+           val newCurrentFilteringFuture = filteringFuture map { filteredRequest ⇒
+            websocketWorker ! filteredRequest
+          } recover handleFilterExceptions(cwr) { response ⇒
+             if (log.isDebugEnabled) {
+               log.debug(s"Event is discarded for ${cwr.context} with filter response $response")
+             }
+           }
+          currentFilteringFuture.set(Some(newCurrentFilteringFuture))
+        } else {
+          val newCurrentFilteringFuture = currentFilteringFuture.get().get andThen {
+            case _ ⇒
+              filteringFuture map { filteredRequest ⇒
+                websocketWorker ! filteredRequest
+              } recover handleFilterExceptions(cwr) { response ⇒
+                if (log.isDebugEnabled) {
+                  log.debug(s"Event is discarded for ${cwr.context} with filter response $response")
+                }
+              }
+          }
+          currentFilteringFuture.set(Some(newCurrentFilteringFuture))
+        }
+      }
+
+      override def onError(error: Throwable): Unit = {
+        error match {
+          case _ : BufferOverflowException ⇒
+            log.error(s"Backpressure overflow. Restarting...")
+            self ! RestartSubscription
+
+          case other ⇒
+            log.error(s"Error has occured on event processing. Restarting... $other")
+            self ! RestartSubscription
+        }
+      }
+    }
+  }
 }
 
 case class BecomeReliable(lastRevision: Long)
 case object BecomeUnreliable
 case object RestartSubscription
 case class BeforeFilterComplete(cwr: ContextWithRequest)
+case class StashedEvent(event: DynamicRequest)
+case object UnstashingCompleted
 
 object FeedSubscriptionActor {
   def props(websocketWorker: ActorRef,
