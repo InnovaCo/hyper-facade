@@ -47,6 +47,7 @@ class EmbedEventFilter(relName: String)(implicit inj: Injector) extends EventFil
 
 object EmbedFilter {
   private val log = LoggerFactory.getLogger(getClass)
+
   def extractLinks(relName: String, body: Value): Seq[Uri] = {
     body match {
       case Obj(fields) ⇒
@@ -70,6 +71,13 @@ object EmbedFilter {
     }
   }
 
+  def embed(uri: Uri, body: Value, cwr: ContextWithRequest, hyperbus: Hyperbus)(implicit ec: ExecutionContext): Future[Value] = {
+    val request = FacadeRequest(uri, Method.GET, cwr.request.headers, cwr.request.body).toDynamicRequest
+    hyperbus <~ request recover {
+      handleHyperbusExceptions(cwr, uri)
+    } map( response ⇒ response.body.content + body)
+  }
+
   private def formattedUri(linkValue: Value, body: Value): Uri = {
     val href = linkValue.href.asString
     if (linkValue.templated.fromValue[Option[Boolean]].contains(true)) { // templated link, have to format
@@ -81,13 +89,6 @@ object EmbedFilter {
     } else {
       Uri(href)
     }
-  }
-
-  def embed(uri: Uri, body: Value, cwr: ContextWithRequest, hyperbus: Hyperbus)(implicit ec: ExecutionContext): Future[Value] = {
-    val request = FacadeRequest(uri, Method.GET, cwr.request.headers, Null).toDynamicRequest
-    hyperbus <~ request recover {
-      handleHyperbusExceptions(cwr, uri)
-    } map( response ⇒ response.body.content + body)
   }
 
   private def handleHyperbusExceptions(cwr: ContextWithRequest, uri: Uri) : PartialFunction[Throwable, Response[DynamicBody]] = {
@@ -105,14 +106,10 @@ object EmbedFilter {
       model.GatewayTimeout(ErrorBody("service-timeout", Some(s"Timeout while serving '${cwr.context.pathAndQuery}'"), errorId = errorId))
 
     case NonFatal(nonFatal) ⇒
-      handleInternalError(nonFatal, cwr)
-  }
-
-  private def handleInternalError(exception: Throwable, cwr: ContextWithRequest): Response[ErrorBody] = {
-    implicit val mcf = cwr.context.clientMessagingContext()
-    val errorId = IdGenerator.create()
-    log.error(s"Exception #$errorId while handling ${cwr.context}", exception)
-    model.InternalServerError(ErrorBody("internal-server-error", Some(exception.getClass.getName + ": " + exception.getMessage), errorId = errorId))
+      implicit val mcf = cwr.context.clientMessagingContext()
+      val errorId = IdGenerator.create()
+      log.error(s"Exception #$errorId while handling ${cwr.context}", nonFatal)
+      model.InternalServerError(ErrorBody("internal-server-error", Some(nonFatal.getClass.getName + ": " + nonFatal.getMessage), errorId = errorId))
   }
 }
 
