@@ -128,6 +128,7 @@ class WebsocketTest extends IntegrationTestBase("raml-configs/integration/websoc
       client ! subscriptionRequest
       Thread.sleep(3000)
       testService.publish(eventRev2)
+      testService.publish(eventRev3)
 
       val resourceState = q.next().futureValue
       resourceState shouldBe """{"status":200,"headers":{"Hyperbus-Revision":["1"],"Hyperbus-Message-Id":["messageId"],"Hyperbus-Correlation-Id":["correlationId"]},"body":{"content":"fullResource"}}"""
@@ -141,8 +142,6 @@ class WebsocketTest extends IntegrationTestBase("raml-configs/integration/websoc
         ObjV("content" → Text("haha"))
       )
       receivedEvent1 shouldBe queuedEvent.toJson
-
-      testService.publish(eventRev3)
 
       val receivedEvent2 = q.next().futureValue
       val directEvent2 = FacadeRequest(Uri("/v3/resource/reliable-feed"), Method.FEED_POST,
