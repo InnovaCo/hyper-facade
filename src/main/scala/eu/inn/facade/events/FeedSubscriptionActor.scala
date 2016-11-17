@@ -89,11 +89,10 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     case StashedEvent(event) ⇒
       lastRevision match {
         case Some(revision) ⇒
-          processReliableEvent(cwr, event, revision, subscriptionSyncTries, subscriber)
+          processReliableEventWhileUnstashing(cwr, event, revision, subscriptionSyncTries, stashedEvents, subscriber)
         case None ⇒
           processUnreliableEvent(cwr, event)
       }
-      unstash(stashedEvents.headOption)
 
     case UnstashingCompleted ⇒
       log.debug(s"Reliable subscription started for ${cwr.context} with revision $lastRevision")
@@ -105,7 +104,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
             context.become(subscribedUnreliable(cwr) orElse stopStartSubscription)
         }
       } else {
-        unstash(stashedEvents.headOption)
+        self ! stashedEvents.head
+        context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries, stashedEvents.tail, subscriber) orElse stopStartSubscription)
       }
 
     case RestartSubscription ⇒
@@ -114,7 +114,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
   def subscribedReliable(cwr: ContextWithRequest, lastRevisionId: Long, subscriptionSyncTries: Int, subscriber: Observer[DynamicRequest]): Receive = {
     case event: DynamicRequest ⇒
-      processReliableEvent(cwr, event, lastRevisionId, subscriptionSyncTries, subscriber)
+      processReliableEvent(cwr, event, lastRevisionId, subscriber)
 
     case RestartSubscription ⇒
       continueSubscription(cwr, subscriptionSyncTries + 1)
@@ -163,6 +163,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     implicit val ec = executionContext
 
     val trackRequestTime = metrics.timer(MetricKeys.REQUEST_PROCESS_TIME).time()
+    var start = 0l
     processRequestWithRaml(cwr) flatMap { cwrRaml ⇒
       val correlationId = cwrRaml.request.headers.getOrElse(Header.CORRELATION_ID,
         cwrRaml.request.headers(Header.MESSAGE_ID)).head
@@ -170,10 +171,13 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       subscriptionManager.off(self)
       subscriptionManager.subscribe(self, subscriptionUri, correlationId)
       implicit val mvx = MessagingContextFactory.withCorrelationId(correlationId + self.path.toString) // todo: check what's here
+      start = System.currentTimeMillis()
       hyperbus <~ cwrRaml.request.copy(method = Method.GET).toDynamicRequest
     } recover {
       handleHyperbusExceptions(cwr)
     } andThen { case _ ⇒
+      val duration = System.currentTimeMillis() - start
+      println(s"getting state - $duration")
       trackRequestTime.stop
     } pipeTo self
   }
@@ -250,10 +254,46 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
   }
 
+  def processReliableEventWhileUnstashing(cwr: ContextWithRequest,
+                                          event: DynamicRequest,
+                                          lastRevisionId: Long,
+                                          subscriptionSyncTries: Int,
+                                          stashedEvents: Vector[StashedEvent],
+                                          subscriber: Observer[DynamicRequest]): Unit = {
+    event.headers.get(Header.REVISION) match {
+      case Some(revision :: _) ⇒
+        val revisionId = revision.toLong
+        if (log.isTraceEnabled) {
+          log.trace(s"Processing reliable event #$revisionId $event for ${cwr.context.pathAndQuery}")
+        }
+
+        if (revisionId == lastRevisionId + 1) {
+          if (stashedEvents.isEmpty) {
+            println(s"processed event $event. Unstashing completed")
+            self ! UnstashingCompleted
+          } else {
+            println(s"processed event $event. stashed events ${stashedEvents.length} remaining ")
+            context.become(waitForUnstash(cwr, Some(revisionId), subscriptionSyncTries, stashedEvents.tail, subscriber) orElse stopStartSubscription)
+            self ! stashedEvents.head
+          }
+          subscriber.onNext(event)
+        }
+        else
+        if (revisionId > lastRevisionId + 1) {
+          // we lost some events, start from the beginning
+          self ! RestartSubscription
+          log.info(s"Subscription on ${cwr.context.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting...")
+        }
+      // if revisionId <= lastRevisionId -- just ignore this event
+
+      case _ ⇒
+        log.error(s"Received event: $event without revisionId for reliable feed: ${cwr.context}")
+    }
+  }
+
   def processReliableEvent(cwr: ContextWithRequest,
                            event: DynamicRequest,
                            lastRevisionId: Long,
-                           subscriptionSyncTries: Int,
                            subscriber: Observer[DynamicRequest]): Unit = {
     event.headers.get(Header.REVISION) match {
       case Some(revision :: _) ⇒
@@ -309,14 +349,17 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     new Observer[DynamicRequest] {
       val currentFilteringFuture = new AtomicReference[Option[Future[Unit]]](None)
       override def onNext(event: DynamicRequest): Unit = {
+        val start = System.currentTimeMillis()
         val filteringFuture = FutureUtils.chain(FacadeRequest(event), cwr.stages.map { _ ⇒
           ramlFilterChain.filterEvent(cwr, _: FacadeRequest)
         }) flatMap { e ⇒
           afterFilterChain.filterEvent(cwr, e)
         }
         if (currentFilteringFuture.get().isEmpty) {
-           val newCurrentFilteringFuture = filteringFuture map { filteredRequest ⇒
+          val newCurrentFilteringFuture = filteringFuture map { filteredRequest ⇒
             websocketWorker ! filteredRequest
+            val duration = System.currentTimeMillis() - start
+            println(s"event duration - $duration")
           } recover handleFilterExceptions(cwr) { response ⇒
              if (log.isDebugEnabled) {
                log.debug(s"Event is discarded for ${cwr.context} with filter response $response")
@@ -328,6 +371,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
             case _ ⇒
               filteringFuture map { filteredRequest ⇒
                 websocketWorker ! filteredRequest
+                val duration = System.currentTimeMillis() - start
+                println(s"event duration - $duration")
               } recover handleFilterExceptions(cwr) { response ⇒
                 if (log.isDebugEnabled) {
                   log.debug(s"Event is discarded for ${cwr.context} with filter response $response")
