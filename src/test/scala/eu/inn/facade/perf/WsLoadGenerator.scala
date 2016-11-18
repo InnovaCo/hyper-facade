@@ -65,12 +65,9 @@ object WsLoadGenerator extends App {
     for ( i ← 1 to clientsCount) {
       val newClientActorId = maxPreviousActorId + i
       clientsAcc += actorSystem.actorOf(Props(new WsTestClient(connect, onUpgradeGetReq) {
-        var acN = i
         override def onUpgrade() = {
           connectedClients.incrementAndGet()
         }
-
-        override def onMessage(frame: TextFrame): Unit = println(acN + "  --  " + frame.payload.utf8String)
       }), "WsLoader-" + newClientActorId)
     }
     val clients = clientsAcc.result()
@@ -89,6 +86,7 @@ object WsLoadGenerator extends App {
           FacadeHeaders.CLIENT_CORRELATION_ID → Seq(client.path.name)),
         Obj()
       )
+      Thread.sleep(5)
     }
   }
 
