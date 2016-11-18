@@ -81,7 +81,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
                      stashedEvents: Vector[StashedEvent],
                      subscriber: Observer[DynamicRequest]): Receive = {
     case event: DynamicRequest ⇒
-      context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries, stashedEvents :+ StashedEvent(event), subscriber))
+      if (stashedEvents.length > maxStashedEventsCount) {
+        log.info(s"Stashed events buffer overflow while unstashing, seems that producer is faster than consumer. ${self.path.name} is resubscribing on ${cwr.context.pathAndQuery}...")
+        continueSubscription(cwr, subscriptionSyncTries.getOrElse(1) + 1)
+      } else {
+        context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries, stashedEvents :+ StashedEvent(event), subscriber))
+      }
 
     case StashedEvent(event) ⇒
       lastRevision match {
@@ -163,18 +168,11 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
       log.trace(s"Processing event while subscribing $event for ${cwr.context.pathAndQuery}")
     }
 
-    event.headers.get(Header.REVISION) match {
-      // reliable feed
-      case Some(_) ⇒
-        log.debug(s"event $event is stashed because resource state is not fetched yet")
-        context.become(subscribing(cwr, subscriptionSyncTries, stashedEvents :+ StashedEvent(event)))
-        if (stashedEvents.length > maxStashedEventsCount) {
-          continueSubscription(cwr, subscriptionSyncTries + 1)
-        }
-
-      // unreliable feed
-      case _ ⇒
-        processUnreliableEvent(cwr, event)
+    log.debug(s"event $event is stashed because resource state is not fetched yet")
+    context.become(subscribing(cwr, subscriptionSyncTries, stashedEvents :+ StashedEvent(event)))
+    if (stashedEvents.length > maxStashedEventsCount) {
+      log.info(s"Stashed events buffer overflow while fetching resource state. ${self.path.name} is resubscribing on ${cwr.context.pathAndQuery}...")
+      continueSubscription(cwr, subscriptionSyncTries + 1)
     }
   }
 
@@ -220,6 +218,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     }
     if (stashedEvents.isEmpty) {
       context.become(subscribedUnreliable(cwr))
+      log.debug(s"Unstashing completed for ${self.path.name}")
     } else {
       context.become(waitForUnstash(cwr, None, None, stashedEvents.tail, subscriber) orElse stopStartSubscription)
       self ! stashedEvents.head
@@ -263,19 +262,26 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         if (revisionId == lastRevisionId + 1) {
           if (stashedEvents.isEmpty) {
             context.become(subscribedReliable(cwr, revisionId, subscriptionSyncTries, subscriber) orElse stopStartSubscription)
+            log.debug(s"Unstashing completed for ${self.path.name}")
           } else {
             context.become(waitForUnstash(cwr, Some(revisionId), Some(subscriptionSyncTries), stashedEvents.tail, subscriber) orElse stopStartSubscription)
             self ! stashedEvents.head
           }
           subscriber.onNext(event)
-        }
-        else
-        if (revisionId > lastRevisionId + 1) {
+        } else if (revisionId > lastRevisionId + 1) {
           // we lost some events, start from the beginning
-          log.info(s"Subscription on ${cwr.context.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting...")
+          log.info(s"Subscription on ${cwr.context.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting subscription for ${self.path.name}...")
           continueSubscription(cwr, subscriptionSyncTries + 1)
+        } else {
+          // if revisionId <= lastRevisionId -- just ignore this event and process next one
+          if (stashedEvents.isEmpty) {
+            context.become(subscribedReliable(cwr, lastRevisionId, subscriptionSyncTries, subscriber) orElse stopStartSubscription)
+            log.debug(s"Unstashing completed for ${self.path.name}")
+          } else {
+            context.become(waitForUnstash(cwr, Some(lastRevisionId), Some(subscriptionSyncTries), stashedEvents.tail, subscriber) orElse stopStartSubscription)
+            self ! stashedEvents.head
+          }
         }
-      // if revisionId <= lastRevisionId -- just ignore this event
 
       case _ ⇒
         log.error(s"Received event: $event without revisionId for reliable feed: ${cwr.context}")
@@ -301,7 +307,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
         else
         if (revisionId > lastRevisionId + 1) {
           // we lost some events, start from the beginning
-          log.info(s"Subscription on ${cwr.context.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting ${self.path.name}...")
+          log.info(s"Subscription on ${cwr.context.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting subscription for ${self.path.name}...")
           continueSubscription(cwr, subscriptionSyncTries + 1)
         }
         // if revisionId <= lastRevisionId -- just ignore this event

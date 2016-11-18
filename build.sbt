@@ -61,12 +61,12 @@ libraryDependencies ++= Seq(
   "com.wandoulabs.akka"  %% "spray-websocket"             % "0.1.4",
   "eu.inn"               %% "binders-core"                % "0.12.93",
   "eu.inn"               %% "expression-parser"           % "0.1.29",
-  "eu.inn"               %% "auth-service-model"          % "0.1.7",
-  "eu.inn"               %% "hyperbus"                    % "0.1.83",
-  "eu.inn"               %% "hyperbus-model"              % "0.1.83",
-  "eu.inn"               %% "hyperbus-transport"          % "0.1.83",
-  "eu.inn"               %% "hyperbus-t-kafka"            % "0.1.83",
-  "eu.inn"               %% "hyperbus-t-distributed-akka" % "0.1.83",
+  "eu.inn"               %% "auth-service-model"          % "0.1.8",
+  "eu.inn"               %% "hyperbus"                    % "0.1.87",
+  "eu.inn"               %% "hyperbus-model"              % "0.1.87",
+  "eu.inn"               %% "hyperbus-transport"          % "0.1.87",
+  "eu.inn"               %% "hyperbus-t-kafka"            % "0.1.87",
+  "eu.inn"               %% "hyperbus-t-distributed-akka" % "0.1.87",
   "eu.inn"               % "raml-parser-2"                % "1.0.1.35",
   "eu.inn"               %% "service-control"             % "0.2.17",
   "eu.inn"               %% "service-config"              % "0.1.6",
@@ -78,7 +78,7 @@ libraryDependencies ++= Seq(
   "io.spray"             %% "spray-client"                % "1.3.3"     % "test",
   "org.scaldi"           %% "scaldi"                      % "0.5.7",
   "org.scalatest"        %% "scalatest"                   % "2.2.6"     % "test",
-  "eu.inn"               %% "simple-auth-service"         % "0.1.13"    % "test",
+  "eu.inn"               %% "simple-auth-service"         % "0.1.14"    % "test",
   "org.pegdown"          % "pegdown"                      % "1.4.2"     % "test"
 )
 

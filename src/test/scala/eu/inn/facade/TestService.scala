@@ -13,6 +13,7 @@ import eu.inn.hyperbus.model.annotations.{body, request}
 import eu.inn.hyperbus.transport.api._
 import eu.inn.hyperbus.transport.api.matchers.{RequestMatcher, Specific}
 import eu.inn.hyperbus.transport.api.uri.Uri
+import org.slf4j.LoggerFactory
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -117,6 +118,7 @@ case class PerfTestEventBody(content: String, secretField: String) extends Body
 case class PerfTestFeedEvent(body: PerfTestEventBody, headers: Map[String, Seq[String]]) extends Request[PerfTestEventBody]
 
 object TestService4WebsocketPerfWithFilters extends App {
+  val log = LoggerFactory.getLogger(getClass)
   val RESOURCE_URI = Uri("/perf-test")  // this uri should match value in perf-test.raml as rewritten uri for "/perf-test-with-filters"
   val config = ConfigLoader()
   val hyperbus = new HyperbusFactory(config).hyperbus
@@ -139,7 +141,7 @@ object TestService4WebsocketPerfWithFilters extends App {
       val startTime = System.currentTimeMillis()
       for (i ← 1 to eventsPerSecond) {
         revision += 1
-        println(revision)
+        if (revision == 500) revision = 502
         testService.publish(PerfTestFeedEvent(PerfTestEventBody("perfEvent", "secret"), Headers.plain(Map("revision" → Seq(s"$revision"), "messageId" → Seq("m")))))
       }
       val remainingTime = 1000 - (startTime - System.currentTimeMillis())
@@ -148,7 +150,6 @@ object TestService4WebsocketPerfWithFilters extends App {
   }
 
   def state(): Response[Body] = {
-    println(s"here $revision")
     Ok(DynamicBody(Obj(Map("content" → Text("fullResource")))), Headers.plain(Map("revision" → Seq(s"$revision"), "messageId" → Seq("m"))))
   }
 }
