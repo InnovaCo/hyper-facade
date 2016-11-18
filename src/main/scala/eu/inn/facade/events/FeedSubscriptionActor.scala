@@ -31,6 +31,9 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   val maxSubscriptionTries = config.getInt(FacadeConfigPaths.MAX_SUBSCRIPTION_TRIES)
   val maxStashedEventsCount = config.getInt(FacadeConfigPaths.FEED_MAX_STASHED_EVENTS_COUNT)
 
+  val stashedBufferOverflow = metrics.meter(MetricKeys.WS_STASHED_EVENTS_BUFFER_OVERFLOW_COUNT)
+  val stashedEventsCounter = metrics.counter(MetricKeys.WS_STASHED_EVENTS_COUNT)
+
   val log = LoggerFactory.getLogger(getClass)
   val executionContext = inject[ExecutionContext] // don't make this implicit
 
@@ -60,6 +63,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           context.become(waitForUnstash(cwr, Some(lastRevision), Some(subscriptionSyncTries), stashedEvents.tail, subscriber) orElse stopStartSubscription)
           log.debug(s"Reliable subscription will be started for ${cwr.context} with revision $lastRevision after unstashing of all events")
           self ! stashedEvents.head
+          stashedEventsCounter.dec()
         }
       } onBackpressureBuffer(maxStashedEventsCount) subscribe(reliableEventsObserver(cwr))
 
@@ -71,6 +75,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
           context.become(waitForUnstash(cwr, None, None, stashedEvents.tail, subscriber) orElse stopStartSubscription)
           log.debug(s"Unreliable subscription will be started for ${cwr.context} after unstashing of all events")
           self ! stashedEvents.head
+          stashedEventsCounter.dec()
         }
       } onBackpressureBuffer(maxStashedEventsCount) subscribe(reliableEventsObserver(cwr))
   }
@@ -83,9 +88,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     case event: DynamicRequest ⇒
       if (stashedEvents.length > maxStashedEventsCount) {
         log.info(s"Stashed events buffer overflow while unstashing, seems that producer is faster than consumer. ${self.path.name} is resubscribing on ${cwr.context.pathAndQuery}...")
+        stashedBufferOverflow.mark()
+        stashedEventsCounter.dec(stashedEvents.length)
         continueSubscription(cwr, subscriptionSyncTries.getOrElse(1) + 1)
       } else {
         context.become(waitForUnstash(cwr, lastRevision, subscriptionSyncTries, stashedEvents :+ StashedEvent(event), subscriber))
+        stashedEventsCounter.inc()
       }
 
     case StashedEvent(event) ⇒
@@ -170,8 +178,12 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
 
     log.debug(s"event $event is stashed because resource state is not fetched yet")
     context.become(subscribing(cwr, subscriptionSyncTries, stashedEvents :+ StashedEvent(event)))
+    stashedEventsCounter.inc()
+
     if (stashedEvents.length > maxStashedEventsCount) {
       log.info(s"Stashed events buffer overflow while fetching resource state. ${self.path.name} is resubscribing on ${cwr.context.pathAndQuery}...")
+      stashedBufferOverflow.mark()
+      stashedEventsCounter.dec(stashedEvents.length)
       continueSubscription(cwr, subscriptionSyncTries + 1)
     }
   }
@@ -222,6 +234,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
     } else {
       context.become(waitForUnstash(cwr, None, None, stashedEvents.tail, subscriber) orElse stopStartSubscription)
       self ! stashedEvents.head
+      stashedEventsCounter.dec()
     }
     subscriber.onNext(event)
   }
@@ -265,21 +278,25 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
             log.debug(s"Unstashing completed for ${self.path.name}")
           } else {
             context.become(waitForUnstash(cwr, Some(revisionId), Some(subscriptionSyncTries), stashedEvents.tail, subscriber) orElse stopStartSubscription)
+            stashedEventsCounter.dec()
             self ! stashedEvents.head
           }
           subscriber.onNext(event)
-        } else if (revisionId > lastRevisionId + 1) {
+        }
+        else if (revisionId > lastRevisionId + 1) {
           // we lost some events, start from the beginning
           log.info(s"Subscription on ${cwr.context.pathAndQuery} lost events from $lastRevisionId to $revisionId. Restarting subscription for ${self.path.name}...")
+          stashedEventsCounter.dec(stashedEvents.length)
           continueSubscription(cwr, subscriptionSyncTries + 1)
-        } else {
-          // if revisionId <= lastRevisionId -- just ignore this event and process next one
+        }
+        else {  // if revisionId <= lastRevisionId -- just ignore this event and process next one
           if (stashedEvents.isEmpty) {
             context.become(subscribedReliable(cwr, lastRevisionId, subscriptionSyncTries, subscriber) orElse stopStartSubscription)
             log.debug(s"Unstashing completed for ${self.path.name}")
           } else {
             context.become(waitForUnstash(cwr, Some(lastRevisionId), Some(subscriptionSyncTries), stashedEvents.tail, subscriber) orElse stopStartSubscription)
             self ! stashedEvents.head
+            stashedEventsCounter.dec()
           }
         }
 
