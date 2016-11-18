@@ -193,7 +193,7 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
   def processResourceState(cwr: ContextWithRequest, resourceState: Response[DynamicBody], subscriptionSyncTries: Int) = {
     val facadeResponse = FacadeResponse(resourceState)
     if (log.isDebugEnabled) {
-      log.trace(s"Processing resource state $resourceState for ${cwr.context.pathAndQuery}")
+      log.debug(s"Processing resource state $resourceState for ${cwr.context.pathAndQuery}")
     }
 
     implicit val ec = executionContext
@@ -227,8 +227,8 @@ class FeedSubscriptionActor(websocketWorker: ActorRef,
                                             event: DynamicRequest,
                                             stashedEvents: Vector[StashedEvent],
                                             subscriber: Observer[DynamicRequest]): Unit = {
-    if (log.isTraceEnabled()) {
-      log.trace(s"Processing stashed unreliable event $event for ${cwr.context.pathAndQuery}")
+    if (log.isDebugEnabled) {
+      log.debug(s"Processing stashed unreliable event $event for ${cwr.context.pathAndQuery}")
     }
     if (stashedEvents.isEmpty) {
       context.become(subscribedUnreliable(cwr))
