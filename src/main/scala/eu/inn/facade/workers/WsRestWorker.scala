@@ -42,7 +42,7 @@ class WsRestWorker(val serverConnection: ActorRef,
   var isConnectionTerminated = false
   var remoteAddress = clientAddress
   var httpRequest: Option[HttpRequest] = None
-  val wsPingInterval = inject[Config].getFiniteDuration(FacadeConfigPaths.WS_PING_INTERVAL)
+  val wsPingInterval = inject[Config].getFiniteDuration(FacadeConfigPaths.REQUEST_TIMEOUT)
 
   context.system.scheduler.schedule(wsPingInterval, wsPingInterval, self, CheckConnection)
 
