@@ -1,7 +1,10 @@
 package eu.inn.facade.workers
 
 import akka.actor._
+import com.typesafe.config.Config
 import eu.inn.binders.value.Text
+import eu.inn.config.ConfigExtenders._
+import eu.inn.facade.FacadeConfigPaths
 import eu.inn.facade.events.{FeedSubscriptionActor, SubscriptionsManager}
 import eu.inn.facade.metrics.MetricKeys
 import eu.inn.facade.model._
@@ -15,6 +18,8 @@ import spray.can.{Http, websocket}
 import spray.http.HttpRequest
 import spray.routing.HttpServiceActor
 
+import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 import scala.util.control.NonFatal
 
 class WsRestWorker(val serverConnection: ActorRef,
@@ -28,6 +33,8 @@ class WsRestWorker(val serverConnection: ActorRef,
   with ActorLogging
   with Injectable {
 
+  implicit val ec = inject[ExecutionContext]
+
   val metrics = inject[Metrics]
   val trackWsTimeToLive = metrics.timer(MetricKeys.WS_LIFE_TIME).time()
   val trackWsMessages = metrics.meter(MetricKeys.WS_MESSAGE_COUNT)
@@ -35,6 +42,9 @@ class WsRestWorker(val serverConnection: ActorRef,
   var isConnectionTerminated = false
   var remoteAddress = clientAddress
   var httpRequest: Option[HttpRequest] = None
+  val wsPingInterval = inject[Config].getFiniteDuration(FacadeConfigPaths.WS_PING_INTERVAL)
+
+  context.system.scheduler.schedule(wsPingInterval, wsPingInterval, self, CheckConnection)
 
   override def preStart(): Unit = {
     super.preStart()
@@ -50,9 +60,9 @@ class WsRestWorker(val serverConnection: ActorRef,
     trackWsTimeToLive.stop()
   }
   // order is really important, watchConnection should be before httpRequests, otherwise there is a memory leak
-  override def receive = watchConnection orElse businessLogic orElse httpRequests
+  override def receive = watchConnection(System.currentTimeMillis) orElse businessLogic orElse httpRequests
 
-  def watchConnection: Receive = {
+  def watchConnection(connectionCheckedAt: Long): Receive = {
     case handshakeRequest@websocket.HandshakeRequest(state) ⇒
       state match {
         case wsContext: websocket.HandshakeContext ⇒
@@ -79,6 +89,11 @@ class WsRestWorker(val serverConnection: ActorRef,
 
     case UHttp.Upgraded ⇒
       self ! websocket.UpgradedToWebSocket
+
+    case CheckConnection ⇒
+      if (System.currentTimeMillis - connectionCheckedAt > wsPingInterval.toMillis)
+        log.warning(s"Websocket worker ${self.path.name} will be stopped because client seems to be disconnected")
+        context.stop(self)
   }
 
   def businessLogic: Receive = {
@@ -106,6 +121,7 @@ class WsRestWorker(val serverConnection: ActorRef,
               throw new RuntimeException(s"httpRequest is empty while processing frame.")
           }
         }
+        context.become(watchConnection(System.currentTimeMillis) orElse businessLogic orElse httpRequests)
       }
       catch {
         case NonFatal(t) ⇒
@@ -180,3 +196,5 @@ object WsRestWorker {
     subscriptionManager,
     clientAddress))
 }
+
+case object CheckConnection
